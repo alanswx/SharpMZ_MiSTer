@@ -99,3 +99,6 @@ ${ROMTOOL} --command=CGROM                                  \
            --20_cgrom=${ROMDIR}/MZFONT.rom                  \
            --binout=${ROMDIR}/combined_cgrom.rom            \
            --mifout=${MIFDIR}/combined_cgrom.mif
+
+# MZ-800 ROM and CG (not in romtool's layout).
+python3 $(dirname $0)/add_mz800_rom.py ${ROMDIR} ${MIFDIR}

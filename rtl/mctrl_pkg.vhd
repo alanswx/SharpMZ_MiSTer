@@ -15,7 +15,7 @@ package mctrl_pkg is
 
     -- Config Bus
     --
-    subtype  CONFIG_WIDTH is integer range 70 downto 0;
+    subtype  CONFIG_WIDTH is integer range 71 downto 0;
 
 
     -- Mode signals indicating type of machine we are emulating.
@@ -73,6 +73,9 @@ package mctrl_pkg is
     subtype  PERSPEED        is integer range 66 downto 65;              -- Active Peripheral Speed.
     subtype  RTCSPEED        is integer range 68 downto 67;              -- Active RTC Speed.
     subtype  SNDSPEED        is integer range 70 downto 69;              -- Active Sound Speed.
+
+    -- MZ-800 rear mode switch, read by the IPL through IN CE bit 1.
+    constant MZ800_MODE      : integer := 71;
 
     -- CMT Bus
     --

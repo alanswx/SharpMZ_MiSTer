@@ -62,7 +62,7 @@ entity mctrl is
         CFG_MODEL            : in  std_logic_vector(7 downto 0);         -- 2:0 machine model.
         CFG_DISPLAY          : in  std_logic_vector(7 downto 0);         -- 2:0 display type, 4 VRAM off, 5 GRAM off, 6 VRAM wait, 7 PCG RAM.
         CFG_DISPLAY2         : in  std_logic_vector(7 downto 0);         -- 1:0 video timing, 7:3 GRAM I/O address.
-        CFG_DISPLAY3         : in  std_logic_vector(7 downto 0);         -- 0 menu overlay, 1 status overlay.
+        CFG_DISPLAY3         : in  std_logic_vector(7 downto 0);         -- 0 menu overlay, 1 status overlay, 2 MZ-800 mode switch.
         CFG_CPU              : in  std_logic_vector(7 downto 0);         -- 2:0 turbo, 7 boot reset.
         CFG_AUDIO            : in  std_logic_vector(7 downto 0);         -- 0 audio source (sound / tape).
         CFG_CMT              : in  std_logic_vector(7 downto 0);         -- 2:0 fast tape, 4:3 buttons, 5/6 Sharp ASCII conversion in/out.
@@ -106,7 +106,7 @@ begin
     process (COLD_RESET, CLKBUS(CKMASTER))
     begin
         if COLD_RESET = '1' then
-            CONFIG(CONFIG_WIDTH) <= "00000000000000000000000000000000011000000000000000000000011001000001000";
+            CONFIG(CONFIG_WIDTH) <= "000000000000000000000000000000000011000000000000000000000011001000001000";
             DEBUG(DEBUG_WIDTH)   <= "0000000000000000";
 
         elsif CLKBUS(CKMASTER)'event and CLKBUS(CKMASTER)='1' then
@@ -223,7 +223,7 @@ begin
                 -- MiSTer not used.
     
                 if CMT_BUS_OUT(ACTIVE) = '1' then
-                    if REGISTER_MODEL /= "100" and REGISTER_MODEL(2 downto 0) /= "110" and REGISTER_MODEL(2 downto 0) /= "111" then
+                    if REGISTER_MODEL(2 downto 0) /= "100" and REGISTER_MODEL(2 downto 0) /= "101" and REGISTER_MODEL(2 downto 0) /= "110" and REGISTER_MODEL(2 downto 0) /= "111" then
                         case REGISTER_CMT(2 downto 0) is
                             when "000" => CONFIG(CPUSPEED) <= "0000";   -- 2MHz
                             when "001" => CONFIG(CPUSPEED) <= "0010";   -- 4MHz
@@ -235,7 +235,7 @@ begin
                             when "111" => CONFIG(CPUSPEED) <= "0000";   -- 2MHz
                             when others => null;
                         end case;
-                    elsif REGISTER_MODEL(2 downto 0)  = "100" then
+                    elsif REGISTER_MODEL(2 downto 0) = "100" or REGISTER_MODEL(2 downto 0) = "101" then
                         case REGISTER_CMT(2 downto 0) is
                             when "000" => CONFIG(CPUSPEED) <= "0001";   -- 3.5MHz
                             when "001" => CONFIG(CPUSPEED) <= "0011";   -- 7MHz
@@ -263,7 +263,7 @@ begin
                         CONFIG(CPUSPEED) <= "0000";    -- Default 2MHz
                     end if;
                 else
-                    if REGISTER_MODEL /= "100" and REGISTER_MODEL(2 downto 0) /= "110" and REGISTER_MODEL(2 downto 0) /= "111" then
+                    if REGISTER_MODEL(2 downto 0) /= "100" and REGISTER_MODEL(2 downto 0) /= "101" and REGISTER_MODEL(2 downto 0) /= "110" and REGISTER_MODEL(2 downto 0) /= "111" then
                         case REGISTER_CPU(2 downto 0) is
                             when "000" => CONFIG(CPUSPEED) <= "0000";   -- 2MHz
                             when "001" => CONFIG(CPUSPEED) <= "0010";   -- 4MHz
@@ -275,7 +275,7 @@ begin
                             when "111" => CONFIG(CPUSPEED) <= "0000";   -- 2MHz
                             when others => null;
                         end case;
-                    elsif REGISTER_MODEL(2 downto 0)  = "100" then
+                    elsif REGISTER_MODEL(2 downto 0) = "100" or REGISTER_MODEL(2 downto 0) = "101" then
                         case REGISTER_CPU(2 downto 0) is
                             when "000" => CONFIG(CPUSPEED) <= "0001";   -- 3.5MHz
                             when "001" => CONFIG(CPUSPEED) <= "0011";   -- 7MHz
@@ -400,9 +400,9 @@ begin
                     CONFIG(RTCSPEED) <= "00";
                 end if;
     
-                if REGISTER_MODEL(2 downto 0)  = "100" then
+                if REGISTER_MODEL(2 downto 0)  = "100" or REGISTER_MODEL(2 downto 0)  = "101" then
                     CONFIG(SNDSPEED) <= "01";
-                elsif REGISTER_MODEL(2 downto 0)  = "101" or  REGISTER_MODEL(2 downto 0)  = "110" then
+                elsif REGISTER_MODEL(2 downto 0)  = "110" then
                     CONFIG(SNDSPEED) <= "00";
                 elsif REGISTER_MODEL(2 downto 0) /= "110" and REGISTER_MODEL(2 downto 0) /= "111" then
                     CONFIG(SNDSPEED) <= "00";
@@ -429,6 +429,7 @@ begin
                 CONFIG(VGAMODE)      <= REGISTER_DISPLAY2(1 downto 0);
                 CONFIG(MENUENABLE)   <= REGISTER_DISPLAY3(0);
                 CONFIG(STATUSENABLE) <= REGISTER_DISPLAY3(1);
+                CONFIG(MZ800_MODE)   <= REGISTER_DISPLAY3(2);
                 CONFIG(TURBO)        <= REGISTER_CPU(2 downto 0);
                 CONFIG(FASTTAPE)     <= REGISTER_CMT(2 downto 0);
                 CONFIG(BUTTONS)      <= REGISTER_CMT(4 downto 3);

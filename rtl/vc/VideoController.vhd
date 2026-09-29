@@ -982,25 +982,23 @@ begin
     --
     -- Palette. The original held 5-bit per channel palettes in RAM, loaded by the tranZPUter I/O
     -- processor. On MiSTer only the fixed mappings are needed: a plane bit gives full intensity,
-    -- and the MZ-800 16 colour IRGB set sits at index 1111_IRGB_1.
+    -- and the MZ-800 16 colour IRGB set sits at index 1111_IRGB_1, using mz800emu's colours.
     PALETTE_LUT: process( SYS_CLK )
+        -- Bit 4 is the digital level, 3:0 the 16 level output.
+        type pal16_t is array(0 to 15) of std_logic_vector(4 downto 0);
+        constant MZ800_R : pal16_t := ("00000", "00100", "11101", "11011", "00100", "00010", "11110", "11101", "11000", "00000", "11111", "11111", "00101", "11000", "11111", "11111");
+        constant MZ800_G : pal16_t := ("00000", "00100", "00011", "00000", "00110", "11100", "11101", "11101", "11000", "11000", "00000", "00101", "11111", "11111", "11111", "11111");
+        constant MZ800_B : pal16_t := ("00000", "11010", "00000", "11000", "00000", "11111", "00011", "11101", "11000", "11110", "00000", "11100", "00101", "11111", "00010", "11111");
         function pal(idx : std_logic_vector(8 downto 0); ch : natural) return std_logic_vector is
-            variable i, c : std_logic;
+            variable c : integer range 0 to 15;
         begin
             if idx(8 downto 5) = "1111" and idx(0) = '1' then
-                i := idx(4);
+                c := to_integer(unsigned(idx(4 downto 1)));                   -- I, G (III), R (II), B (I).
                 case ch is
-                    when 0      => c := idx(2);                                 -- Red   (plane II).
-                    when 1      => c := idx(3);                                 -- Green (plane III).
-                    when others => c := idx(1);                                 -- Blue  (plane I).
+                    when 0      => return MZ800_R(c);
+                    when 1      => return MZ800_G(c);
+                    when others => return MZ800_B(c);
                 end case;
-                if c = '1' then
-                    if i = '1' then return "11111"; else return "10100"; end if;
-                elsif i = '1' and idx(3 downto 1) = "000" then
-                    return "01100";                                             -- Intensity only: grey.
-                else
-                    return "00000";
-                end if;
             elsif idx(0) = '1' then
                 return "11111";
             else
@@ -1073,17 +1071,23 @@ begin
 
     -- Mux the pallet address, top end 0xF0-0xFF is reserved for the MZ800, 16 colours, selected by the GPALLET register
     -- or direct plane drive, I = Blue, II = Red, III = Green, IV = Intensity.
-    PALETTE_R_MUX            <= PALETTE_REG & SR_R_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
+    PALETTE_R_MUX            <= "11111" & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1'                             when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: the bright half of the MZ-800 colours.
+                                else
+                                PALETTE_REG & SR_R_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
                                 else
                                 "1111" & GPALLET_REG(to_integer(unsigned(GPALLET_IDX(1 downto 0)))) & '1' when MODE_VIDEO_MZ800 = '1' and GPALLET_IDX(2) = '0'
                                 else
                                 "1111" & SR_PLANE_IV & SR_PLANE_III & SR_PLANE_II & SR_PLANE_I & '1';
-    PALETTE_G_MUX            <= PALETTE_REG & SR_G_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
+    PALETTE_G_MUX            <= "11111" & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1'                             when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: the bright half of the MZ-800 colours.
+                                else
+                                PALETTE_REG & SR_G_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
                                 else
                                 "1111" & GPALLET_REG(to_integer(unsigned(GPALLET_IDX(1 downto 0)))) & '1' when MODE_VIDEO_MZ800 = '1' and GPALLET_IDX(2) = '0'
                                 else
                                 "1111" & SR_PLANE_IV & SR_PLANE_III & SR_PLANE_II & SR_PLANE_I & '1';
-    PALETTE_B_MUX            <= PALETTE_REG & SR_B_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
+    PALETTE_B_MUX            <= "11111" & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1'                             when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: the bright half of the MZ-800 colours.
+                                else
+                                PALETTE_REG & SR_B_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
                                 else
                                 "1111" & GPALLET_REG(to_integer(unsigned(GPALLET_IDX(1 downto 0)))) & '1' when MODE_VIDEO_MZ800 = '1' and GPALLET_IDX(2) = '0'
                                 else

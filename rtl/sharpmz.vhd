@@ -557,6 +557,8 @@ component mz80c
           VGATE_n            : out std_logic;
           HBLANK             : in  std_logic;                            -- Horizontal Blanking Signal
           VBLANK             : in  std_logic;                            -- Vertical Blanking Signal          
+          HSYNC_n            : in  std_logic;                            -- Horizontal Sync
+          VSYNC_n            : in  std_logic;                            -- Vertical Sync
 
           -- HPS Interface
           IOCTL_DOWNLOAD     : in  std_logic;                            -- HPS Downloading to FPGA.
@@ -965,6 +967,8 @@ begin
             VGATE_n          => MZ80C_VGATE_n,
             HBLANK           => MZ_HBLANK,
             VBLANK           => MZ_VBLANK,
+            HSYNC_n          => MZ_HSYNC_n,
+            VSYNC_n          => MZ_VSYNC_n,
 
             -- HPS Interface
             IOCTL_DOWNLOAD   => MZ_IOCTL_DOWNLOAD,                    
@@ -1197,7 +1201,10 @@ begin
     --     2048    43008    45055    0019000    1    1    0    0    1    0    00197FF    1    1    0    0    1    0
     --     2048    45056    47103    0019800    1    1    0    0    1    1    0019FFF    1    1    0    0    1    1
     --
-    MROM_BANK                <= "00000" & T80_A16(11)     when CONFIG(MZ80K)                 = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
+    -- MZ-800: one 16KB ROM at 0x1C000 (1Z-013B, CG, IPL/9Z-504M), addressed by A13..A0 (E000 -> 2000).
+    MROM_BANK                <= "111" & T80_A16(13 downto 11) when CONFIG(MZ800)          = '1'
+                                else
+                                "00000" & T80_A16(11)     when CONFIG(MZ80K)                 = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
                                 "00001" & T80_A16(11)     when CONFIG(MZ80K)                 = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
                                 else

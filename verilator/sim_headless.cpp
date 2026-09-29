@@ -42,6 +42,7 @@ struct TypeCmd { uint32_t frame; std::string text; };
 struct Options {
     std::string model = "mz700";
     std::string vmode = "native";
+    bool mz800_700 = false;
     int      turbo = 0;
     int      fast_tape = 1;           // Menu step 1 = off (real speed), as the reference emulator runs.
     uint32_t stop_frame = 0;
@@ -76,6 +77,7 @@ static void usage()
 "Machine and run:\n"
 "  --model M              mz80k|mz80c|mz1200|mz80a|mz700|mz800|mz80b|mz2000 (default mz700)\n"
 "  --vmode native|vga60   video timing (default native)\n"
+"  --mz800-mode 800|700   MZ-800 rear mode switch (default 800)\n"
 "  --turbo N              CPU speed menu step 0..7 (default 0 = machine speed)\n"
 "  --fast-tape N          tape speed menu step 0..7 (default 1 = off, real speed)\n"
 "  --stop-at-frame N      exit after frame N (frames count vsyncs from reset)\n"
@@ -128,6 +130,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--headless") {}
         else if (a == "--model") o.model = next();
         else if (a == "--vmode") o.vmode = next();
+        else if (a == "--mz800-mode") o.mz800_700 = next() == "700";
         else if (a == "--turbo") o.turbo = (int)parse_num(next());
         else if (a == "--fast-tape") o.fast_tape = (int)parse_num(next());
         else if (a == "--stop-at-frame") { o.stop_frame = parse_num(next()); o.stop_set = true; }
@@ -457,6 +460,7 @@ void Sim::write_config()
     top->cfg_model    = m->code;
     top->cfg_display  = m->display;                            // video/graphics/VRAM wait/PCG bits off
     top->cfg_display2 = opt.vmode == "native" ? 3 : 1;         // sharpmz.sv: 2'b11 native, 2'b01 640x480@60
+    top->cfg_display3 = opt.mz800_700 ? 0 : 4;                   // bit 2: MZ-800 mode switch
     top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
     top->cfg_audio    = 0;
     top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape

@@ -85,6 +85,7 @@ localparam CONF_STR =
 	"P1O[3:1],Model,MZ80A,MZ80K,MZ80C,MZ1200,MZ700,MZ80B,MZ2000,MZ800;",
 	"P1O[6:4],CPU Speed,Default,+1,+2,+3,+4,+5,+6,+7;",
 	"P1O[30],Boot Reset,Off,On;",
+	"P1O[32],MZ-800 Mode,MZ-800,MZ-700;",
 	"-;",
 	"P2,Tape;",
 	"P2F1,MZF,Load Tape to CMT;",
@@ -285,7 +286,7 @@ wire [7:0] cfg_fdcrom  = status[29] ? (8'd1 << cfg_model) : 8'd0;
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, status[18], status[17], status[16], 1'b0, cfg_display};  // PCG is software controlled (E010-E012).
 wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
-wire [7:0] cfg_reg3_display = 8'd0;
+wire [7:0] cfg_reg3_display = {5'd0, ~status[32], 2'b00};  // 2: MZ-800 mode switch (1 = MZ-800).
 wire [7:0] cfg_reg4_cpu     = {status[30], 4'd0, status[6:4]};
 wire [7:0] cfg_reg5_audio   = {7'd0, status[20]};
 wire [7:0] cfg_reg6_cmt     = {1'b0, status[27], status[26], cfg_tape_buttons, cfg_fast_tape};
