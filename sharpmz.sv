@@ -98,7 +98,6 @@ localparam CONF_STR =
 	"-;",
 	"P3,Display;",
 	"P3O[8:7],Display Type,Default,Mono 80x25,Colour 40x25,Colour 80x25;",
-	"P3O[10:9],Video Timing,640x480@60,Native,640x480@75,640x480@85;",
 	"P3O[16],Video,On,Off;",
 	"P3O[17],Graphics,On,Off;",
 	"P3O[18],VRAM Wait,Off,On;",
@@ -252,17 +251,6 @@ function automatic [2:0] mz_display_type(input [1:0] menu_sel, input [2:0] model
 	end
 endfunction
 
-function automatic [1:0] mz_video_timing(input [1:0] menu_sel);
-	begin
-		case(menu_sel)
-			2'd0: mz_video_timing = 2'b01; // 640x480@60
-			2'd1: mz_video_timing = 2'b11; // Native machine timing.
-			2'd2: mz_video_timing = 2'b10; // 640x480@75
-			default: mz_video_timing = 2'b00; // 640x480@85
-		endcase
-	end
-endfunction
-
 function automatic [1:0] mz_tape_buttons(input [1:0] menu_sel);
 	begin
 		case(menu_sel)
@@ -291,7 +279,6 @@ endfunction
 
 wire [2:0] cfg_model = mz_model_code(status[3:1]);
 wire [2:0] cfg_display = mz_display_type(status[8:7], cfg_model);
-wire [1:0] cfg_vmode = mz_video_timing(status[10:9]);
 wire [1:0] cfg_tape_buttons = mz_tape_buttons(status[25:24]);
 wire [2:0] cfg_fast_tape = mz_fast_tape(status[23:21]);
 wire [7:0] cfg_userrom = status[28] ? (8'd1 << cfg_model) : 8'd0;
@@ -299,7 +286,7 @@ wire [7:0] cfg_fdcrom  = status[29] ? (8'd1 << cfg_model) : 8'd0;
 
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {status[19], status[18], status[17], status[16], 1'b0, cfg_display};
-wire [7:0] cfg_reg2_display = {5'd0, cfg_vmode};
+wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
 wire [7:0] cfg_reg3_display = 8'd0;
 wire [7:0] cfg_reg4_cpu     = {status[30], 4'd0, status[6:4]};
 wire [7:0] cfg_reg5_audio   = {7'd0, status[20]};

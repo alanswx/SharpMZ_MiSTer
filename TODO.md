@@ -116,8 +116,15 @@ Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `
 - Fixes to v2: 50 Hz timing rows restored (568/1136 x 312), with a `VIDEO_50HZ` input (MZ-700/800) replacing the management CPU's mode register. The config is applied after reset (it was skipped when the model didn't change after reset), and the 80-column/colour flags follow the config instead of toggling.
 - Wrapper `rtl/vc/video_vc.vhd`: CONFIG translation to the v2 layout, MREQ gated by the machine's decode, v1 VRAM wait states.
 - Verified in simulation: MZ-80K/80C/1200/80A/700 boot tests pass. MZ-700 is 50 Hz (70,886 T-states per frame, same as v1 and mz800emu); MZ-80A is green mono; the MZ-80B IPL screen renders.
-- Quartus: timing closes on every domain (core clock +1.80 ns after removing the OSD-size dividers and the A0–BF controller registers). 12,310 ALMs, 403/553 RAM blocks (was 482). Test RBF: `output_files/SharpMZ_standard-core_phase4-v2video.rbf`.
-- Still to do from the plan: strip the remaining GPU/OSD/VGA/composite logic, gate the A0–BF and MZ-80B snoop decode (section 2), fix the read-latency path for turbo, verify the MZ-80B GRAM and 40/80 switching, remove v1 `video.vhd`, and check BRAM and timing in Quartus.
+- Quartus: timing closes on every domain (core clock +1.80 ns after removing the OSD-size dividers and the A0–BF controller registers). 12,310 ALMs, 403/553 RAM blocks (was 482). After removing v1: 12,329 ALMs, 403/553 RAM blocks, core clock +2.61 ns. Test RBF: `output_files/SharpMZ_standard-core_phase4.rbf`.
+- Done since:
+  - **v1 removed:** `video.vhd` deleted, the "Video Timing" OSD option removed (native only), and the unused pixel enable removed from clkgen.
+  - **Read path:** the controller's emulator-mode read path now follows the data while RD is active; it used to latch once, 4 clocks in, which races the CPU at turbo speed.
+  - **Unreachable host logic left in place:** GPU, OSD buffers, palette registers, VGA/composite paths. With the A0–BF registers disabled and no direct addressing, Quartus removes them (VideoController: 1,120 ALMs, 84 M10K). Keeping the text close to upstream makes it easier to pick up the author's future fixes.
+  - **MZ-80B/2000 decode kept as v2 had it:** VideoController snoops the PPI/PIO writes while the core's own 8255/Z80 PIO models run, the same arrangement as the author's v2 emulator build. MREQ is still gated by the machine decode.
+  - **Framebuffer graphics extension dropped for now:** the author's add-on bitmap graphics for the MZ-700/80A (v1: I/O ports 00–07 by default; v2: B8–BD). It's not original Sharp hardware and v1's default ports could clash with expansion hardware. It could come back on v2's ports as an OSD option.
+- [ ] Verify the MZ-80B GRAM and 40/80 column switching with real MZ-80B software (none available in `software/` yet).
+- [ ] MZ-2000 colour GRAM (C000–FFFF) isn't in v1's memory decode, so the MREQ gate blocks it; fix together with the MZ-2000 IPL.
 
 - [ ] **Evaluate v2 `VideoController`** before investing in v1 `video.vhd`:
   - [ ] Port its native timing tables (MONO40/80, COLOUR40/80 at 60 Hz and 50 Hz) and the character/graphics/OSD layered renderer.

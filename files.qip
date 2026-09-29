@@ -62,7 +62,6 @@ set_global_assignment -name VHDL_FILE rtl/clk_div.vhd
 set_global_assignment -name VHDL_FILE rtl/mctrl.vhd
 set_global_assignment -name VHDL_FILE rtl/dpram.vhd
 set_global_assignment -name VHDL_FILE rtl/keymatrix.vhd
-set_global_assignment -name VHDL_FILE rtl/video.vhd
 set_global_assignment -name VHDL_FILE rtl/cmt.vhd
 set_global_assignment -name VHDL_FILE rtl/z8420/z8420.vhd
 set_global_assignment -name VHDL_FILE rtl/z8420/Interrupt.vhd

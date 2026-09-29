@@ -1409,7 +1409,9 @@ begin
 
                 -- Timing is more critical for the T80, read and latch the data in advance of T80 T3 cycle.
                 elsif MODE_EMUMZ = '1' then
-                    if VIDEO_LAST_RDni = "1000" and VIDEO_RDn = '0' then
+                    -- Follow the read data for as long as RD is active. The original latched once, 4 SYS_CLKs
+                    -- into the read, which is too late for the CPU at turbo speeds on this core's clock.
+                    if VIDEO_RDn = '0' then
                         VIDEO_DATA_OUT       <= VIDEO_DATA_OUTi;
                     end if;
 

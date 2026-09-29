@@ -30,6 +30,5 @@ package config_pkg is
     constant DEBUG_ENABLE           : integer := 1;                      -- Enable debug logic,
     constant NEO_ENABLE             : integer := 0;                      -- Enable local NEO430 IO processor,
     constant STORM_ENABLE           : integer := 0;                      -- Enable local STORM IO processor,
-    constant VIDEO_V2               : integer := 1;                      -- 1 = v2 VideoController (rtl/vc), 0 = v1 video.vhd.
 
 end config_pkg;

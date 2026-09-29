@@ -107,10 +107,6 @@ architecture RTL of clkgen is
     constant R_28M                 : rate_t  := rate(XTAL_700 * 8, 5);
     constant R_56M                 : rate_t  := rate(XTAL_700 * 16, 5);
     constant R_64M                 : rate_t  := rate(64000000);
-    constant R_8M8                 : rate_t  := rate(XTAL_700, 2);        -- MZ-700 40 column dot clock.
-    constant R_17M7                : rate_t  := rate(XTAL_700);           -- MZ-700 80 column dot clock.
-    constant R_25M175              : rate_t  := rate(25175000);           -- VGA 640x480@60.
-    constant R_31M5                : rate_t  := rate(31500000);           -- VGA 640x480@75.
     -- Timer inputs are square waves, so their enables run at twice the timer clock.
     constant R_SND_2M_X2           : rate_t  := rate(2000000 * 2);
     constant R_SND_700_X2          : rate_t  := rate(XTAL_700 * 2, 16);   -- MZ-700 8253 counter 0, 1.1088 MHz.
@@ -119,18 +115,15 @@ architecture RTL of clkgen is
     constant R_RTC_HSYNC_X2        : rate_t  := rate(XTAL_700 * 2, 1136); -- MZ-700 line rate, 15.611 kHz.
 
     signal CPU_RATE                : rate_t;
-    signal VID_RATE                : rate_t;
     signal SND_RATE                : rate_t;
     signal RTC_RATE                : rate_t;
 
     signal CPU_ACC                 : acc_t;
-    signal VID_ACC                 : acc_t;
     signal PER_ACC                 : acc_t;
     signal SND_ACC                 : acc_t;
     signal RTC_ACC                 : acc_t;
 
     signal CKENCPUi                : std_logic;
-    signal CKENVIDEOi              : std_logic;
     signal CKENPERi                : std_logic;
     signal CKSOUNDi                : std_logic;
     signal CKRTCi                  : std_logic;
@@ -168,15 +161,6 @@ begin
             when others => CPU_RATE <= R_2M;
         end case;
 
-        case CONFIG(VIDSPEED) is
-            when "000"  => VID_RATE <= R_8M;
-            when "001"  => VID_RATE <= R_16M;
-            when "010"  => VID_RATE <= R_8M8;
-            when "011"  => VID_RATE <= R_17M7;
-            when "110"  => VID_RATE <= R_31M5;
-            when others => VID_RATE <= R_25M175;
-        end case;
-
         case CONFIG(SNDSPEED) is
             when "01"   => SND_RATE <= R_SND_700_X2;
             when others => SND_RATE <= R_SND_2M_X2;
@@ -194,18 +178,15 @@ begin
         if rising_edge(CKBASE) then
             if RST = '1' then
                 CPU_ACC            <= (others => '0');
-                VID_ACC            <= (others => '0');
                 PER_ACC            <= (others => '0');
                 SND_ACC            <= (others => '0');
                 RTC_ACC            <= (others => '0');
                 CKENCPUi           <= '0';
-                CKENVIDEOi         <= '0';
                 CKENPERi           <= '0';
                 CKSOUNDi           <= '0';
                 CKRTCi             <= '0';
             else
                 step(CPU_ACC, CPU_RATE, CKENCPUi);
-                step(VID_ACC, VID_RATE, CKENVIDEOi);
                 step(PER_ACC, R_2M,     CKENPERi);
 
                 -- Square waves: toggle on each enable.
@@ -228,7 +209,7 @@ begin
     CLKBUS(CKMASTER)               <= CKBASE;                            -- System clock.
     CLKBUS(CKSOUND)                <= CKSOUNDi;                          -- Sound timer input, 50/50 square wave (data, sampled on CKBASE).
     CLKBUS(CKRTC)                  <= CKRTCi;                            -- RTC timer input, 50/50 square wave (data, sampled on CKBASE).
-    CLKBUS(CKENVIDEO)              <= CKENVIDEOi;                        -- Pixel clock enable.
+    CLKBUS(CKENVIDEO)              <= '0';                               -- Unused: the video controller makes its own pixel enable.
     CLKBUS(CKVIDEO)                <= '0';                               -- Unused.
     CLKBUS(CKIOP)                  <= '0';                               -- Unused (was the IO processor clock).
     CLKBUS(CKENCPU)                <= CKENCPUi;                          -- CPU clock enable.

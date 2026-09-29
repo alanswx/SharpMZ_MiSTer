@@ -41,6 +41,7 @@ architecture sim of tb_clkgen is
         variable seen  : boolean := false;
     begin
         mn := natural'high; mx := 0; n := 0;
+        prev := sq;                                  -- Don't count a wave that is already high as an edge.
         for i in 1 to cycles loop
             wait until rising_edge(clk);
             if sq = '1' and prev = '0' then
@@ -94,7 +95,6 @@ begin
         wait for 100 ns; rst <= '0';
 
         measure(clk7, bus7(CKENCPU), N7, r);          report_rate("MZ-700 CPU",   r, N7, 70937600.0, 3546880.0, true);
-        measure(clk7, bus7(CKENVIDEO), N7, r);        report_rate("MZ-700 pixel", r, N7, 70937600.0, 8867200.0, true);
         measure_toggle(clk7, bus7(CKSOUND), N7, r);   report_rate("MZ-700 8253 CLK0", r, N7, 70937600.0, 1108400.0, true);
         measure_toggle(clk7, bus7(CKRTC), N7, r);     report_rate("MZ-700 8253 CLK1", r, N7, 70937600.0, 15611.27, true);
         cfg7(CPUSPEED) <= "0111"; wait until rising_edge(clk7);
@@ -106,7 +106,6 @@ begin
         measure(clk6, bus6(CKENCPU), N6, r);          report_rate("MZ-80K CPU cap", r, N6, 64000000.0, 32000000.0, true);
         cfg6(CPUSPEED) <= "0000"; wait until rising_edge(clk6);
         measure(clk6, bus6(CKENCPU), N6, r);          report_rate("MZ-80K CPU",   r, N6, 64000000.0, 2000000.0, true);
-        measure(clk6, bus6(CKENVIDEO), N6, r);        report_rate("MZ-80K pixel", r, N6, 64000000.0, 8000000.0, true);
         measure_toggle(clk6, bus6(CKSOUND), N6, r);   report_rate("MZ-80K 8253 CLK0", r, N6, 64000000.0, 2000000.0, true);
         measure(clk6, bus6(CKENPERIPH), N6, r);       report_rate("MZ-80K periph", r, N6, 64000000.0, 2000000.0, true);
 

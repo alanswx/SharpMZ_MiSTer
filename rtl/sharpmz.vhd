@@ -30,7 +30,7 @@
 --                                      |                                         -> dpram.vhd                 (common)
 --                                      |                                         -> dprom.vhd                 (common)
 --                                      |                                         -> mctrl.vhd                 (common)
---                                      |                                         -> video.vhd                 (common)
+--                                      |                                         -> vc/video_vc.vhd          (common)
 --                                      |
 --                                      |
 --                                      (emu) sharpmz.vhd (mz80b)	->	mz80b.vhd
@@ -440,57 +440,6 @@ component mctrl
     );
 end component;
 
-component video is
-    Port (
-        RST_n                : in  std_logic;                            -- Reset
-
-        -- Different operations modes.
-        CONFIG               : in  std_logic_vector(CONFIG_WIDTH);
-
-        -- Clocks
-        CLKBUS               : in  std_logic_vector(CLKBUS_WIDTH);       -- Clock signals created by clkgen module.
-
-        -- CPU Signals
-        T80_A                : in  std_logic_vector(13 downto 0);        -- CPU Address Bus
-        T80_RD_n             : in  std_logic;                            -- CPU Read Signal
-        T80_WR_n             : in  std_logic;                            -- CPU Write Signal
-        T80_MREQ_n           : in  std_logic;                            -- CPU Memory Request
-        T80_BUSACK_n         : in  std_logic;                            -- CPU Bus Acknowledge
-        T80_WAIT_n           : out std_logic;                            -- CPU Wait Request
-        T80_DI               : in  std_logic_vector(7 downto 0);         -- CPU Data Bus in
-        T80_DO               : out std_logic_vector(7 downto 0);         -- CPU Data Bus out
-
-        -- Selects.
-        CS_VRAM_n            : in  std_logic;                            -- VRAM Select
-        CS_MEM_G_n           : in  std_logic;                            -- Peripherals Select
-        CS_GRAM_n            : in  std_logic;                            -- Colour GRAM Select
-        CS_GRAM_80B_n        : in  std_logic;                            -- MZ80B GRAM Select
-        CS_IO_GFB_n          : in  std_logic;                            -- Graphics FB IO Select range
-        CS_IO_G_n            : in  std_logic;                            -- Graphics Options IO Select range
-
-        -- Video Signals
-        VGATE_n              : in  std_logic;                            -- Video Output Control
-        INVERSE_n            : in  std_logic;                            -- Invert video display.
-        CONFIG_CHAR80        : in  std_logic;                            -- 40 Char = 0, 80 Char = 1 select.
-        HBLANK               : out std_logic;                            -- Horizontal Blanking
-        VBLANK               : out std_logic;                            -- Vertical Blanking
-        HSYNC_n              : out std_logic;                            -- Horizontal Sync
-        VSYNC_n              : out std_logic;                            -- Vertical Sync
-        ROUT                 : out std_logic_vector(7 downto 0);         -- Red Output
-        GOUT                 : out std_logic_vector(7 downto 0);         -- Green Output
-        BOUT                 : out std_logic_vector(7 downto 0);         -- Green Output
-
-        -- HPS Interface
-        IOCTL_DOWNLOAD       : in  std_logic;                            -- HPS Downloading to FPGA.
-        IOCTL_UPLOAD         : in  std_logic;                            -- HPS Uploading from FPGA.
-        IOCTL_CLK            : in  std_logic;                            -- HPS I/O Clock.
-        IOCTL_WR             : in  std_logic;                            -- HPS Write Enable to FPGA.
-        IOCTL_RD             : in  std_logic;                            -- HPS Read Enable to FPGA.
-        IOCTL_ADDR           : in  std_logic_vector(24 downto 0);        -- HPS Address in FPGA to write into.
-        IOCTL_DOUT           : in  std_logic_vector(31 downto 0);        -- HPS Data to be written into FPGA.
-        IOCTL_DIN            : out std_logic_vector(31 downto 0)         -- HPS Data to be read into HPS.
-    );
-end component;
 
 component keymatrix
     Port (
@@ -850,114 +799,58 @@ begin
             DEBUG            => DEBUG
         );
 
-    VIDEOV1: if VIDEO_V2 = 0 generate
-        VIDEO0 : video
-            port map (
-                RST_n            => T80_RST_n,                               -- Reset
-    
-                -- Different operations modes.
-                CONFIG           => CONFIG,
-    
-                -- Clocks
-                CLKBUS           => CLKBUS,                                  -- Clock signals created by clkgen module.
-    
-                -- CPU Signals
-                T80_A            => T80_A16(13 downto 0),                    -- CPU Address Bus
-                T80_RD_n         => T80_RD_n,                                -- CPU Read Signal
-                T80_WR_n         => T80_WR_n,                                -- CPU Write Signal
-                T80_MREQ_n       => T80_MREQ_n,                              -- CPU Memory Request
-                T80_BUSACK_n     => T80_BUSAK_n,                             -- CPU Bus Acknowledge
-                T80_WAIT_n       => VIDEO_WAIT_n,                            -- Wait Request to CPU from Video circuitry.
-                T80_DI           => T80_DO,                                  -- CPU Data Bus(in)
-                T80_DO           => VRAM_DO,                                 -- CPU Data Bus(out)
-    
-                -- Selects.
-                CS_VRAM_n        => MZ_CS_VRAM_n,                            -- VRAM Select
-                CS_MEM_G_n       => MZ_CS_MEM_G_n,                           -- Peripherals Select
-                CS_GRAM_n        => MZ_CS_GRAM_n,                            -- Colour GRAM Select
-                CS_GRAM_80B_n    => MZ_CS_GRAM_80B_n,                        -- MZ80B GRAM Select
-                CS_IO_GFB_n      => MZ_CS_IO_GFB_n,                          -- Graphics FB IO Select range
-                CS_IO_G_n        => MZ_CS_IO_G_n,                            -- Graphics Options IO Select range
-    
-                -- Video Signals
-                VGATE_n          => MZ_VGATE_n,                              -- Video Output Control
-                INVERSE_n        => MZ_DISPLAY_INVERT_n,                     -- Invert video output.
-                CONFIG_CHAR80    => MZ_DISPLAY_CHAR80,                       -- 40 Char = 0, 80 Char = 1 select.
-                HBLANK           => MZ_HBLANK,                               -- Horizontal Blanking
-                VBLANK           => MZ_VBLANK,                               -- Vertical Blanking
-                HSYNC_n          => MZ_HSYNC_n,                              -- Horizontal Sync
-                VSYNC_n          => MZ_VSYNC_n,                              -- Vertical Sync
-                ROUT             => MZ_R,                                    -- Red Output
-                GOUT             => MZ_G,                                    -- Green Output
-                BOUT             => MZ_B,                                    -- Blue Output
-    
-                -- HPS Interface
-                IOCTL_DOWNLOAD   => MZ_IOCTL_DOWNLOAD,
-                IOCTL_UPLOAD     => MZ_IOCTL_UPLOAD,
-                IOCTL_CLK        => MZ_IOCTL_CLK,                            -- HPS I/O Clock.
-                IOCTL_WR         => MZ_IOCTL_WR,                             -- HPS Write Enable to FPGA.
-                IOCTL_RD         => MZ_IOCTL_RD,                             -- HPS Read Enable to FPGA.
-                IOCTL_ADDR       => MZ_IOCTL_ADDR,                           -- HPS Address in FPGA to write into.
-                IOCTL_DOUT       => MZ_IOCTL_DOUT,                           -- HPS Data to be written into FPGA.
-                IOCTL_DIN        => MZ_IOCTL_DIN_VIDEO                       -- HPS Data to be sent to HPS.
-            );
-        MZ_CE_PIXEL <= CLKBUS(CKENVIDEO);
-    end generate;
+    VIDEO0 : entity work.video_vc
+        port map (
+            RST_n            => T80_RST_n,                               -- Reset
 
-    VIDEOV2: if VIDEO_V2 = 1 generate
-        VIDEO0 : entity work.video_vc
-            port map (
-                RST_n            => T80_RST_n,                               -- Reset
-    
-                -- Different operations modes.
-                CONFIG           => CONFIG,
-    
-                -- Clocks
-                CLKBUS           => CLKBUS,                                  -- Clock signals created by clkgen module.
-    
-                -- CPU Signals
-                T80_A            => T80_A16,                                 -- CPU Address Bus
-                T80_RD_n         => T80_RD_n,                                -- CPU Read Signal
-                T80_WR_n         => T80_WR_n,                                -- CPU Write Signal
-                T80_MREQ_n       => T80_MREQ_n,                              -- CPU Memory Request
-                T80_IORQ_n       => T80_IORQ_n,                              -- CPU I/O Request
-                T80_BUSACK_n     => T80_BUSAK_n,                             -- CPU Bus Acknowledge
-                T80_WAIT_n       => VIDEO_WAIT_n,                            -- Wait Request to CPU from Video circuitry.
-                T80_DI           => T80_DO,                                  -- CPU Data Bus(in)
-                T80_DO           => VRAM_DO,                                 -- CPU Data Bus(out)
-    
-                -- Selects.
-                CS_VRAM_n        => MZ_CS_VRAM_n,                            -- VRAM Select
-                CS_MEM_G_n       => MZ_CS_MEM_G_n,                           -- Peripherals Select
-                CS_GRAM_n        => MZ_CS_GRAM_n,                            -- Colour GRAM Select
-                CS_GRAM_80B_n    => MZ_CS_GRAM_80B_n,                        -- MZ80B GRAM Select
-                CS_IO_GFB_n      => MZ_CS_IO_GFB_n,                          -- Graphics FB IO Select range
-                CS_IO_G_n        => MZ_CS_IO_G_n,                            -- Graphics Options IO Select range
-    
-                -- Video Signals
-                VGATE_n          => MZ_VGATE_n,                              -- Video Output Control
-                INVERSE_n        => MZ_DISPLAY_INVERT_n,                     -- Invert video output.
-                CONFIG_CHAR80    => MZ_DISPLAY_CHAR80,                       -- 40 Char = 0, 80 Char = 1 select.
-                HBLANK           => MZ_HBLANK,                               -- Horizontal Blanking
-                VBLANK           => MZ_VBLANK,                               -- Vertical Blanking
-                HSYNC_n          => MZ_HSYNC_n,                              -- Horizontal Sync
-                VSYNC_n          => MZ_VSYNC_n,                              -- Vertical Sync
-                ROUT             => MZ_R,                                    -- Red Output
-                GOUT             => MZ_G,                                    -- Green Output
-                BOUT             => MZ_B,                                    -- Blue Output
-                CE_PIXEL         => MZ_CE_PIXEL,                             -- Pixel clock enable.
-    
-                -- HPS Interface
-                IOCTL_DOWNLOAD   => MZ_IOCTL_DOWNLOAD,
-                IOCTL_UPLOAD     => MZ_IOCTL_UPLOAD,
-                IOCTL_CLK        => MZ_IOCTL_CLK,                            -- HPS I/O Clock.
-                IOCTL_WR         => MZ_IOCTL_WR,                             -- HPS Write Enable to FPGA.
-                IOCTL_RD         => MZ_IOCTL_RD,                             -- HPS Read Enable to FPGA.
-                IOCTL_ADDR       => MZ_IOCTL_ADDR,                           -- HPS Address in FPGA to write into.
-                IOCTL_DOUT       => MZ_IOCTL_DOUT,                           -- HPS Data to be written into FPGA.
-                IOCTL_DIN        => MZ_IOCTL_DIN_VIDEO                       -- HPS Data to be sent to HPS.
-            );
-    end generate;
+            -- Different operations modes.
+            CONFIG           => CONFIG,
+
+            -- Clocks
+            CLKBUS           => CLKBUS,                                  -- Clock signals created by clkgen module.
+
+            -- CPU Signals
+            T80_A            => T80_A16,                                 -- CPU Address Bus
+            T80_RD_n         => T80_RD_n,                                -- CPU Read Signal
+            T80_WR_n         => T80_WR_n,                                -- CPU Write Signal
+            T80_MREQ_n       => T80_MREQ_n,                              -- CPU Memory Request
+            T80_IORQ_n       => T80_IORQ_n,                              -- CPU I/O Request
+            T80_BUSACK_n     => T80_BUSAK_n,                             -- CPU Bus Acknowledge
+            T80_WAIT_n       => VIDEO_WAIT_n,                            -- Wait Request to CPU from Video circuitry.
+            T80_DI           => T80_DO,                                  -- CPU Data Bus(in)
+            T80_DO           => VRAM_DO,                                 -- CPU Data Bus(out)
+
+            -- Selects.
+            CS_VRAM_n        => MZ_CS_VRAM_n,                            -- VRAM Select
+            CS_MEM_G_n       => MZ_CS_MEM_G_n,                           -- Peripherals Select
+            CS_GRAM_n        => MZ_CS_GRAM_n,                            -- Colour GRAM Select
+            CS_GRAM_80B_n    => MZ_CS_GRAM_80B_n,                        -- MZ80B GRAM Select
+            CS_IO_GFB_n      => MZ_CS_IO_GFB_n,                          -- Graphics FB IO Select range
+            CS_IO_G_n        => MZ_CS_IO_G_n,                            -- Graphics Options IO Select range
+
+            -- Video Signals
+            VGATE_n          => MZ_VGATE_n,                              -- Video Output Control
+            INVERSE_n        => MZ_DISPLAY_INVERT_n,                     -- Invert video output.
+            CONFIG_CHAR80    => MZ_DISPLAY_CHAR80,                       -- 40 Char = 0, 80 Char = 1 select.
+            HBLANK           => MZ_HBLANK,                               -- Horizontal Blanking
+            VBLANK           => MZ_VBLANK,                               -- Vertical Blanking
+            HSYNC_n          => MZ_HSYNC_n,                              -- Horizontal Sync
+            VSYNC_n          => MZ_VSYNC_n,                              -- Vertical Sync
+            ROUT             => MZ_R,                                    -- Red Output
+            GOUT             => MZ_G,                                    -- Green Output
+            BOUT             => MZ_B,                                    -- Blue Output
+            CE_PIXEL         => MZ_CE_PIXEL,                             -- Pixel clock enable.
+
+            -- HPS Interface
+            IOCTL_DOWNLOAD   => MZ_IOCTL_DOWNLOAD,
+            IOCTL_UPLOAD     => MZ_IOCTL_UPLOAD,
+            IOCTL_CLK        => MZ_IOCTL_CLK,                            -- HPS I/O Clock.
+            IOCTL_WR         => MZ_IOCTL_WR,                             -- HPS Write Enable to FPGA.
+            IOCTL_RD         => MZ_IOCTL_RD,                             -- HPS Read Enable to FPGA.
+            IOCTL_ADDR       => MZ_IOCTL_ADDR,                           -- HPS Address in FPGA to write into.
+            IOCTL_DOUT       => MZ_IOCTL_DOUT,                           -- HPS Data to be written into FPGA.
+            IOCTL_DIN        => MZ_IOCTL_DIN_VIDEO                       -- HPS Data to be sent to HPS.
+        );
 
     TAPE0 : cmt
         port map (
