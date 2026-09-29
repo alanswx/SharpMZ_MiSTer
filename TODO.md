@@ -70,6 +70,7 @@ Status: new `clkgen.vhd` (accumulator CEs, `CLK_HZ` = 70.9376 MHz) and the emu `
 - **MZ-80B Z80 PIO interrupt never fires:** `z8420.vhd` connects `RST_n` (active low) to `Interrupt`'s active-high `RESET`, so the interrupt logic is held in reset during normal operation. Kept as-is (behaviour-preserving refactor); verify against MZ-80B software before enabling.
 - **Tape lead-in:** the core plays the full 22,000-pulse long gap (~10–11 s, matching real hardware), so a `.mzf` loaded from the monitor takes ~1,050 frames. mz800emu generates a much shorter lead-in, so compare tape-load *results* rather than frame numbers. Check its option for a real-length gap.
 - **Model coverage in simulation (after Phase 2 config change):** MZ-80K (SP-1002), MZ-80C (MZ_MONITOR 4.4), MZ-1200 (SP-1002), MZ-80A (SA-1510) and MZ-700 (1Z-013A) boot to their monitor prompts. MZ-80B shows "IPL is looking for a program" (correct). **MZ-2000 shows a black screen**: its ROM slot (0x17800) holds the MZ-80B IPL (`IPL.rom`), not a real MZ-2000 IPL. The CPU loops between 0038h and 1038h (RST 38h with the bank-swap bit toggling), and it counts only 33,280 T-states per frame (MZ-80B: 66,560 = 4 MHz at 60 Hz), so either its CPU runs at 2 MHz or its frame rate doubles. Check on hardware whether master behaves the same, and look at v2's MZ-2000 handling.
+- **Tape record decoder never worked (MZ-700):** `cmt.vhd` sampled recorded pulses 1302 T-states after the rising edge, from the documented "368 µs read point". Measured in simulation and confirmed against the 1Z-013A listing, the monitor writes pulses with a 676 T-state (short) or 1300 T-state (long) high phase and reads its own tapes ~960–990 T-states after the edge. The documented µs figures assume 18 T-states per delay-loop iteration (`DEC A; JP NZ` is really 14). The sample landed at the very end of a long pulse, so every bit decoded as 0 and SAVE never produced a file. Now 988. mz800emu agrees on CPU timing (70,886.5 T-states/frame, no per-access wait states). Checked from the ROMs: SP-1002/SA-1510 (MZ-80K/80A) write 480/940 T-state pulses and sample at 681 T, so 736 is fine; the MZ-800 path (1020) also falls between the 1Z-013A pulse widths. **Still to check: the MZ-80B IPL (1020 @ 4 MHz, different tape format).**
 - **Sim speed:** ~1.6M clk_sys cycles/s, about 1/44 real time. A 100-frame boot takes ~90 s.
 
 ## Phase 2: Config and I/O
@@ -85,16 +86,22 @@ Status: config bus and bridge removed; timing still closes (worst setup +0.54 ns
 
 ## Phase 3: Tape (restore what the legacy Main driver did)
 
+Status: tape image slot working in simulation. Loading from an MZT runs the program and queues the next record; the monitor's SAVE writes a byte-exact MZF into a blank image. Timing closes (core clock +1.93 ns); 11,687 ALMs, 482/553 RAM blocks. Test RBF: `output_files/SharpMZ_standard-core_phase3.rbf`.
+
 The old `sharpmz.cpp` handled save, a 5-entry tape queue and MZ-80B APSS. The core's `cmt.vhd` still decodes records into header + data (= MZF), but nothing reads it now. v2's `cmt.vhd` doesn't help here: it hands file I/O to its management CPU through interrupts.
 
 - [ ] Keep `F` quick-load of `.mzf` to CMT and direct-to-RAM.
-- [ ] Add an `S` tape-image slot (`MZF MZT`), CoCo2/3 style (`rtl/Cassette_Write.sv` in those cores):
-  - [ ] **Save:** on `RECORD_READY`, append the header plus data as the next MZF in the image, with sector buffering and partial-sector read-modify-write.
-  - [ ] **Load:** play successive programs from the image (multi-program tapes, replacing the old queue).
-  - [ ] **MZ-80B/2000 APSS:** seek forward/back and eject against the image.
-  - [ ] **OSD controls:** Rewind, Record/Play arm, and tape status.
-- [ ] Tape image creation, per the decision: blank image (zero header = end of tape) and/or `FS` save or Main PR. Document it in the README.
-- [ ] Verify: SAVE from BASIC/monitor, reload, compare against the source MZF, and check the waveform against mz-archive `.wav`.
+- [x] Add an `S` tape-image slot (`MZF MZT`), CoCo2/3 style: `rtl/tape_image.sv`, OSD Tape page "Tape Image" (S0) and "Rewind Tape Image" (T[31]).
+  - [x] **Load:** mounting copies the first record into the CMT buffer. When the CMT drops PLAY_READY after playing (motor stopped), the next record follows, which replaces the old 5-entry queue.
+  - [x] **Save:** on `RECORD_READY` the header and data are read back from the CMT buffer and appended after the last record. Sector writes go through a one-sector write-back cache. If the image is read-only or too small, the save is skipped and `tape_full` is set.
+  - [x] **MZ-80B/2000 APSS:** seek forward/back moves one record (8-deep history for back); eject rewinds.
+  - [x] **OSD:** Rewind. LED_DISK shows tape image access and CMT activity.
+  - [ ] Show tape status (record number, tape full) somewhere visible, e.g. the OSD info line.
+- [x] Blank tape image: `tools/make_blank_tape.py` (zero-filled; a zero attribute byte marks the end of the tape). Document it in the README.
+- [x] Park the core download bus on an unused address when idle. `cmt.vhd` clears RECORD_READY whenever the address points at its buffers, and after an OSD tape download the address used to stay there, so recordings could be lost on hardware too.
+- [x] Verify SAVE from the monitor (MZ-700, `S120012FF1200`): the image holds a correct MZF (attribute, name, load/exec, and data identical to RAM).
+- [ ] Verify reload of a saved tape, SAVE from BASIC, MZ-80K/80A/80B saves, and APSS on the MZ-80B.
+- [ ] Check the playback waveform against mz-archive `.wav` recordings.
 
 ## Phase 4: Video
 

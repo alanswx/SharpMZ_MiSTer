@@ -55,7 +55,7 @@ VHD_SRC = \
 	$(RTL)/sharpmz.vhd
 
 GEN_V = $(GEN)/sharpmz.v
-V_SRC = sim.v $(GEN_V) rtl_v/dpram.v rtl_v/dprom.v
+V_SRC = sim.v $(GEN_V) rtl_v/dpram.v rtl_v/dprom.v $(RTL)/tape_image.sv
 
 MIFS    = $(wildcard $(RTL)/software/mif/*.mif)
 MIF_HEX = $(patsubst $(RTL)/software/mif/%.mif,software/mif/%.mif.hex,$(MIFS))

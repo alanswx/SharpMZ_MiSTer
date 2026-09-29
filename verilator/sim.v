@@ -56,6 +56,28 @@ module top(
    output        dbg_vwait_n /*verilator public_flat*/,
    output [70:0] dbg_config /*verilator public_flat*/,
 
+   // Tape image slot (hps_io S0), driven by the harness.
+   input         img_mounted,
+   input         img_readonly,
+   input  [63:0] img_size,
+   output [31:0] sd_lba,
+   output        sd_rd,
+   output        sd_wr,
+   input         sd_ack,
+   input  [8:0]  sd_buff_addr,
+   input  [7:0]  sd_buff_dout,
+   output [7:0]  sd_buff_din,
+   input         sd_buff_wr,
+   input         tape_rewind,
+   output        tape_active /*verilator public_flat*/,
+   output        tape_full /*verilator public_flat*/,
+   output [7:0]  tape_record /*verilator public_flat*/,
+   output [13:0] cmt_status /*verilator public_flat*/,
+   output [31:0] dbg_rcv /*verilator public_flat*/,
+   output [31:0] dbg_rcv_sum /*verilator public_flat*/,
+   output        dbg_pc1 /*verilator public_flat*/,
+   output        dbg_readbit /*verilator public_flat*/,
+
    // Backdoor reads of internal memories for --ascii-end and --dump-mem.
    input  [11:0] vram_addr,
    output [7:0]  vram_q,
@@ -64,6 +86,25 @@ module top(
 );
 
    wire [31:0] din32;
+   wire [24:0] tape_addr;
+   wire        tape_wr;
+   wire [7:0]  tape_dout;
+   wire        tape_mounted;
+
+   tape_image tape(
+      .clk(clk_sys), .reset(reset),
+      .img_mounted(img_mounted), .img_readonly(img_readonly), .img_size(img_size),
+      .sd_lba(sd_lba), .sd_rd(sd_rd), .sd_wr(sd_wr), .sd_ack(sd_ack),
+      .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(sd_buff_din), .sd_buff_wr(sd_buff_wr),
+      .rewind(tape_rewind), .host_busy(ioctl_download), .cmt_status(cmt_status),
+      .active(tape_active), .bus_addr(tape_addr), .bus_wr(tape_wr), .bus_dout(tape_dout), .bus_din(din32[7:0]),
+      .mounted(tape_mounted), .tape_full(tape_full), .record_no(tape_record)
+   );
+
+   // Same bus mux as sharpmz.sv.
+   wire        mz_wr   = tape_active ? tape_wr   : ioctl_wr;
+   wire [24:0] mz_addr = tape_active ? tape_addr : ioctl_download ? ioctl_addr : 25'h1000000;
+   wire [7:0]  mz_dout = tape_active ? tape_dout : ioctl_dout;
    wire        clksys_out, clkiop_unused;
 
    sharpmz core(
@@ -83,10 +124,10 @@ module top(
       .IOCTL_DOWNLOAD (ioctl_download),
       .IOCTL_UPLOAD   (1'b0),
       .IOCTL_CLK      (clk_sys),
-      .IOCTL_WR       (ioctl_wr),
+      .IOCTL_WR       (mz_wr),
       .IOCTL_RD       (ioctl_rd),
-      .IOCTL_ADDR     (ioctl_addr),
-      .IOCTL_DOUT     ({24'd0, ioctl_dout}),
+      .IOCTL_ADDR     (mz_addr),
+      .IOCTL_DOUT     ({24'd0, mz_dout}),
       .CLKSYS         (clksys_out),
       .CLKVID         (ce_pix),
       .CLKIOP         (clkiop_unused),
@@ -100,6 +141,7 @@ module top(
       .VGA_B_O        (VGA_B),
       .AUDIO_L_O      (AUDIO_L),
       .AUDIO_R_O      (AUDIO_R),
+      .CMT_STATUS     (cmt_status),
       .IOCTL_DIN      (din32)
    );
 
@@ -116,6 +158,13 @@ module top(
    assign dbg_wait_n = core.t80_wait_n;
    assign dbg_vwait_n = core.video_wait_n;
    assign dbg_config = core.config_v;
+   // CMT record FSM: {rcv_ram_state, rcv_state, recseq, type, error, try, success, done, ready_set}
+   assign dbg_rcv = {15'd0, core.tape0.rcv_ram_state, core.tape0.rcv_state, core.tape0.recseq,
+                     core.tape0.rcv_type, core.tape0.rcv_error, core.tape0.rcv_ram_try,
+                     core.tape0.rcv_ram_success, core.tape0.rcv_done, core.tape0.record_ready_set};
+   assign dbg_rcv_sum = {core.tape0.rcv_ram_checksum, core.tape0.rcv_checksum};
+   assign dbg_pc1 = core.mz80hw.i8255_pc_o[1];
+   assign dbg_readbit = core.tape0.readbit;
 
    assign vram_q   = core.video0.vram0.mem[vram_addr];
    assign sysram_q = core.sysram.mem[sysram_addr];

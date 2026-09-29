@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <deque>
 #include <fstream>
 #include <map>
@@ -61,6 +62,10 @@ struct Options {
     std::string trace_file;
     uint32_t trace_from = 0, trace_to = UINT32_MAX;
     bool     quiet = false;
+    bool     verbose = false;
+    std::string tape_image;
+    bool     tape_readonly = false;
+    std::set<uint32_t> tape_rewinds;
 };
 
 static void usage()
@@ -75,10 +80,15 @@ static void usage()
 "  --fast-tape N          tape speed menu step 0..7 (default 1 = off, real speed)\n"
 "  --stop-at-frame N      exit after frame N (frames count vsyncs from reset)\n"
 "  --quiet                no progress on stderr\n"
+"  --verbose              also print internal state every 10M clocks\n"
 "Tapes:\n"
 "  --mzf FILE             put an MZF in the tape buffer (Load Tape to CMT)\n"
 "  --mzf-direct           load it straight to RAM instead (Load Direct to RAM)\n"
 "  --mzf-direct-frame N   frame to do the direct load at (default 0)\n"
+"Tape image (the OSD Tape Image slot):\n"
+"  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
+"  --tape-readonly        mount it read-only\n"
+"  --tape-rewind N        pulse Rewind Tape Image at frame N (repeatable)\n"
 "Typing:\n"
 "  --type FRAME:TEXT      type TEXT from FRAME; \\n or {RETURN}, {BREAK}, {DEL}, {INS},\n"
 "                         {HOME}, {CLR}, {UP}, {DOWN}, {LEFT}, {RIGHT}, {WAIT n}\n"
@@ -122,6 +132,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fast-tape") o.fast_tape = (int)parse_num(next());
         else if (a == "--stop-at-frame") { o.stop_frame = parse_num(next()); o.stop_set = true; }
         else if (a == "--quiet") o.quiet = true;
+        else if (a == "--verbose") o.verbose = true;
         else if (a == "--mzf") o.mzf = next();
         else if (a == "--mzf-direct") o.mzf_direct = true;
         else if (a == "--mzf-direct-frame") o.mzf_direct_frame = parse_num(next());
@@ -157,6 +168,9 @@ static bool parse_args(int argc, char **argv, Options &o)
             if (c1 == std::string::npos || c2 == std::string::npos) { fprintf(stderr, "--dump-mem wants ADDR:LEN:FILE\n"); return false; }
             o.memdumps.push_back({parse_num(v.substr(0, c1)), parse_num(v.substr(c1 + 1, c2 - c1 - 1)), v.substr(c2 + 1)});
         }
+        else if (a == "--tape-image") o.tape_image = next();
+        else if (a == "--tape-readonly") o.tape_readonly = true;
+        else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
         else if (a == "--trace-cpu") o.trace_file = next();
         else if (a == "--trace-from") o.trace_from = parse_num(next());
         else if (a == "--trace-to") o.trace_to = parse_num(next());
@@ -213,6 +227,18 @@ private:
 
     FILE *flog = nullptr, *ftrace = nullptr;
 
+    // Tape image slot, emulating Main_MiSTer's side of hps_io's sd_* handshake.
+    FILE    *img = nullptr;
+    uint64_t img_size = 0;
+    enum { SD_IDLE, SD_READ, SD_READ_END, SD_WRITE } sd_state = SD_IDLE;
+    int      sd_idx = 0;
+    uint32_t sd_cur_lba = 0;
+    uint8_t  sd_data[512];
+    uint32_t tape_rewind_frames = 0;
+    uint16_t cmt_last = 0xFFFF;
+    void sd_step();
+    void mount_tape();
+
     void clock();
     void on_frame_end();
     void write_config();
@@ -225,8 +251,76 @@ private:
     void write_png(uint32_t f);
 };
 
+void Sim::sd_step()
+{
+    top->sd_buff_wr = 0;
+    switch (sd_state) {
+    case SD_IDLE:
+        if (img && (top->sd_rd || top->sd_wr)) {
+            sd_cur_lba = top->sd_lba;
+            sd_idx = 0;
+            top->sd_ack = 1;
+            if (top->sd_rd) {
+                memset(sd_data, 0, sizeof(sd_data));
+                uint64_t off = (uint64_t)sd_cur_lba * 512;
+                if (off < img_size) {
+                    fseeko(img, (off_t)off, SEEK_SET);
+                    fread(sd_data, 1, (size_t)std::min<uint64_t>(512, img_size - off), img);
+                }
+                sd_state = SD_READ;
+            } else {
+                sd_state = SD_WRITE;
+            }
+        }
+        break;
+    case SD_READ:
+        top->sd_buff_addr = sd_idx;
+        top->sd_buff_dout = sd_data[sd_idx];
+        top->sd_buff_wr = 1;
+        if (++sd_idx == 512) sd_state = SD_READ_END;
+        break;
+    case SD_READ_END:
+        top->sd_ack = 0;
+        sd_state = SD_IDLE;
+        break;
+    case SD_WRITE:
+        // sd_buff_din is registered: it holds the byte addressed on the previous clock.
+        if (sd_idx > 0) sd_data[sd_idx - 1] = top->sd_buff_din;
+        if (sd_idx < 512) {
+            top->sd_buff_addr = sd_idx++;
+        } else {
+            // Like Main, never grow the image: write only what fits.
+            uint64_t off = (uint64_t)sd_cur_lba * 512;
+            if (off < img_size) {
+                fseeko(img, (off_t)off, SEEK_SET);
+                fwrite(sd_data, 1, (size_t)std::min<uint64_t>(512, img_size - off), img);
+                fflush(img);
+            }
+            top->sd_ack = 0;
+            sd_state = SD_IDLE;
+        }
+        break;
+    }
+}
+
+void Sim::mount_tape()
+{
+    img = fopen(opt.tape_image.c_str(), opt.tape_readonly ? "rb" : "r+b");
+    if (!img) { fprintf(stderr, "cannot open tape image %s\n", opt.tape_image.c_str()); exit_code = 2; return; }
+    fseeko(img, 0, SEEK_END);
+    img_size = (uint64_t)ftello(img);
+    top->img_size = img_size;
+    top->img_readonly = opt.tape_readonly;
+    top->img_mounted = 1;
+    clock();
+    top->img_mounted = 0;
+    if (!opt.quiet) fprintf(stderr, "[sim] tape image '%s' mounted, %llu bytes\n", opt.tape_image.c_str(), (unsigned long long)img_size);
+}
+
 void Sim::clock()
 {
+    sd_step();
+
     // Sample what the video pipeline sees at this rising edge: MiSTer's
     // video_mixer latches RGB on the clk_sys edge where CE_PIXEL is high.
     top->clk_sys = 0;
@@ -274,7 +368,51 @@ void Sim::clock()
     if (vs && !prev_vs) on_frame_end();
     prev_vs = vs;
 
-    if (!opt.quiet && (cycle % (cycle < 1000 ? 50 : 10000000)) == 0)
+    // Tape status changes (PLAY_READY, PLAYING, RECORD_READY, RECORDING, ACTIVE, APSS).
+    if (opt.verbose) {
+        static uint32_t rcv_last = 0xFFFFFFFF;
+        uint32_t r = top->dbg_rcv;
+        // Ignore the bit-level rcv_state and done bit churn; log FSM-level changes.
+        uint32_t key = r & ~(0xFu << 9) & ~2u;
+        if (key != rcv_last) {
+            fprintf(stderr, "[rcv] frame %u ram_state %u recseq %u%u%u type %u err %u try %u ok %u done %u ready_set %u  sums ram %04X rcv %04X\n",
+                    frame, (r >> 13) & 15, (r >> 8) & 1, (r >> 7) & 1, (r >> 6) & 1, (r >> 5) & 1, (r >> 4) & 1,
+                    (r >> 3) & 1, (r >> 2) & 1, (r >> 1) & 1, r & 1, top->dbg_rcv_sum >> 16, top->dbg_rcv_sum & 0xFFFF);
+            rcv_last = key;
+        }
+    }
+    if (opt.verbose) {
+        static bool pc1_l = 0, rb_l = 0; static uint64_t pc1_n = 0, rb_n = 0; static uint32_t st_l = 99;
+        if (top->dbg_pc1 != pc1_l) { pc1_n++; pc1_l = top->dbg_pc1; }
+        // Pulse phase lengths in CPU enables, while recording.
+        static uint64_t ce_at_edge = 0; static std::map<uint32_t, uint32_t> hi_hist, lo_hist;
+        if (top->dbg_readbit != rb_l) {
+            uint32_t len = (uint32_t)(cpu_cycles - ce_at_edge);
+            if (top->cmt_status & 8) (rb_l ? hi_hist : lo_hist)[len / 50 * 50]++;
+            ce_at_edge = cpu_cycles;
+        }
+        if (frame == opt.stop_frame && top->VGA_VS && !hi_hist.empty()) {
+            fprintf(stderr, "[pulse] high phase (CPU enables, 50-wide buckets):"); for (auto &h : hi_hist) fprintf(stderr, " %u:%u", h.first, h.second);
+            fprintf(stderr, "\n[pulse] low phase:"); for (auto &h : lo_hist) fprintf(stderr, " %u:%u", h.first, h.second);
+            fprintf(stderr, "\n"); hi_hist.clear();
+        }
+        if (top->dbg_readbit != rb_l) { rb_n++; rb_l = top->dbg_readbit; }
+        uint32_t st = (top->dbg_rcv >> 9) & 15;
+        if (st != st_l || (frame % 10 == 0 && top->VGA_VS && !prev_vs)) {
+            fprintf(stderr, "[bit] frame %u rcv_state %u  pc1 toggles %llu  readbit toggles %llu\n", frame, st,
+                    (unsigned long long)pc1_n, (unsigned long long)rb_n);
+            st_l = st;
+        }
+    }
+    uint16_t cs = top->cmt_status & 0x3E1F;
+    if (opt.verbose && cs != cmt_last) {
+        fprintf(stderr, "[cmt] frame %u cycle %llu status %04X%s%s%s%s%s  tape_active %d\n", frame, (unsigned long long)cycle, cs,
+                cs & 1 ? " PLAY_READY" : "", cs & 2 ? " PLAYING" : "", cs & 4 ? " RECORD_READY" : "",
+                cs & 8 ? " RECORDING" : "", cs & 16 ? " ACTIVE" : "", top->tape_active);
+        cmt_last = cs;
+    }
+
+    if (opt.verbose && (cycle % 10000000) == 0)
         fprintf(stderr, "[sim] cycle %lluM  %.3fs emulated  frame %u  pc %04X  vs %d hb %d vb %d ce_pix %d  cpu_ce %llu sysreset %d delay %d rm %d warm %d wait_n %d vwait_n %d model %d vga %d vid %d cpu %d\n",
                 (unsigned long long)(cycle / 1000000), cycle / CLK_HZ, frame, top->cpu_pc, vs, hb, vb, ce, (unsigned long long)cpu_cycles, top->dbg_sysreset, top->dbg_delay, top->dbg_rm, top->dbg_warm, top->dbg_wait_n, top->dbg_vwait_n,
                 (int)(top->dbg_config[0] & 0xFF), (int)((top->dbg_config[0] >> 17) & 3), (int)(((top->dbg_config[1] >> 30) & 3) | ((top->dbg_config[2] & 1) << 2)), (int)((top->dbg_config[1] >> 26) & 15));
@@ -297,6 +435,8 @@ void Sim::on_frame_end()
     for (auto it = range.first; it != range.second; ++it) ps2_queue.push_back(it->second);
 
     if (!opt.mzf.empty() && opt.mzf_direct && frame == opt.mzf_direct_frame && frame != 0) load_mzf(true);
+
+    top->tape_rewind = opt.tape_rewinds.count(frame) ? 1 : 0;   // Held for one frame.
 }
 
 void Sim::ioctl_write(uint32_t addr, uint8_t data)
@@ -475,10 +615,17 @@ int Sim::run()
 
     if (!opt.mzf.empty() && (!opt.mzf_direct || opt.mzf_direct_frame == 0))
         if (!load_mzf(opt.mzf_direct)) return exit_code;
+    if (!opt.tape_image.empty()) { mount_tape(); if (exit_code) return exit_code; }
 
     uint32_t last = opt.stop_set ? opt.stop_frame : 150;
     while (frame <= last && !Verilated::gotFinish()) clock();
 
+    if (img) {
+        // Let a save in progress finish.
+        for (int i = 0; i < 2000000 && top->tape_active; i++) clock();
+        if (!opt.quiet) fprintf(stderr, "[sim] tape image: record %u%s\n", top->tape_record, top->tape_full ? ", TAPE FULL" : "");
+        fclose(img);
+    }
     if (opt.ascii_end) print_ascii();
     dump_memory();
     if (flog) fclose(flog);

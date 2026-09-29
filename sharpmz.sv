@@ -70,7 +70,6 @@ assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
 assign HDMI_BOB_DEINT = 0;
 
-assign LED_DISK = 0;
 assign LED_POWER = 0;
 assign BUTTONS = 0;
 
@@ -90,6 +89,8 @@ localparam CONF_STR =
 	"P2,Tape;",
 	"P2F1,MZF,Load Tape to CMT;",
 	"P2F2,MZF,Load Direct to RAM;",
+	"P2S0,MZTMZF,Tape Image;",
+	"P2T[31],Rewind Tape Image;",
 	"P2O[25:24],Tape Buttons,Auto,Off,Play,Record;",
 	"P2O[23:21],Fast Tape,Default,Off,2x,4x,8x,16x,32x,Default;",
 	"P2O[27:26],Sharp ASCII Name,Off,On Save,On Load,Both;",
@@ -151,6 +152,20 @@ wire  [7:0] hps_ioctl_dout;
 wire  [7:0] hps_ioctl_din;
 wire [31:0] hps_ioctl_file_ext;
 
+wire        img_mounted;
+wire        img_readonly;
+wire [63:0] img_size;
+wire [31:0] sd_lba;
+wire        sd_rd;
+wire        sd_wr;
+wire        sd_ack;
+wire  [8:0] sd_buff_addr;
+wire  [7:0] sd_buff_dout;
+wire  [7:0] sd_buff_din;
+wire        sd_buff_wr;
+
+wire        tape_active;
+
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -182,7 +197,20 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_file_ext(hps_ioctl_file_ext),
 	.ioctl_upload_req(1'b0),
 	.ioctl_upload_index(8'd0),
-	.ioctl_wait(1'b0),
+	.ioctl_wait(tape_active),
+
+	.img_mounted(img_mounted),
+	.img_readonly(img_readonly),
+	.img_size(img_size),
+	.sd_lba('{sd_lba}),
+	.sd_blk_cnt('{6'd0}),
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din('{sd_buff_din}),
+	.sd_buff_wr(sd_buff_wr),
 
 	.info_req(1'b0),
 	.info(8'd0)
@@ -350,6 +378,53 @@ wire [31:0] mz_ioctl_din;
 
 assign hps_ioctl_din = mz_ioctl_din[7:0];
 
+/////////////////  TAPE IMAGE  ////////////////////
+
+wire [13:0] cmt_status;
+wire [24:0] tape_addr;
+wire        tape_wr;
+wire  [7:0] tape_dout;
+wire        tape_mounted, tape_full;
+wire  [7:0] tape_record;
+
+tape_image tape_image
+(
+	.clk(clk_sys),
+	.reset(reset),
+
+	.img_mounted(img_mounted),
+	.img_readonly(img_readonly),
+	.img_size(img_size),
+	.sd_lba(sd_lba),
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din),
+	.sd_buff_wr(sd_buff_wr),
+
+	.rewind(status[31]),
+	.host_busy(hps_ioctl_download),
+	.cmt_status(cmt_status),
+
+	.active(tape_active),
+	.bus_addr(tape_addr),
+	.bus_wr(tape_wr),
+	.bus_dout(tape_dout),
+	.bus_din(mz_ioctl_din[7:0]),
+
+	.mounted(tape_mounted),
+	.tape_full(tape_full),
+	.record_no(tape_record)
+);
+
+// Core download bus: the tape engine, an OSD download, or parked on an unused address. The CMT clears
+// its record-ready flag whenever the bus points at its buffers, so it must not idle there.
+wire        mz_ioctl_wr   = tape_active ? tape_wr   : (hps_ioctl_wr && mzf_direct_wr_valid);
+wire [24:0] mz_ioctl_addr = tape_active ? tape_addr : hps_ioctl_download ? hps_ioctl_addr_mapped : 25'h1000000;
+wire  [7:0] mz_ioctl_dout = tape_active ? tape_dout : hps_ioctl_dout;
+
 /////////////////  RESET  /////////////////////////
 
 wire reset = RESET | ~pll_locked;
@@ -400,6 +475,8 @@ sharpmz sharp_mz
 	.AUDIO_L_O(audio_l_emu),
 	.AUDIO_R_O(audio_r_emu),
 
+	.CMT_STATUS(cmt_status),
+
 	// Machine configuration from the OSD.
 	.CFG_MODEL(cfg_reg0_model),
 	.CFG_DISPLAY(cfg_reg1_display),
@@ -415,14 +492,15 @@ sharpmz sharp_mz
 	.IOCTL_DOWNLOAD(hps_ioctl_download),
 	.IOCTL_UPLOAD(hps_ioctl_upload),
 	.IOCTL_CLK(clk_sys),
-	.IOCTL_WR(hps_ioctl_wr && mzf_direct_wr_valid),
+	.IOCTL_WR(mz_ioctl_wr),
 	.IOCTL_RD(hps_ioctl_rd),
-	.IOCTL_ADDR(hps_ioctl_addr_mapped),
-	.IOCTL_DOUT({24'd0, hps_ioctl_dout}),
+	.IOCTL_ADDR(mz_ioctl_addr),
+	.IOCTL_DOUT({24'd0, mz_ioctl_dout}),
 	.IOCTL_DIN(mz_ioctl_din)
 );
 
 assign LED_USER = hps_ioctl_download;
+assign LED_DISK = {1'b0, tape_active | cmt_status[4]};    // Tape image access or CMT activity.
 
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL  = clk_video_in;

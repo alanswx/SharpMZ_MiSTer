@@ -38,6 +38,11 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 ./obj_dir_headless/Vtop --mzf ../rtl/software/mzf/ramtest.mzf --type '100:L\n' \
     --stop-at-frame 900 --dump-every 100 --frame-log out/ramtest.csv --ascii-end
 
+# Tape image slot: load from an MZT, or save into a blank tape (tools/make_blank_tape.py)
+./obj_dir_headless/Vtop --fast-tape 4 --tape-image out/two.mzt --type '100:L\n' --stop-at-frame 700 --ascii-end
+./obj_dir_headless/Vtop --fast-tape 5 --tape-image out/blank.mzt \
+    --type '100:S120012FF1200\n{WAIT 20}TEST\n' --stop-at-frame 600 --ascii-end
+
 # Same scenario on the reference emulator
 ../refs/mz800emu/build/build-mz700emu-pal/mz700emu-pal --headless --model mz700 \
     --mzf ../rtl/software/mzf/ramtest.mzf --type '100:L\n' --stop-at-frame 900 --ascii-end
@@ -48,5 +53,6 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 - **Frames:** a frame is counted at each vsync rising edge after the machine is configured. Frame 0 is the first one.
 - **`fb_hash`:** FNV-1a 32 over the RGB888 bytes of the unblanked picture, the same bytes written to the PNG. The core captures only the active area (e.g. 320x200); mz800emu includes its border unless run with `--crop canvas`. Compare text dumps and frame timing rather than hashes across the two.
 - **`--dump-mem`:** reads physical main RAM, not the CPU's banked view.
-- **Tape speed:** `--fast-tape` defaults to 1 (off, real speed), matching the reference emulator's scripted mode.
+- **Tape speed:** `--fast-tape` defaults to 1 (off, real speed), matching the reference emulator's scripted mode. Real-speed tapes have a 10 s lead-in; `--fast-tape 4` (8x) or `5` (fastest, capped at clk_sys/2) cuts sim time a lot.
+- **Tape image:** `--tape-image` emulates Main's side of the OSD `S0` slot (512-byte sector reads and writes, never growing the file). `--verbose` also logs CMT status changes, the record FSM, and recorded pulse widths.
 - **Speed:** about 1/44 real time (~1.6M `clk_sys` cycles per second on an M-series Mac).

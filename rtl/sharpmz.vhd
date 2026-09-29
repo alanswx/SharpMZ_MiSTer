@@ -102,6 +102,8 @@ entity sharpmz is
         --------------------                        AUDIO                       ------------------------------
         AUDIO_L_O             : out    std_logic;
         AUDIO_R_O             : out    std_logic;
+        --------------------                      Tape status                   ------------------------------
+        CMT_STATUS            : out    std_logic_vector(13 downto 0);           -- CMT_BUS_OUT, see mctrl_pkg.vhd.
         --------------------                   Machine configuration              ------------------------------
         CFG_MODEL             : in     std_logic_vector(7 downto 0);            -- See mctrl.vhd for the bit layout.
         CFG_DISPLAY           : in     std_logic_vector(7 downto 0);
@@ -1152,6 +1154,7 @@ begin
 
     -- Parent signals onto local wires.
     --
+    CMT_STATUS               <= MZ_CMT_BUS_OUT;
     MZ_PS2_KEY               <= ps2_key;
     MZ_IOCTL_DOWNLOAD        <= ioctl_download;
     MZ_IOCTL_UPLOAD          <= ioctl_upload;

@@ -898,7 +898,11 @@ begin
                     if CONFIG(MZ_KC) = '1' or CONFIG(MZ_A) = '1' then
                         RCV_CNT                         <= to_unsigned(736, 16);     -- 368uS @ 2Mhz
                     elsif CONFIG(MZ700) = '1' then
-                        RCV_CNT                         <= to_unsigned(1302, 16);    -- 368uS @ 3.54MHz
+                        -- The 1Z-013A monitor writes pulses with a 676 T-state (short) or 1300 T-state (long) high
+                        -- phase and reads them back ~960-990 T-states after the rising edge (EDGE + DLY3, real Z80
+                        -- timing). The documented 368uS read point assumes 18 T-states per delay loop iteration
+                        -- instead of 14 and lands on the end of a long pulse, so recordings never decoded.
+                        RCV_CNT                         <= to_unsigned(988, 16);     -- ~279uS @ 3.54MHz
                     else
                         RCV_CNT                         <= to_unsigned(1020, 16);    -- 255uS @ 4MHz
                     end if;
