@@ -102,3 +102,6 @@ ${ROMTOOL} --command=CGROM                                  \
 
 # MZ-800 ROM and CG (not in romtool's layout).
 python3 $(dirname $0)/add_mz800_rom.py ${ROMDIR} ${MIFDIR}
+
+# Keymap fixes: MZ-700/MZ-800 layout (mz800emu) and extended keys.
+python3 $(dirname $0)/fix_keymap.py ${ROMDIR} ${MIFDIR}

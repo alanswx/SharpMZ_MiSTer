@@ -2,6 +2,7 @@
 # Regression tests for the SharpMZ simulation. Run from verilator/ (make test).
 #
 #   boot_<model>  boot to frame 150 and compare the text screen with tests/expected/
+#   kb_mz700      MZ-700: type letters, digits, symbols, cursor keys and DEL at the monitor (matches mz800emu)
 #   mon_mz800     MZ-800: M at the IPL starts the 9Z-504M monitor
 #   gfx_mz800     MZ-800: tests/mz800/gfx320.mzf draws 320x200 planes; frame hash compared
 #                 (the picture matches mz800emu, see tests/mz800/README.md)
@@ -29,6 +30,9 @@ for m in $MODELS; do
     pids+=($!); names+=("boot_$m")
 done
 
+( $BIN --model mz700 --type '120:ABCXYZ0123456789-,./;[] QABCD{LEFT}{LEFT}X{BS}' --stop-at-frame 400 --ascii-end --quiet \
+      > "$OUT/kb_mz700.txt" 2> "$OUT/kb_mz700.log" ) &
+pids+=($!); names+=("kb_mz700")
 ( $BIN --model mz800 --type 160:M --stop-at-frame 300 --ascii-end --quiet > "$OUT/mon_mz800.txt" 2> "$OUT/mon_mz800.log" ) &
 pids+=($!); names+=("mon_mz800")
 ( $BIN --model mz800 --mzf tests/mz800/gfx320.mzf --mzf-direct --mzf-direct-frame 20 --type 200:M --type '280:J2000\n' \
@@ -66,7 +70,7 @@ for p in "${pids[@]}"; do wait $p; done
 fail=0
 for n in "${names[@]}"; do
     case $n in
-        boot_*|mon_*|gfx_*|pcg_*|m800_*)
+        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*)
             if diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
                 echo "PASS $n"
             else

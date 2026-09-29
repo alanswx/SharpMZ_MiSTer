@@ -145,6 +145,10 @@ Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `
 - [x] Audio level: the 1-bit output drove AUDIO_L/R at full scale signed (0 / −32768). Now unsigned half scale, centred by the framework's DC blocker.
 - [ ] Audio mixing (sound + tape together, volume), v2 `snd.vhd` style, and the MZ-800 PSG later.
 - [ ] Keyboard (waiting for hardware feedback): adopt v2 `keymatrix.vhd` per-model maps (MZ-80K, MZ-2000, …) in place of the ROM-loaded keymap, keeping a PS/2 path only.
+  - [x] Extended keys (E0) never reached their own keymap entries (`keymatrix.vhd` cleared the flag in the same cycle); fixed, and extended keys without an entry fall back to their keypad twin (`tools/fix_keymap.py`).
+  - [x] MZ-700/MZ-800 map now follows mz800emu: 4 was C; Backspace/Delete, Insert, End (BREAK), right SHIFT, CTRL, `'` (:), Tab/ALPHA, keypad were missing or wrong. Typing matches mz800emu.
+  - [ ] MZ-80A (and probably 80K/1200): cursor keys type 4/6/8/2 and Backspace types `/`. Needs the MZ-80A matrix (sharpmz.net docs) to map the cursor and DEL keys.
+  - [ ] Hardware report 2026-09-29: MZ-700 Galactic Invaders plays (SHIFT fire, cursor keys); SPACE pauses, as the game intends.
 - [ ] Joystick mapping (currently `J,Fire` only), `LED_DISK` on tape activity.
 - [x] README rewrite: models and status, menu, tape image and saving, known issues, design, build/sim.
 - [ ] Release RBF `releases/SharpMZ_YYYYMMDD.rbf` after hardware testing.

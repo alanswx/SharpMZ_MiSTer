@@ -240,10 +240,13 @@ begin
                     if(KEY_PRESS='0') then
                         FLGF0  <= '1';
                     end if;
+                    -- hps_io gives the E0 (extended) flag with each key, so index the map with it directly.
+                    -- (FLGE0 above was for a byte-wise PS/2 stream and was always cleared here, so extended
+                    -- keys only ever reached their non-extended entry.)
                     if(PS2_KEY(7 downto 0) = X"AA" ) then
                         F_KBDT <= X"EF";
                     else
-                        F_KBDT <= FLGE0 & PS2_KEY(6 downto 0); FLGE0<='0';
+                        F_KBDT <= KEY_EXTENDED & PS2_KEY(6 downto 0);
                     end if;
                 end if;
     
