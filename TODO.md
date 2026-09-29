@@ -140,11 +140,11 @@ Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `
 
 - [x] `DEBUG_ENABLE = 0` (debug LED/sampling logic out of the build).
 - [x] OSD cleanup: removed the PCG ROM/RAM option (software controls the PCG via E010–E012; the config bit collided with v2's blend register) and the unused `J,Fire`; config version bumped to 5.
-- [ ] Delete dead RTL: `jtag_uart_0`, `sysid`, `spi_master`, `i8253/`, `mz80c/cmt.vhd`, `mz80c/mz80c_video.vhd`, unused `mz80b/` FDC files, `mz80b_dummy`, unused T80 variants, and `DEBUG_ENABLE` blocks. Trim `files.qip`.
+- [x] Delete dead RTL: i8253/, mz80b FDC/video/misc files, mz80c cmt/video, unused T80 variants, clk_div, memory_hw.tcl; files.qip lists only what's built.
 - [x] Update `sys/` to the latest Template_MiSTer (identical to upstream 3ea1134, Aug 2026).
 - [x] Audio level: the 1-bit output drove AUDIO_L/R at full scale signed (0 / −32768). Now unsigned half scale, centred by the framework's DC blocker.
 - [ ] Audio mixing (sound + tape together, volume), v2 `snd.vhd` style, and the MZ-800 PSG later.
-- [ ] Keyboard: adopt v2 `keymatrix.vhd` per-model maps (MZ-80K, MZ-2000, …) in place of the ROM-loaded keymap, keeping a PS/2 path only.
+- [ ] Keyboard (waiting for hardware feedback): adopt v2 `keymatrix.vhd` per-model maps (MZ-80K, MZ-2000, …) in place of the ROM-loaded keymap, keeping a PS/2 path only.
 - [ ] Joystick mapping (currently `J,Fire` only), `LED_DISK` on tape activity.
 - [x] README rewrite: models and status, menu, tape image and saving, known issues, design, build/sim.
 - [ ] Release RBF `releases/SharpMZ_YYYYMMDD.rbf` after hardware testing.
