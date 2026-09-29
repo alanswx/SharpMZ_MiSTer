@@ -102,6 +102,7 @@ The old `sharpmz.cpp` handled save, a 5-entry tape queue and MZ-80B APSS. The co
 - [x] Verify SAVE from the monitor (MZ-700, `S120012FF1200`): the image holds a correct MZF (attribute, name, load/exec, and data identical to RAM).
 - [x] Verify reload of a saved tape: mounting the image written by SAVE and typing `L` prints `LOADING TEST`, loads without a checksum error and auto-runs it. (The RAM init MIF preloads the author's SHARPMZ TESTER at 1200h, so that's what the saved bytes contained.)
 - [ ] Verify SAVE from BASIC, MZ-80K/80A/80B saves, and APSS on the MZ-80B.
+- [ ] MZ-80K: `LOAD` of `3-D MAZE.MZF` reads the header and data (no checksum error) and runs it, but the screen afterwards looks like garbage (`verilator/out/tape/k_load`). Check against real hardware or an MZ-80K emulator; it may just be the program's start-up screen.
 - [ ] Check the playback waveform against mz-archive `.wav` recordings.
 
 ## Phase 4: Video
