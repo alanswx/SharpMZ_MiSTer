@@ -3,6 +3,8 @@ set_global_assignment -name SDC_FILE sharpmz.sdc
 
 set_global_assignment -name VHDL_FILE rtl/jtag_uart_0.vhd
 set_global_assignment -name VHDL_FILE rtl/config_pkg.vhd
+set_global_assignment -name VHDL_FILE rtl/clkgen_pkg.vhd
+set_global_assignment -name VHDL_FILE rtl/mctrl_pkg.vhd
 set_global_assignment -name VHDL_FILE rtl/bridge.vhd
 set_global_assignment -name VHDL_FILE rtl/sharpmz.vhd
 
@@ -47,9 +49,6 @@ set_global_assignment -name VHDL_FILE rtl/mz80b/mz80b.vhd
 #============================================================
 set_global_assignment -name QIP_FILE rtl/pll.qip
 set_global_assignment -name VHDL_FILE rtl/clkgen.vhd
-#set_global_assignment -name QIP_FILE rtl/submodules/pll_1.qip
-#set_global_assignment -name QIP_FILE rtl/submodules/pll_2.qip
-#set_global_assignment -name QIP_FILE rtl/submodules/pll_4.qip
 
 #============================================================
 # Common modules

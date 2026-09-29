@@ -205,6 +205,9 @@ signal INTMSK                :     std_logic;                               -- E
 signal DOPIT                 :     std_logic_vector(7 downto 0);
 signal SOUND_ENABLE          :     std_logic;
 signal SOUND_PULSE_X2        :     std_logic;
+signal SOUND_PULSE_X2_LAST   :     std_logic := '0';
+signal CS_ESWP_LAST_n        :     std_logic;
+signal CURSOR_TICK          :     std_logic := '0';
 signal SOUND                 :     std_logic;
 signal INTX                  :     std_logic;
 --
@@ -592,14 +595,18 @@ begin
 
     -- MZ80A/1200 Memory Swap - swap rom out and ram in.
     --
-    process( MZ_RESET, CS_ESWP_n ) begin
+    process( MZ_RESET, CLKBUS(CKMASTER) ) begin
         if(MZ_RESET = '1') then
             MZ_MEMORY_SWAP            <= '0';
-        elsif(CS_ESWP_n'event and CS_ESWP_n='0') then
-            if(T80_A16(4 downto 2) = "011") then
-                MZ_MEMORY_SWAP        <= '1';
-            elsif(T80_A16(4 downto 2) = "100") then
-                MZ_MEMORY_SWAP        <= '0';
+            CS_ESWP_LAST_n            <= '1';
+        elsif rising_edge(CLKBUS(CKMASTER)) then
+            CS_ESWP_LAST_n            <= CS_ESWP_n;
+            if CS_ESWP_n = '0' and CS_ESWP_LAST_n = '1' then     -- Falling edge of the swap chip select.
+                if(T80_A16(4 downto 2) = "011") then
+                    MZ_MEMORY_SWAP    <= '1';
+                elsif(T80_A16(4 downto 2) = "100") then
+                    MZ_MEMORY_SWAP    <= '0';
+                end if;
             end if;
         end if;
     end process;
@@ -706,10 +713,12 @@ begin
             TCOUNT          := (others=>'0');
 
         elsif CLKBUS(CKMASTER)'event and CLKBUS(CKMASTER)='1' then
+            CURSOR_TICK         <= '0';
             if CLKBUS(CKENPERIPH) = '1' then
                 if( TCOUNT = 18371 ) then
                     TCOUNT      := (others=>'0');
                     CURSOR_CLK  <= not CURSOR_CLK;
+                    CURSOR_TICK <= not CURSOR_CLK;                    -- Pulse where CURSOR_CLK rises.
                 else
                     TCOUNT      := TCOUNT + '1';
                 end if;
@@ -720,15 +729,17 @@ begin
     --
     -- Cursor blink Clock
     --
-    process( CURSOR_CLK, CURSOR_RESET ) begin
-        if( CURSOR_RESET='0' ) then
-            CCOUNT           <= (others => '0');
-        elsif( CURSOR_CLK'event and CURSOR_CLK = '1' ) then
-            if( CCOUNT = 18 ) then
-                CCOUNT       <=(others=>'0');
-                CURSOR_BLINK <= not CURSOR_BLINK;
-            else
-                CCOUNT       <= CCOUNT+'1';
+    process( CLKBUS(CKMASTER) ) begin
+        if rising_edge(CLKBUS(CKMASTER)) then
+            if( CURSOR_RESET='0' ) then
+                CCOUNT           <= (others => '0');
+            elsif( CURSOR_TICK = '1' ) then
+                if( CCOUNT = 18 ) then
+                    CCOUNT       <=(others=>'0');
+                    CURSOR_BLINK <= not CURSOR_BLINK;
+                else
+                    CCOUNT       <= CCOUNT+'1';
+                end if;
             end if;
         end if;
     end process;
@@ -759,9 +770,12 @@ begin
 
     -- The signal coming out of the 8254 is not a square wave and twice the frequency. The addition of a flip-flop to divide the
     -- frequency by 2 results in a square wave of the correct audio frequency.
-    process( SOUND_PULSE_X2 ) begin
-        if( SOUND_PULSE_X2'event and SOUND_PULSE_X2 = '1' ) then
-            SOUND <= not SOUND;
+    process( CLKBUS(CKMASTER) ) begin
+        if rising_edge(CLKBUS(CKMASTER)) then
+            SOUND_PULSE_X2_LAST <= SOUND_PULSE_X2;
+            if SOUND_PULSE_X2 = '1' and SOUND_PULSE_X2_LAST = '0' then
+                SOUND <= not SOUND;
+            end if;
         end if;
     end process;
 

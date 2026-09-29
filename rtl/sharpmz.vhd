@@ -1140,7 +1140,7 @@ begin
     MZ_PS2_KEY               <= ps2_key;
     MZ_IOCTL_DOWNLOAD        <= ioctl_download;
     MZ_IOCTL_UPLOAD          <= ioctl_upload;
-    MZ_IOCTL_CLK             <= ioctl_clk;
+    MZ_IOCTL_CLK             <= CLKBUS(CKMASTER);                       -- ioctl runs on clk_sys (hps_io's clock on MiSTer); IOCTL_CLK is unused.
     MZ_IOCTL_WR              <= ioctl_wr;
     MZ_IOCTL_RD              <= ioctl_rd;
     MZ_IOCTL_ADDR            <= ioctl_addr;
@@ -1394,6 +1394,7 @@ begin
                                 when "1111" =>  -- 0.1Hz
                                     block_flip <= 1;
                                     bank_flip  <= 1;
+                                when others => null;
                             end case;
                 
                             -- If a subbank has been provided, we dont cycle through the blocks in the bank,
@@ -1416,6 +1417,7 @@ begin
                                         flip_counter <= 0;
                                         debug_counter <= debug_counter + 1;
                                     end if;
+                                when others => null;
                             end case;
                 
                             -- Bank 0 : T80 Signals

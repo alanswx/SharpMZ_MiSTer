@@ -263,7 +263,7 @@ begin
     -- Storage of the tape header for play and record operations.
     TAPEHDR : dpram
     GENERIC MAP (
-        init_file            => null,
+        init_file            => "",
         widthad_a            => 7,
         width_a              => 8,
         widthad_b            => 7,
@@ -289,7 +289,7 @@ begin
     -- Maximum size of 64K as this is the limit that can be accommodated by the MZ software.
     TAPEDATA : dpram
     GENERIC MAP (
-        init_file            => null,
+        init_file            => "",
         widthad_a            => 16,
         width_a              => 8,
         widthad_b            => 16,
@@ -447,6 +447,7 @@ begin
                                 TAPE_MOTOR_ON_n         <= '0';
                                 CMT_BUS_OUTi(TAPEREADY) <= '0';                         -- Indicates tape loaded, active Low.
                                 CMT_BUS_OUTi(WRITEREADY)<= '0';                         -- Indicates write mechanism disabled.
+                            when others => null;
                         end case;
                     end if;
     

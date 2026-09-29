@@ -322,6 +322,7 @@ signal V_SYNC_START          :     integer range 0 to 2047;
 signal V_SYNC_END            :     integer range 0 to 2047;
 signal V_LINE_END            :     integer range 0 to 2047;
 signal VRAM_WAIT             :     std_logic;                            -- Horizontal Blanking Memory Access
+signal T80_MREQ_LAST_n       :     std_logic := '1';
 --
 -- CG-ROM
 --
@@ -409,7 +410,7 @@ begin
 --
 VRAM0 : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 12,
     width_a              => 8,
     widthad_b            => 11,
@@ -440,7 +441,7 @@ PORT MAP (
 --
 GRAMG : dpram -- GREEN
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 14,
     width_a              => 8,
     widthad_b            => 14,
@@ -467,7 +468,7 @@ PORT MAP (
 --
 GRAMR : dpram -- RED
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 14,
     width_a              => 8,
     widthad_b            => 14,
@@ -494,7 +495,7 @@ PORT MAP (
 --
 GRAMB : dpram -- BLUE
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 14,
     width_a              => 8,
     widthad_b            => 14,
@@ -523,7 +524,7 @@ PORT MAP (
 --
 GRAMI : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 13,
     width_a              => 8,
     widthad_b            => 13,
@@ -552,7 +553,7 @@ PORT MAP (
 --
 GRAMII : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 13,
     width_a              => 8,
     widthad_b            => 13,
@@ -582,7 +583,7 @@ PORT MAP (
 --
 FRAMEBUF0 : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 14,
     width_a              => 24,
     widthad_b            => 14,
@@ -612,7 +613,7 @@ PORT MAP (
 --
 STATUSBUFG : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 12,
     width_a              => 8,
     widthad_b            => 12,
@@ -639,7 +640,7 @@ PORT MAP (
 --
 STATUSBUFR : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 12,
     width_a              => 8,
     widthad_b            => 12,
@@ -666,7 +667,7 @@ PORT MAP (
 --
 STATUSBUFB : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 12,
     width_a              => 8,
     widthad_b            => 12,
@@ -693,7 +694,7 @@ PORT MAP (
 --
 MENUBUFG : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 13,
     width_a              => 8,
     widthad_b            => 13,
@@ -720,7 +721,7 @@ PORT MAP (
 --
 MENUBUFR : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 13,
     width_a              => 8,
     widthad_b            => 13,
@@ -747,7 +748,7 @@ PORT MAP (
 --
 MENUBUFB : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 13,
     width_a              => 8,
     widthad_b            => 13,
@@ -804,7 +805,7 @@ PORT MAP (
 
 CGRAM : dpram
 GENERIC MAP (
-    init_file            => null,
+    init_file            => "",
     widthad_a            => 12,
     width_a              => 8,
     widthad_b            => 12,
@@ -1078,6 +1079,7 @@ begin
                                 XFER_MAPPED_DATA <= XFER_MAPPED_DATA nand reverse_vector(XFER_GRAM_DATA(23 downto 16)) & reverse_vector(XFER_GRAM_DATA(15 downto 8)) & reverse_vector(XFER_GRAM_DATA(7 downto 0));
                             when "11" =>
                                 XFER_MAPPED_DATA <= XFER_MAPPED_DATA xor  reverse_vector(XFER_GRAM_DATA(23 downto 16)) & reverse_vector(XFER_GRAM_DATA(15 downto 8)) & reverse_vector(XFER_GRAM_DATA(7 downto 0));
+                            when others => null;
                         end case;
                     end if;
                     XFER_CYCLE := 7;
@@ -1546,9 +1548,12 @@ end process;
 -- is copied into a framebuffer during the Vertical Blanking period so no wait states are needed. To keep consistency with the original design (for programs which depend on it),
 -- the wait states can be enabled by configuration.
 --
-process( T80_MREQ_n ) begin
-    if falling_edge(T80_MREQ_n) then
-        VRAM_WAIT <= H_BLANKi;
+process( CLKBUS(CKMASTER) ) begin
+    if rising_edge(CLKBUS(CKMASTER)) then
+        T80_MREQ_LAST_n <= T80_MREQ_n;
+        if T80_MREQ_n = '0' and T80_MREQ_LAST_n = '1' then    -- Start of a memory cycle.
+            VRAM_WAIT <= H_BLANKi;
+        end if;
     end if;
 end process;
 --

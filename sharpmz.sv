@@ -120,7 +120,18 @@ localparam CONF_STR =
 
 /////////////////  CLOCKS  ////////////////////////
 
+// 70.9376 MHz = 4 x the 17.7344 MHz MZ-700 crystal. rtl/clkgen.vhd derives all
+// machine clock enables from it (CLK_HZ must match).
 wire clk_sys;
+wire pll_locked;
+
+pll pll
+(
+	.refclk(CLK_50M),
+	.rst(0),
+	.outclk_0(clk_sys),
+	.locked(pll_locked)
+);
 
 /////////////////  HPS  ///////////////////////////
 
@@ -401,7 +412,7 @@ assign hps_ioctl_din = bridge_ioctl_din[7:0];
 
 /////////////////  RESET  /////////////////////////
 
-wire reset = RESET;
+wire reset = RESET | ~pll_locked;
 wire warm_reset = status[0] | buttons[1] | direct_load_active | (direct_load_reset_ctr != 0);
 
 ////////////////  Machine  ////////////////////////
@@ -430,11 +441,9 @@ wire bridge_sd_cd;
 
 bridge sharp_mz
 (
-	// Clocks Input to Emulator.
-	.clkmaster(CLK_50M),
-
-	// System clock.
-	.clksys(clk_sys),
+	// System clock; the core runs everything on it with clock enables.
+	.clkmaster(clk_sys),
+	.clksys(),
 
 	// Clocks output by the emulator.
 	.clkvid(clk_video_in),

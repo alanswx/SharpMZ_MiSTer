@@ -38,3 +38,15 @@ c5_pin_model_dump.txt
 *_netlist
 *.cdf
 **/.DS_Store
+# Local reference emulators (not part of the core)
+/refs/
+
+# Local software/tape archive (large, third-party)
+/software/
+
+# Verilator sim build products
+verilator/gen/
+verilator/ghdl_work/
+verilator/obj_dir*/
+verilator/software/
+verilator/out/
