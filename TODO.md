@@ -100,7 +100,8 @@ The old `sharpmz.cpp` handled save, a 5-entry tape queue and MZ-80B APSS. The co
 - [x] Blank tape image: `tools/make_blank_tape.py` (zero-filled; a zero attribute byte marks the end of the tape). Document it in the README.
 - [x] Park the core download bus on an unused address when idle. `cmt.vhd` clears RECORD_READY whenever the address points at its buffers, and after an OSD tape download the address used to stay there, so recordings could be lost on hardware too.
 - [x] Verify SAVE from the monitor (MZ-700, `S120012FF1200`): the image holds a correct MZF (attribute, name, load/exec, and data identical to RAM).
-- [ ] Verify reload of a saved tape, SAVE from BASIC, MZ-80K/80A/80B saves, and APSS on the MZ-80B.
+- [x] Verify reload of a saved tape: mounting the image written by SAVE and typing `L` prints `LOADING TEST`, loads without a checksum error and auto-runs it. (The RAM init MIF preloads the author's SHARPMZ TESTER at 1200h, so that's what the saved bytes contained.)
+- [ ] Verify SAVE from BASIC, MZ-80K/80A/80B saves, and APSS on the MZ-80B.
 - [ ] Check the playback waveform against mz-archive `.wav` recordings.
 
 ## Phase 4: Video
