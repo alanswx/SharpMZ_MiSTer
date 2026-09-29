@@ -1102,7 +1102,7 @@ begin
                                 else
                                 '0' & SR_PLANE_IV & SR_PLANE_III               when GD_DMD_320X200 = '1' and GD_DMD_FRAME_B = '1'  and CONFIG(OPT_MZ1R25) = '1'
                                 else
-                                '0' & SR_PLANE_IV & SR_PLANE_III               when GD_DMD_320X200 = '1' and GD_DMD_FRAME_AB = '1' and CONFIG(OPT_MZ1R25) = '1'  and GD_PALLETSW(0) = SR_PLANE_III and GD_PALLETSW(1) = SR_PLANE_IV
+                                '0' & SR_PLANE_II & SR_PLANE_I                 when GD_DMD_320X200 = '1' and GD_DMD_FRAME_AB = '1' and CONFIG(OPT_MZ1R25) = '1'  and GD_PALLETSW(0) = SR_PLANE_III and GD_PALLETSW(1) = SR_PLANE_IV  -- 16 colours: palette group IV/III selects the palette, II/I index it (mz800emu).
                                 else
                                 "100"                                          when GD_DMD_320X200 = '1' and GD_DMD_FRAME_AB = '1' and CONFIG(OPT_MZ1R25) = '1'  and (GD_PALLETSW(0) /= SR_PLANE_III or GD_PALLETSW(1) /= SR_PLANE_IV)
                                 else
@@ -2077,7 +2077,15 @@ begin
 
                                 when 2 =>
                                     -- Save the second plane data.
-                                    if (GD_DMD_320X200 = '1' and FB_GFX_MUXADDR(14) = '0') or (GD_DMD_640X200 = '1' and FB_GFX_MUXADDR(14) = '0') then
+                                    if GD_DMD_640X200 = '1' then
+                                        -- 640x200 mode, second plane is plane III, from either bank.
+                                        if FB_GFX_MUXADDR(14) = '0' then
+                                            FB_GFX_DATA          <= X"00" & reverse_vector(RENDR_GRAM_DATA(7 downto 0)) & FB_GFX_DATA(15 downto 8) & X"00";
+                                        else
+                                            FB_GFX_DATA          <= X"00" & reverse_vector(RENDR_GRAM_DATA(15 downto 8)) & FB_GFX_DATA(15 downto 8) & X"00";
+                                        end if;
+                                        RENDR_GFX_CYCLE          := 0;
+                                    elsif (GD_DMD_320X200 = '1' and FB_GFX_MUXADDR(14) = '0') then
                                         FB_GFX_DATA              <= X"0000" & FB_GFX_DATA(15 downto 8) & reverse_vector(RENDR_GRAM_DATA(7 downto 0));
                                         RENDR_GFX_CYCLE          := 3;
                                     elsif (GD_DMD_320X200 = '1' and FB_GFX_MUXADDR(14) = '1') then
@@ -2882,25 +2890,28 @@ begin
                         GD_O_DATA             <= GD_SRC_DATA;
 
                         -- Single write.
+                        -- SINGLE, EXOR, OR and RESET write the selected planes that exist in the current resolution
+                        -- (I-IV at 320x200, I and III at 640x200); the frame bit in WF only matters for REPLACE and PSET
+                        -- (mz800emu vramctrl, a transcription of the GDG VHDL).
                         if GD_WMD_SWRITE = '1' then
                             -- Frame A 320x200 Mode Plane I         or 640x200 Mode Plane I
-                            if (GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_I = '1' then
+                            if GD_WR_PLANE_I = '1' then
                                 GD_O_DATA(GD_320_PLANE_I_RANGE)   <= GD_CPUWRDATA;
                             end if;
                             --  Frame A 320x200 mode Plane II
-                            if ((GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_II = '1') then
+                            if (GD_DMD_320X200 = '1' and GD_WR_PLANE_II = '1') then
                                 GD_O_DATA(GD_320_PLANE_II_RANGE)  <= GD_CPUWRDATA;
                             end if;
                             -- Frame B 640x200 mode Plane III          
-                            if ((GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
+                            if (GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
                                 GD_O_DATA(GD_640_PLANE_III_RANGE) <= GD_CPUWRDATA;
                             end if;
                             -- Frame B 320x200 Mode Plane III
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
                                 GD_O_DATA(GD_320_PLANE_III_RANGE) <= GD_CPUWRDATA;
                             end if;
                             -- Frame B 320x200 Mode Plane IV
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
                                 GD_O_DATA(GD_320_PLANE_IV_RANGE) <= GD_CPUWRDATA;
                             end if;
                         end if;
@@ -2908,11 +2919,11 @@ begin
                         -- EXOR
                         if GD_WMD_EXOR = '1' then
                             -- Frame A 320x200 Mode Plane I         or 640x200 Mode Plane I
-                            if (GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_I = '1' then
+                            if GD_WR_PLANE_I = '1' then
                                 GD_O_DATA(GD_320_PLANE_I_RANGE)   <= (GD_SRC_DATA(GD_320_PLANE_I_RANGE) xor GD_CPUWRDATA);
                             end if;
                             --  Frame A 320x200 mode Plane II 
-                            if ((GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_II = '1') then
+                            if (GD_DMD_320X200 = '1' and GD_WR_PLANE_II = '1') then
                                
                                 GD_O_DATA(GD_320_PLANE_II_RANGE)  <= (GD_SRC_DATA(GD_320_PLANE_II_BIT7) xor GD_CPUWRDATA(7)) &
                                                                      (GD_SRC_DATA(GD_320_PLANE_II_BIT6) xor GD_CPUWRDATA(6)) &
@@ -2925,7 +2936,7 @@ begin
                                 --GD_CPUWRDATA; -- (GD_SRC_DATA(15 downto  8)); -- xor GD_CPUWRDATA);
                             end if;
                             -- Frame B 640x200 mode Plane III          
-                            if ((GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
+                            if (GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
 
                                 GD_O_DATA(GD_640_PLANE_III_RANGE) <= (GD_SRC_DATA(GD_640_PLANE_III_BIT7) xor GD_CPUWRDATA(7)) &
                                                                      (GD_SRC_DATA(GD_640_PLANE_III_BIT6) xor GD_CPUWRDATA(6)) &
@@ -2937,11 +2948,11 @@ begin
                                                                      (GD_SRC_DATA(GD_640_PLANE_III_BIT0) xor GD_CPUWRDATA(0));
                             end if;
                             -- Frame B 320x200 Mode Plane III
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
                                 GD_O_DATA(GD_320_PLANE_III_RANGE) <= (GD_SRC_DATA(GD_320_PLANE_III_RANGE) xor GD_CPUWRDATA);
                             end if;
                             -- Frame B 320x200 Mode Plane IV
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
                                 GD_O_DATA(GD_320_PLANE_IV_RANGE)  <= (GD_SRC_DATA(GD_320_PLANE_IV_RANGE) xor GD_CPUWRDATA);
                             end if;
                         end if;
@@ -2949,23 +2960,23 @@ begin
                         -- OR
                         if GD_WMD_OR = '1' then
                             -- Frame A 320x200 Mode Plane I         or 640x200 Mode Plane I
-                            if (GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_I = '1' then
+                            if GD_WR_PLANE_I = '1' then
                                 GD_O_DATA(GD_320_PLANE_I_RANGE)   <= GD_SRC_DATA(GD_320_PLANE_I_RANGE)  or GD_CPUWRDATA;
                             end if;
                             --  Frame A 320x200 mode Plane II
-                            if ((GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_II = '1') then
+                            if (GD_DMD_320X200 = '1' and GD_WR_PLANE_II = '1') then
                                 GD_O_DATA(GD_320_PLANE_II_RANGE)  <= GD_SRC_DATA(GD_320_PLANE_II_RANGE)  or GD_CPUWRDATA;
                             end if;
                             -- Frame B 640x200 mode Plane III          
-                            if ((GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
+                            if (GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
                                 GD_O_DATA(GD_640_PLANE_III_RANGE) <= GD_SRC_DATA(GD_640_PLANE_III_RANGE)  or GD_CPUWRDATA;
                             end if;
                             -- Frame B 320x200 Mode Plane III
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
                                 GD_O_DATA(GD_320_PLANE_III_RANGE) <= GD_SRC_DATA(GD_320_PLANE_III_RANGE)  or GD_CPUWRDATA;
                             end if;
                             -- Frame B 320x200 Mode Plane IV
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
                                 GD_O_DATA(GD_320_PLANE_IV_RANGE)  <= GD_SRC_DATA(GD_320_PLANE_IV_RANGE)  or GD_CPUWRDATA;
                             end if;
                         end if;
@@ -2973,23 +2984,23 @@ begin
                         -- RESET
                         if GD_WMD_RESET = '1' then
                             -- Frame A 320x200 Mode Plane I         or 640x200 Mode Plane I
-                            if (GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_I = '1' then
+                            if GD_WR_PLANE_I = '1' then
                                 GD_O_DATA(GD_320_PLANE_I_RANGE)   <= GD_SRC_DATA(GD_320_PLANE_I_RANGE) and not GD_CPUWRDATA;
                             end if;
                             --  Frame A 320x200 mode Plane II
-                            if ((GD_WR_FRAME_A = '1' or GD_DMD_FRAME_AB = '1') and GD_WR_PLANE_II = '1') then
+                            if (GD_DMD_320X200 = '1' and GD_WR_PLANE_II = '1') then
                                 GD_O_DATA(GD_320_PLANE_II_RANGE)  <= GD_SRC_DATA(GD_320_PLANE_II_RANGE) and not GD_CPUWRDATA;
                             end if;
                             -- Frame B 640x200 mode Plane III          
-                            if ((GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
+                            if (GD_DMD_640X200 = '1' and GD_WR_PLANE_III = '1') then
                                 GD_O_DATA(GD_640_PLANE_III_RANGE) <= GD_SRC_DATA(GD_640_PLANE_III_RANGE) and not GD_CPUWRDATA;
                             end if;
                             -- Frame B 320x200 Mode Plane III
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_III = '1' then
                                 GD_O_DATA(GD_320_PLANE_III_RANGE) <= GD_SRC_DATA(GD_320_PLANE_III_RANGE) and not GD_CPUWRDATA;
                             end if;
                             -- Frame B 320x200 Mode Plane IV
-                            if (GD_WR_FRAME_B = '1' or GD_DMD_FRAME_AB = '1') and GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
+                            if GD_DMD_320X200 = '1' and GD_WR_PLANE_IV = '1' then
                                 GD_O_DATA(GD_320_PLANE_IV_RANGE) <= GD_SRC_DATA(GD_320_PLANE_IV_RANGE) and not GD_CPUWRDATA;
                             end if;
                         end if;
@@ -3140,14 +3151,14 @@ begin
                     -- Frame A 320x200
                     if    GD_RD_FRAME_A = '1'  and GD_DMD_320X200 = '1' then 
 
-                        GD_CPURDDATA      <= ((GD_SRC_DATA(GD_320_PLANE_I_BIT7) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT7) xnor GD_RD_PLANE_II)) &
-                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT6) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT6) xnor GD_RD_PLANE_II)) &
-                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT5) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT5) xnor GD_RD_PLANE_II)) &
-                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT4) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT4) xnor GD_RD_PLANE_II)) &
-                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT3) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT3) xnor GD_RD_PLANE_II)) &
-                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT2) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT2) xnor GD_RD_PLANE_II)) &
-                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT1) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT1) xnor GD_RD_PLANE_II)) &
-                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT0) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_I_BIT0) xnor GD_RD_PLANE_II));
+                        GD_CPURDDATA      <= ((GD_SRC_DATA(GD_320_PLANE_I_BIT7) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT7) xnor GD_RD_PLANE_II)) &
+                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT6) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT6) xnor GD_RD_PLANE_II)) &
+                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT5) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT5) xnor GD_RD_PLANE_II)) &
+                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT4) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT4) xnor GD_RD_PLANE_II)) &
+                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT3) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT3) xnor GD_RD_PLANE_II)) &
+                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT2) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT2) xnor GD_RD_PLANE_II)) &
+                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT1) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT1) xnor GD_RD_PLANE_II)) &
+                                             ((GD_SRC_DATA(GD_320_PLANE_I_BIT0) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT0) xnor GD_RD_PLANE_II));
 
                     -- Frame B 320x200
                     elsif GD_RD_FRAME_B = '1'  and GD_DMD_320X200 = '1' then 

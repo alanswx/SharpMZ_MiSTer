@@ -6,6 +6,8 @@
 #   gfx_mz800     MZ-800: tests/mz800/gfx320.mzf draws 320x200 planes; frame hash compared
 #                 (the picture matches mz800emu, see tests/mz800/README.md)
 #   pcg_mz800     MZ-800: tests/mz800/pcg700.mzf redefines a character in the 700 mode CG-RAM (C000); frame hash
+#   m800_<test>   MZ-800 graphics modes, write/read modes and hardware scroll (tests/mz800/make_gfx_modes.py);
+#                 frame hash. The pictures match mz800emu (tests/mz800/compare_emu.sh).
 #   psg_mz800     MZ-800: tests/mz800/psg440.mzf plays 439.8 Hz on the PSG; the frequency is measured from --wav
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
 #   tape_image    load ramtest from an MZT through the tape image slot (fast tape)
@@ -37,6 +39,12 @@ pids+=($!); names+=("gfx_mz800")
       --stop-at-frame 341 --frame-log "$OUT/pcg_mz800.csv" --quiet > /dev/null 2> "$OUT/pcg_mz800.log"
   awk -F, '$1==340 {print $2}' "$OUT/pcg_mz800.csv" > "$OUT/pcg_mz800.txt" ) &
 pids+=($!); names+=("pcg_mz800")
+for t in gfx640 gfx640h gfx320h gfx320b gfx320x gfxwm gfxwm640 gfxrw gfxscr gfxscr640; do
+    ( $BIN --model mz800 --mzf tests/mz800/$t.mzf --mzf-direct --mzf-direct-frame 20 --type 200:M --type '280:J2000\n' \
+          --stop-at-frame 401 --frame-log "$OUT/m800_$t.csv" --quiet > /dev/null 2> "$OUT/m800_$t.log"
+      awk -F, '$1==400 {print $2}' "$OUT/m800_$t.csv" > "$OUT/m800_$t.txt" ) &
+    pids+=($!); names+=("m800_$t")
+done
 ( $BIN --model mz800 --mzf tests/mz800/psg440.mzf --mzf-direct --mzf-direct-frame 20 --type 200:M --type '280:J2000\n' \
       --stop-at-frame 400 --wav "$OUT/psg_mz800.wav" --quiet > /dev/null 2> "$OUT/psg_mz800.log"
   python3 tests/wav_freq.py "$OUT/psg_mz800.wav" 7.0 1.0 > "$OUT/psg_mz800.txt" ) &
@@ -58,7 +66,7 @@ for p in "${pids[@]}"; do wait $p; done
 fail=0
 for n in "${names[@]}"; do
     case $n in
-        boot_*|mon_*|gfx_*|pcg_*)
+        boot_*|mon_*|gfx_*|pcg_*|m800_*)
             if diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
                 echo "PASS $n"
             else

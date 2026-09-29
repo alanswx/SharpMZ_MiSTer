@@ -98,6 +98,7 @@ architecture rtl of video_vc is
     constant V2_OPT_GRAMII   : natural := 44;
     constant V2_OPT_GRAMIII  : natural := 45;
     constant V2_OPT_PCG      : natural := 46;
+    constant V2_OPT_MZ1R25   : natural := 47;
     constant V2_VRAMDISABLE  : natural := 69;
     constant V2_GRAMDISABLE  : natural := 70;
 
@@ -140,6 +141,7 @@ begin
         V2_CONFIG(V2_OPT_GRAMII)  <= '1';
         V2_CONFIG(V2_OPT_GRAMIII) <= '1';
         V2_CONFIG(V2_OPT_PCG)     <= '1';
+        V2_CONFIG(V2_OPT_MZ1R25)  <= CONFIG(MZ800);                  -- MZ-800 VRAM expansion (frame B, 16/4 colour modes), fitted as in mz800emu.
         V2_CONFIG(V2_VRAMDISABLE) <= CONFIG(VRAMDISABLE);
         V2_CONFIG(V2_GRAMDISABLE) <= CONFIG(GRAMDISABLE);
         -- VRAMWAIT and PCGRAM stay 0: VideoController copies them into its character/graphics blend

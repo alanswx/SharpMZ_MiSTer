@@ -8,7 +8,9 @@
 --                  GHDL synthesis cannot handle. These keep the same entities and behaviour:
 --
 --                    - Port A: 32-bit, byte / half-word / word writes; the read word is registered
---                      and the lane for a byte read is selected by the current address.
+--                      and the lane for a byte read is selected by the current address. At an
+--                      address ending in 10 the upper half-word is returned (the original gave one
+--                      byte, which lost plane III in MZ-800 640x200 EXOR/OR/PSET on odd bytes).
 --                    - Port B: 8-bit (3208) or 16-bit (3216); registered data, lane selected
 --                      combinationally by the current address. The MZ-800 renderer relies on that.
 --
@@ -152,7 +154,7 @@ begin
     word     <= qa(3) & qa(2) & qa(1) & qa(0);
     memARead <= word                  when memAAddr(1 downto 0) = "00" else
                 X"000000" & qa(1)     when memAAddr(1 downto 0) = "01" else
-                X"000000" & qa(2)     when memAAddr(1 downto 0) = "10" else
+                X"0000" & qa(3) & qa(2) when memAAddr(1 downto 0) = "10" else   -- Upper half-word (MZ-800 640x200 read-modify-write).
                 X"000000" & qa(3);
     memBRead <= qb(0) when memBAddr(1 downto 0) = "00" else
                 qb(1) when memBAddr(1 downto 0) = "01" else
@@ -211,7 +213,7 @@ begin
     word     <= qa(3) & qa(2) & qa(1) & qa(0);
     memARead <= word                  when memAAddr(1 downto 0) = "00" else
                 X"000000" & qa(1)     when memAAddr(1 downto 0) = "01" else
-                X"000000" & qa(2)     when memAAddr(1 downto 0) = "10" else
+                X"0000" & qa(3) & qa(2) when memAAddr(1 downto 0) = "10" else   -- Upper half-word (MZ-800 640x200 read-modify-write).
                 X"000000" & qa(3);
     memBRead <= qb(1) & qb(0) when memBAddr(0) = '0' else
                 qb(3) & qb(2);

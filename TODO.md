@@ -169,7 +169,8 @@ Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `
   - [x] 700 mode CG-RAM at C000 (PCG), read/write (`pcg_mz800`).
   - [x] Tape loading from the IPL (`C`) runs ramtest as mz800emu does (`tape_mz800`). The CMT had been using MZ-80B timings for the MZ-800.
   - [x] Rear mode switch: bit 1 of IN CE = 1 is MZ-800 (the IPL switches to MZ-800 graphics before starting a loaded program). Default MZ-700, as mz800emu.
-  - [ ] 640x200 mode, frame B, scroll (GCRTC CF), border colour: untested. The framework shows the 320x200 area only (no border).
+  - [x] 640x200 (2 and 4 colours), 320x200 frame B and 16 colours (MZ-1R25 VRAM expansion on, as mz800emu), all write modes (SINGLE/EXOR/OR/RESET/REPLACE/PSET), RF reads and colour search, hardware scroll: all match mz800emu (`tests/mz800/compare_emu.sh`, `m800_*` tests). Fixed on the way: frame gating in SINGLE/EXOR/OR/RESET, 640x200 plane III render for the first bank, 16-colour palette index, frame A colour search, and the half-word read in `vc_rams` (a v2 bug too).
+  - [ ] Border colour (CF register 6): the core outputs only the 320x200/640x200 area, so the border isn't visible.
   - [ ] Z80 PIO at FC-FF (interrupts, printer), joystick reads (F0/F1 return FF).
   - [ ] VideoController IN CE read returns the mode register (not used: the machine side answers CE reads).
   - [ ] Real software: run MZ-800 titles from `software/`.

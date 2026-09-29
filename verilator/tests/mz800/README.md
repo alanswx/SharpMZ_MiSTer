@@ -10,3 +10,22 @@ It matches mz800emu:
 (mz800emu's lower lines also show whatever was in plane I before; the simulation starts with clear VRAM.)
 
 `make_gfx320.py` writes the MZF.
+
+## Graphics modes
+
+`make_gfx_modes.py` writes programs that set a display mode, the palette and (for some) the hardware scroll, and fill the planes through the write format register with address-dependent patterns, so VRAM addressing, pixel order, colour mapping and the write/read logic all show in the picture:
+
+| Test | Mode | What it checks |
+|---|---|---|
+| gfx640 | 640x200, 2 colours | plane I |
+| gfx640h | 640x200, 4 colours | planes I and III (MZ-1R25) |
+| gfx320h | 320x200, 16 colours | planes I-IV, palette group |
+| gfx320b | 320x200, 4 colours, frame B | planes III and IV |
+| gfx320x | 320x200, 4 colours, frame A | planes I and II |
+| gfxwm | 320x200, 16 colours | EXOR, OR, RESET, REPLACE, PSET |
+| gfxwm640 | 640x200, 4 colours | the same write modes |
+| gfxrw | 320x200, 4 colours | RF single-plane read and colour search |
+| gfxscr | 320x200 | full screen hardware scroll, CPU writes while scrolled |
+| gfxscr640 | 640x200 | scroll window (SSA/SEA/SW) |
+
+`compare_emu.sh` runs each in the simulation and in mz800emu (`--crop canvas`) and compares the pictures with `cmp_emu.py`; all match. `run_tests.sh` checks their frame hashes (`m800_*`).
