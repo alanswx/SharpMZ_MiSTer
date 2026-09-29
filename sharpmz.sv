@@ -422,8 +422,9 @@ wire audio_l_emu;
 wire audio_r_emu;
 // 1-bit sound (8253 or tape signal, per the Audio Source option) at half scale; the framework's
 // DC blocker centres it. Full scale was harsh and sat at a large DC offset.
-assign AUDIO_L = {1'b0, audio_l_emu, 14'd0};
-assign AUDIO_R = {1'b0, audio_r_emu, 14'd0};
+wire [13:0] audio_psg;                              // MZ-800 PSG mix (0 on other models).
+assign AUDIO_L = {1'b0, audio_l_emu, 14'd0} + {2'b00, audio_psg};
+assign AUDIO_R = {1'b0, audio_r_emu, 14'd0} + {2'b00, audio_psg};
 assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
@@ -462,6 +463,7 @@ sharpmz sharp_mz
 
 	.AUDIO_L_O(audio_l_emu),
 	.AUDIO_R_O(audio_r_emu),
+	.AUDIO_PSG_O(audio_psg),
 
 	.CMT_STATUS(cmt_status),
 

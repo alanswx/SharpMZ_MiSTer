@@ -63,6 +63,7 @@ library ieee;
 library pkgs;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
+use ieee.numeric_std.all;
 use pkgs.config_pkg.all;
 use pkgs.clkgen_pkg.all;
 use pkgs.mctrl_pkg.all;
@@ -105,6 +106,7 @@ entity mz80c is
           -- Audio.
           AUDIO_L            : out std_logic;
           AUDIO_R            : out std_logic;
+          AUDIO_PSG          : out std_logic_vector(13 downto 0);        -- MZ-800 PSG (SN76489) mix, unsigned.
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -251,6 +253,8 @@ signal M8_STATUS             :     std_logic_vector(7 downto 0);            -- I
 signal M8_TEMPO              :     std_logic;
 signal M8_TEMPO_CNT          :     integer range 0 to 228;
 signal M8_HBLANK_LAST        :     std_logic;
+signal M8_PSG_CS_n           :     std_logic;
+signal M8_PSG_MIX            :     unsigned(13 downto 0);
 --
 -- Debug
 --
@@ -364,6 +368,30 @@ begin
             GATE2            => '1',
             OUT2             => INTX
       );
+
+    -- MZ-800 PSG (SN76489) at port F2, write only. Its clock is fixed at 3.54688 MHz so turbo does not change the pitch.
+    --
+    PSG0 : entity work.sn76489_audio
+        generic map (
+            FAST_IO_G        => '1',                                     -- No wait states, as mz800emu.
+            MIN_PERIOD_CNT_G => 6
+        )
+        port map (
+            clk_i            => CLKBUS(CKMASTER),
+            en_clk_psg_i     => CLKBUS(CKENPSG),
+            ce_n_i           => M8_PSG_CS_n,
+            wr_n_i           => T80_WR_n,
+            ready_o          => open,
+            data_i           => T80_DO,
+            ch_a_o           => open,
+            ch_b_o           => open,
+            ch_c_o           => open,
+            noise_o          => open,
+            mix_audio_o      => M8_PSG_MIX,
+            pcm14s_o         => open
+        );
+    M8_PSG_CS_n              <= '0' when M8 = '1' and M8_IO = X"F2" else '1';
+    AUDIO_PSG                <= std_logic_vector(M8_PSG_MIX) when M8 = '1' and CONFIG(AUDIOSRC) = '0' else (others => '0');
 
     -- Parent signals onto local wires.
     --

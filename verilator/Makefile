@@ -48,6 +48,7 @@ VHD_SRC = \
 	$(RTL)/z8420/z8420.vhd \
 	$(RTL)/keymatrix.vhd \
 	$(RTL)/cmt.vhd \
+	$(RTL)/sn76489_audio.vhd \
 	$(RTL)/mz80c/mz80c.vhd \
 	$(RTL)/mz80b/mz80b.vhd \
 	$(RTL)/vc/vc_mctrl_pkg.vhd \

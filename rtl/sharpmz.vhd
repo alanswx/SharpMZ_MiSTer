@@ -102,6 +102,7 @@ entity sharpmz is
         --------------------                        AUDIO                       ------------------------------
         AUDIO_L_O             : out    std_logic;
         AUDIO_R_O             : out    std_logic;
+        AUDIO_PSG_O           : out    std_logic_vector(13 downto 0);   -- MZ-800 PSG mix, unsigned.
         --------------------                      Tape status                   ------------------------------
         CMT_STATUS            : out    std_logic_vector(13 downto 0);           -- CMT_BUS_OUT, see mctrl_pkg.vhd.
         --------------------                   Machine configuration              ------------------------------
@@ -219,6 +220,7 @@ signal MZ80C_CS_IO_GFB_n     :     std_logic;
 --
 signal MZ80C_AUDIO_L         :     std_logic;
 signal MZ80C_AUDIO_R         :     std_logic;
+signal MZ80C_AUDIO_PSG       :     std_logic_vector(13 downto 0);
 --
 -- Video signals for MZ80C
 --
@@ -540,6 +542,7 @@ component mz80c
           -- Audio.
           AUDIO_L            : out std_logic;
           AUDIO_R            : out std_logic;
+          AUDIO_PSG          : out std_logic_vector(13 downto 0);
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -950,6 +953,7 @@ begin
             -- Audio.
             AUDIO_L          => MZ80C_AUDIO_L,
             AUDIO_R          => MZ80C_AUDIO_R,
+            AUDIO_PSG        => MZ80C_AUDIO_PSG,
 
             -- Different operations modes.
             CONFIG           => CONFIG,
@@ -1092,6 +1096,7 @@ begin
     MZ_CS_IO_G_n             <= '1'               when CONFIG(MZ_80C) = '1'   else MZ80B_CS_IO_G_n;
     audio_l_o                <= MZ80C_AUDIO_L     when CONFIG(MZ_80C) = '1'   else MZ80B_AUDIO_L;
     audio_r_o                <= MZ80C_AUDIO_R     when CONFIG(MZ_80C) = '1'   else MZ80B_AUDIO_R;
+    AUDIO_PSG_O              <= MZ80C_AUDIO_PSG   when CONFIG(MZ_80C) = '1'   else (others => '0');
     MZ_VGATE_n               <= MZ80C_VGATE_n     when CONFIG(MZ_80C) = '1'   else MZ80B_VGATE_n;
     MZ_CMT_BUS_IN            <= MZ80C_CMT_BUS_IN  when CONFIG(MZ_80C) = '1'   else MZ80B_CMT_BUS_IN;
 

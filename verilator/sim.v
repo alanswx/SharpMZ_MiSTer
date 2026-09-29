@@ -26,6 +26,7 @@ module top(
 
    output        AUDIO_L /*verilator public_flat*/,
    output        AUDIO_R /*verilator public_flat*/,
+   output [13:0] AUDIO_PSG /*verilator public_flat*/,
 
    input         ioctl_download,
    input         ioctl_wr,
@@ -142,6 +143,7 @@ module top(
       .VGA_B_O        (VGA_B),
       .AUDIO_L_O      (AUDIO_L),
       .AUDIO_R_O      (AUDIO_R),
+      .AUDIO_PSG_O    (AUDIO_PSG),
       .CMT_STATUS     (cmt_status),
       .IOCTL_DIN      (din32)
    );

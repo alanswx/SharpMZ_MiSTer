@@ -36,6 +36,7 @@ set_global_assignment -name VHDL_FILE rtl/i8255/i8255.vhd
 #============================================================
 # MZ80C specific modules.
 #============================================================
+set_global_assignment -name VHDL_FILE rtl/sn76489_audio.vhd
 set_global_assignment -name VHDL_FILE rtl/mz80c/mz80c.vhd
 
 #============================================================

@@ -120,11 +120,13 @@ architecture RTL of clkgen is
 
     signal CPU_ACC                 : acc_t;
     signal PER_ACC                 : acc_t;
+    signal PSG_ACC                 : acc_t;
     signal SND_ACC                 : acc_t;
     signal RTC_ACC                 : acc_t;
 
     signal CKENCPUi                : std_logic;
     signal CKENPERi                : std_logic;
+    signal CKENPSGi                : std_logic;
     signal CKSOUNDi                : std_logic;
     signal CKRTCi                  : std_logic;
 
@@ -179,15 +181,18 @@ begin
             if RST = '1' then
                 CPU_ACC            <= (others => '0');
                 PER_ACC            <= (others => '0');
+                PSG_ACC            <= (others => '0');
                 SND_ACC            <= (others => '0');
                 RTC_ACC            <= (others => '0');
                 CKENCPUi           <= '0';
                 CKENPERi           <= '0';
+                CKENPSGi           <= '0';
                 CKSOUNDi           <= '0';
                 CKRTCi             <= '0';
             else
                 step(CPU_ACC, CPU_RATE, CKENCPUi);
                 step(PER_ACC, R_2M,     CKENPERi);
+                step(PSG_ACC, R_3M5,    CKENPSGi);
 
                 -- Square waves: toggle on each enable.
                 if SND_ACC + SND_RATE.num >= SND_RATE.modulus then
@@ -215,5 +220,6 @@ begin
     CLKBUS(CKENCPU)                <= CKENCPUi;                          -- CPU clock enable.
     CLKBUS(CKENLEDS)               <= CKENCPUi;                          -- Debug LED sampling follows the CPU.
     CLKBUS(CKENPERIPH)             <= CKENPERi;                          -- Peripheral clock enable, 2 MHz.
+    CLKBUS(CKENPSG)                <= CKENPSGi;                          -- MZ-800 PSG clock enable, 3.54688 MHz.
 
 end RTL;

@@ -61,6 +61,7 @@ struct Options {
     int      ascii_cols = 40;
     std::vector<MemDump> memdumps;
     std::string trace_file;
+    std::string wav_file;
     uint32_t trace_from = 0, trace_to = UINT32_MAX;
     bool     quiet = false;
     bool     verbose = false;
@@ -106,6 +107,7 @@ static void usage()
 "  --dump-mem A:L:FILE    write main RAM A..A+L-1 at exit (physical RAM, not the\n"
 "                         CPU's banked view; addresses in hex or decimal)\n"
 "  --trace-cpu FILE       PC of each instruction fetch\n"
+"  --wav FILE             audio at 48 kHz, 16-bit mono (sound/tape bit + MZ-800 PSG, as sharpmz.sv)\n"
 "  --trace-from N         start tracing at frame N; --trace-to N stops after frame N\n"
 "\n"
 "fb_hash is FNV-1a 32 over the RGB888 bytes of the active (unblanked) picture,\n"
@@ -175,6 +177,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--tape-readonly") o.tape_readonly = true;
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
         else if (a == "--trace-cpu") o.trace_file = next();
+        else if (a == "--wav") o.wav_file = next();
         else if (a == "--trace-from") o.trace_from = parse_num(next());
         else if (a == "--trace-to") o.trace_to = parse_num(next());
         else { fprintf(stderr, "unknown option %s (try --help)\n", a.c_str()); return false; }
@@ -229,6 +232,11 @@ private:
     bool     ps2_toggle = false;
 
     FILE *flog = nullptr, *ftrace = nullptr;
+
+    // Audio capture (--wav): 48 kHz samples of AUDIO_L as sharpmz.sv mixes it.
+    FILE    *fwav = nullptr;
+    uint64_t wav_acc = 0, wav_samples = 0;
+    void wav_header();
 
     // Tape image slot, emulating Main_MiSTer's side of hps_io's sd_* handshake.
     FILE    *img = nullptr;
@@ -352,6 +360,17 @@ void Sim::clock()
     cycle++;
 
     if (top->cpu_ce) cpu_cycles++;
+
+    if (fwav) {
+        wav_acc += 48000;
+        if (wav_acc >= (uint64_t)CLK_HZ) {
+            wav_acc -= (uint64_t)CLK_HZ;
+            int v = (top->AUDIO_L ? 0x4000 : 0) + top->AUDIO_PSG - 0x4000;
+            int16_t smp = (int16_t)v;
+            fwrite(&smp, 2, 1, fwav);
+            wav_samples++;
+        }
+    }
 
     if (ftrace && frame >= opt.trace_from && frame <= opt.trace_to) {
         bool m1 = top->cpu_m1_n;
@@ -536,6 +555,18 @@ bool Sim::want_png(uint32_t f) const
     return false;
 }
 
+void Sim::wav_header()
+{
+    uint32_t data = (uint32_t)(wav_samples * 2);
+    auto u32 = [&](uint32_t v) { fwrite(&v, 4, 1, fwav); };
+    auto u16 = [&](uint16_t v) { fwrite(&v, 2, 1, fwav); };
+    fseek(fwav, 0, SEEK_SET);
+    fwrite("RIFF", 1, 4, fwav); u32(36 + data); fwrite("WAVEfmt ", 1, 8, fwav);
+    u32(16); u16(1); u16(1); u32(48000); u32(96000); u16(2); u16(16);
+    fwrite("data", 1, 4, fwav); u32(data);
+    fseek(fwav, 0, SEEK_END);
+}
+
 void Sim::write_png(uint32_t f)
 {
     if (fb_w == 0 || fb_h == 0) return;
@@ -597,6 +628,10 @@ int Sim::run()
         fprintf(stderr, "cannot write %s\n", opt.frame_log.c_str()); return 2;
     }
     if (flog) fprintf(flog, "frame,fb_hash,cpu_cycles,pc\n");
+    if (!opt.wav_file.empty()) {
+        if (!(fwav = fopen(opt.wav_file.c_str(), "wb"))) { fprintf(stderr, "cannot write %s\n", opt.wav_file.c_str()); return 2; }
+        wav_header();
+    }
     if (!opt.trace_file.empty() && !(ftrace = fopen(opt.trace_file.c_str(), "w"))) {
         fprintf(stderr, "cannot write %s\n", opt.trace_file.c_str()); return 2;
     }
@@ -633,6 +668,7 @@ int Sim::run()
     if (opt.ascii_end) print_ascii();
     dump_memory();
     if (flog) fclose(flog);
+    if (fwav) { wav_header(); fclose(fwav); }
     if (ftrace) fclose(ftrace);
     return exit_code;
 }

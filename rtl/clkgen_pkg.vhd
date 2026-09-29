@@ -15,7 +15,7 @@ package clkgen_pkg is
 
     -- Clock bus, various clocks on a single bus construct.
     --
-    subtype  CLKBUS_WIDTH is integer range 8 downto 0;
+    subtype  CLKBUS_WIDTH is integer range 9 downto 0;
 
     -- Indexes to the various clocks on the bus.
     --
@@ -28,4 +28,5 @@ package clkgen_pkg is
     constant CKENCPU                : integer := 6;                      -- CPU clock enable.
     constant CKENLEDS               : integer := 7;                      -- LEDS display clock enable.
     constant CKENPERIPH             : integer := 8;                      -- Peripheral clock enable.
+    constant CKENPSG                : integer := 9;                      -- MZ-800 PSG clock enable, 3.54688 MHz (not affected by turbo).
 end clkgen_pkg;
