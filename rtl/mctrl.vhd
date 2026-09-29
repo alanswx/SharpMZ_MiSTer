@@ -6,8 +6,8 @@
 -- Description:     Sharp MZ series Programmable Machine Control logic.
 --                  This module forms the Programmable control of the emulation along with sync reset
 --                  management.
---                  A set of 16 addressable registers is presented on the external IOCTL interface.
---                  Each register controls an aspect of the emulation, such as video mode or cpu speed.
+--                  Configuration inputs (from the OSD) control each aspect of the emulation, such
+--                  as video mode or cpu speed, and are decoded here into the CONFIG bus.
 --
 --                  Reset to all components is managed by this module, taking cold, warm and internally
 --                  generated reset signals and creating a unified system reset output.
@@ -57,13 +57,17 @@ entity mctrl is
         WARM_RESET           : in  std_logic;
         SYSTEM_RESET         : out std_logic;
 
-        -- HPS Interface
-        IOCTL_CLK            : in  std_logic;                            -- HPS I/O Clock.
-        IOCTL_WR             : in  std_logic;                            -- HPS Write Enable to FPGA.
-        IOCTL_RD             : in  std_logic;                            -- HPS Read Enable from FPGA.
-        IOCTL_ADDR           : in  std_logic_vector(24 downto 0);        -- HPS Address in FPGA to write into.
-        IOCTL_DOUT           : in  std_logic_vector(31 downto 0);        -- HPS Data to be written into FPGA.
-        IOCTL_DIN            : out std_logic_vector(31 downto 0);        -- HPS Data to be read into HPS.
+        -- Machine configuration, driven from the OSD status bits (sharpmz.sv). Same layout as the
+        -- registers the legacy HPS driver wrote at 0x1000000+.
+        CFG_MODEL            : in  std_logic_vector(7 downto 0);         -- 2:0 machine model.
+        CFG_DISPLAY          : in  std_logic_vector(7 downto 0);         -- 2:0 display type, 4 VRAM off, 5 GRAM off, 6 VRAM wait, 7 PCG RAM.
+        CFG_DISPLAY2         : in  std_logic_vector(7 downto 0);         -- 1:0 video timing, 7:3 GRAM I/O address.
+        CFG_DISPLAY3         : in  std_logic_vector(7 downto 0);         -- 0 menu overlay, 1 status overlay.
+        CFG_CPU              : in  std_logic_vector(7 downto 0);         -- 2:0 turbo, 7 boot reset.
+        CFG_AUDIO            : in  std_logic_vector(7 downto 0);         -- 0 audio source (sound / tape).
+        CFG_CMT              : in  std_logic_vector(7 downto 0);         -- 2:0 fast tape, 4:3 buttons, 5/6 Sharp ASCII conversion in/out.
+        CFG_USERROM          : in  std_logic_vector(7 downto 0);         -- User ROM enable per machine.
+        CFG_FDCROM           : in  std_logic_vector(7 downto 0);         -- FDC ROM enable per machine.
 
         -- Different operations modes.
         CONFIG               : out std_logic_vector(CONFIG_WIDTH);
@@ -89,19 +93,12 @@ signal REGISTER_DISPLAY3     : std_logic_vector(7 downto 0)     := "00000000";
 signal REGISTER_CPU          : std_logic_vector(7 downto 0)     := "00000000";
 signal REGISTER_AUDIO        : std_logic_vector(7 downto 0)     := "00000000";
 signal REGISTER_CMT          : std_logic_vector(7 downto 0)     := "00000000";
-signal REGISTER_CMT2         : std_logic_vector(7 downto 0)     := "00000000";
 signal REGISTER_USERROM      : std_logic_vector(7 downto 0)     := "00000000";
 signal REGISTER_FDCROM       : std_logic_vector(7 downto 0)     := "00000000";
-signal REGISTER_10           : std_logic_vector(7 downto 0)     := "00000000";
-signal REGISTER_11           : std_logic_vector(7 downto 0)     := "00000000";
-signal REGISTER_12           : std_logic_vector(7 downto 0)     := "00000000";
--- REGISTER_13 is a read only configuration, so no register required.
-signal REGISTER_DEBUG        : std_logic_vector(7 downto 0)     := "00001000";
-signal REGISTER_DEBUG2       : std_logic_vector(7 downto 0)     := "00000000";
+constant REGISTER_DEBUG       : std_logic_vector(7 downto 0)     := "00000000";  -- Debug features off.
+constant REGISTER_DEBUG2      : std_logic_vector(7 downto 0)     := "00000000";  -- Debug features off.
 signal delay                 : integer range 0 to 63;
-signal READ_STATUS           : std_logic_vector(15 downto 0);
 signal RESET_MACHINE         : std_logic;
-signal CMT_BUS_OUT_LAST      : std_logic_vector(CMT_BUS_OUT_WIDTH);
 
 begin
     -- Synchronise the register update with the configuration signals according to the CPU clock.
@@ -395,7 +392,7 @@ begin
                 end case;
     
                 -- Setup RTC clock frequency dependent upon model.
-                if REGISTER_MODEL(2 downto 0) = "110" and REGISTER_MODEL(2 downto 0) = "111" then
+                if REGISTER_MODEL(2 downto 0) = "110" or REGISTER_MODEL(2 downto 0) = "111" then
                     CONFIG(RTCSPEED) <= "01";
                 elsif REGISTER_MODEL(2 downto 0)  = "100" or  REGISTER_MODEL(2 downto 0)  = "101" then
                     CONFIG(RTCSPEED) <= "10";
@@ -452,137 +449,47 @@ begin
         end if;
     end process;
 
-    -- Machine control is just a set of registers holding latched signals to configure machine components.
-    -- A write is made on address 100000000000000000000AAAA to read/write the registers, direction is via the
-    -- RD/WR signals.
-    -- AAAA specifies which register to read/write.
+    -- Configuration registers follow the OSD inputs. A change of model, display type, or a CPU setting
+    -- change with boot reset enabled resets the machine, as the legacy register writes did.
     --
-    process (COLD_RESET, IOCTL_CLK)
+    process (COLD_RESET, CLKBUS(CKMASTER))
     begin
         if COLD_RESET = '1' then
-            REGISTER_MODEL   <= "00000011";   
+            REGISTER_MODEL   <= "00000011";
             REGISTER_DISPLAY <= "00000000";
             REGISTER_DISPLAY2<= "00000000";
             REGISTER_DISPLAY3<= "00000000";
             REGISTER_CPU     <= "00000000";
             REGISTER_AUDIO   <= "00000000";
             REGISTER_CMT     <= "00000000";
-            REGISTER_CMT2    <= "00000000";
             REGISTER_USERROM <= "00000000";
             REGISTER_FDCROM  <= "00000000";
-            REGISTER_10      <= "00000000";
-            REGISTER_11      <= "00000000";
-            REGISTER_12      <= "00000000";
-            REGISTER_DEBUG   <= "00000000";
-            REGISTER_DEBUG2  <= "00000000";
-            READ_STATUS      <= (others => '0');
             RESET_MACHINE    <= '1';
-            CMT_BUS_OUT_LAST <= (others => '0');
-        elsif IOCTL_CLK'event and IOCTL_CLK='1' then
+        elsif rising_edge(CLKBUS(CKMASTER)) then
+            RESET_MACHINE    <= '0';
 
-            -- Reset a register if it has been read, ready for next status change.
-            --
-            if READ_STATUS(6) = '1' then
-                REGISTER_CMT2    <= (others => '0');
+            if CFG_MODEL /= REGISTER_MODEL then
+                RESET_MACHINE <= '1';
             end if;
-
-            -- CMT Register 2, for bits 0,2,3 & 4, they set an active bit, then upon read it is reset.
-            --
-            if CMT_BUS_OUT(APSS_STOP) /= CMT_BUS_OUT_LAST(APSS_STOP) and CMT_BUS_OUT(APSS_STOP) = '1' then
-                REGISTER_CMT2(4) <= CMT_BUS_OUT(APSS_STOP);
+            if CFG_DISPLAY(2 downto 0) /= REGISTER_DISPLAY(2 downto 0) then
+                RESET_MACHINE <= '1';
             end if;
-            --if CMT_BUS_OUT(APSS_PLAY) /= CMT_BUS_OUT_LAST(APSS_PLAY) and CMT_BUS_OUT(APSS_PLAY) = '1' then
-                REGISTER_CMT2(3) <= CMT_BUS_OUT(APSS_PLAY);
-            --end if;
-            if CMT_BUS_OUT(APSS_EJECT) /= CMT_BUS_OUT_LAST(APSS_EJECT) and CMT_BUS_OUT(APSS_EJECT) = '1' then
-                REGISTER_CMT2(2) <= '1';
-            end if;
-            REGISTER_CMT2(1)     <= CMT_BUS_OUT(APSS_DIR);
-            if CMT_BUS_OUT(APSS_SEEK) /= CMT_BUS_OUT_LAST(APSS_SEEK) and CMT_BUS_OUT(APSS_SEEK) = '1' then
-                REGISTER_CMT2(0) <= '1';
-            end if;
-            CMT_BUS_OUT_LAST     <= CMT_BUS_OUT;
-            READ_STATUS          <= (others => '0');
-            
-            -- For reading of registers, if no specific signal is required, just read back the output latch.
-            --
-            if IOCTL_ADDR(24) = '1' and IOCTL_RD = '1' then
-                case IOCTL_ADDR(3 downto 0) is
-                    when "0000" => IOCTL_DIN        <= X"000000" & REGISTER_MODEL;          READ_STATUS(0)  <= '1';
-                    when "0001" => IOCTL_DIN        <= X"000000" & REGISTER_DISPLAY;        READ_STATUS(1)  <= '1';
-                    when "0010" => IOCTL_DIN        <= X"000000" & REGISTER_DISPLAY2;       READ_STATUS(2)  <= '1';
-                    when "0011" => IOCTL_DIN        <= X"000000" & REGISTER_DISPLAY3;       READ_STATUS(3)  <= '1';
-                    when "0100" => IOCTL_DIN        <= X"000000" & REGISTER_CPU;            READ_STATUS(4)  <= '1';
-                    when "0101" => IOCTL_DIN        <= X"000000" & REGISTER_AUDIO;          READ_STATUS(5)  <= '1';
-                    when "0110" => IOCTL_DIN        <= X"000000" & CMT_BUS_OUT(7 downto 0); READ_STATUS(6)  <= '1';
-                    when "0111" => IOCTL_DIN        <= X"000000" & REGISTER_CMT2;           READ_STATUS(7)  <= '1';
-                    when "1000" => IOCTL_DIN        <= X"000000" & REGISTER_USERROM;        READ_STATUS(8)  <= '1';
-                    when "1001" => IOCTL_DIN        <= X"000000" & REGISTER_FDCROM;         READ_STATUS(9)  <= '1';
-                    when "1010" => IOCTL_DIN        <= X"000000" & REGISTER_10;             READ_STATUS(10) <= '1';
-                    when "1011" => IOCTL_DIN        <= X"000000" & REGISTER_11;             READ_STATUS(11) <= '1';
-                    when "1100" => IOCTL_DIN        <= X"000000" & REGISTER_12;             READ_STATUS(12) <= '1';
-                    when "1101" => IOCTL_DIN        <= X"000000" & "000000" & std_logic_vector(to_unsigned(NEO_ENABLE, 1)) & std_logic_vector(to_unsigned(DEBUG_ENABLE, 1));
-                    when "1110" => IOCTL_DIN        <= X"000000" & REGISTER_DEBUG;          READ_STATUS(14) <= '1';
-                    when "1111" => IOCTL_DIN        <= X"000000" & REGISTER_DEBUG2;         READ_STATUS(15) <= '1';
-                    when others => null;
-                end case;
-            end if;
-            -- For writing of registers, just assign the input bus to the register.
-            if IOCTL_ADDR(24) = '1' and IOCTL_WR = '1' then
-                case IOCTL_ADDR(3 downto 0) is
-                    when "0000" => 
-                        -- Assign the model data to the register and preset the default display hardware.
-                        REGISTER_MODEL   <= IOCTL_DOUT(7 downto 0);
-                        case IOCTL_DOUT(2 downto 0) is
-                            when "000" | "001" | "010" | "011" =>
-                                 REGISTER_DISPLAY   <= REGISTER_DISPLAY(7 downto 3) & "000";
-                            when "100" | "101" =>
-                                 REGISTER_DISPLAY   <= REGISTER_DISPLAY(7 downto 3) & "010";
-                            when "110" | "111" =>
-                                 REGISTER_DISPLAY   <= REGISTER_DISPLAY(7 downto 3) & "001";
-                            when others => null;
-                        end case;
-                        RESET_MACHINE <= '1';
-                    when "0001" =>
-                        REGISTER_DISPLAY            <= IOCTL_DOUT(7 downto 0);
-
-                        -- Reset display if the mode changes.
-                        if REGISTER_DISPLAY(2 downto 0) /= IOCTL_DOUT(2 downto 0) then
-                            RESET_MACHINE           <= '1';
-                        end if;
-                    when "0010" =>
-                        -- Check the sanity, certain address ranges are blocked by the underlying machine.
-                        --
-                        if IOCTL_DOUT(7 downto 4) /= "1111" and IOCTL_DOUT(7 downto 4) /= "1110" and IOCTL_DOUT(7 downto 4) /= "1101" then
-                            REGISTER_DISPLAY2       <= IOCTL_DOUT(7 downto 0);
-                        end if;
-
-                    when "0011" => REGISTER_DISPLAY3<= IOCTL_DOUT(7 downto 0);
-
-                    when "0100" => REGISTER_CPU     <= IOCTL_DOUT(7 downto 0);
-                                   if REGISTER_CPU(7) = '1' then
-                                       RESET_MACHINE<= '1';
-                                   end if;
-                    when "0101" => REGISTER_AUDIO   <= IOCTL_DOUT(7 downto 0);
-                    when "0110" => REGISTER_CMT     <= IOCTL_DOUT(7 downto 0);
-                    when "0111" => REGISTER_CMT2    <= IOCTL_DOUT(7 downto 0);
-                    when "1000" => REGISTER_USERROM <= IOCTL_DOUT(7 downto 0);
-                    when "1001" => REGISTER_FDCROM  <= IOCTL_DOUT(7 downto 0);
-                    when "1010" => REGISTER_10      <= IOCTL_DOUT(7 downto 0);
-                    when "1011" => REGISTER_11      <= IOCTL_DOUT(7 downto 0);
-                    when "1100" => REGISTER_12      <= IOCTL_DOUT(7 downto 0);
-                    when "1101" => -- Setup register showing configuration, cannot be changed.
-                    when "1110" => REGISTER_DEBUG   <= IOCTL_DOUT(7 downto 0);
-                    when "1111" => REGISTER_DEBUG2  <= IOCTL_DOUT(7 downto 0);
-                    when others => null;
-                end case;
+            if CFG_CPU /= REGISTER_CPU and REGISTER_CPU(7) = '1' then
+                RESET_MACHINE <= '1';
             end if;
 
-            -- Only allow reset signal to be active for 1 clock cycle, just enough to trigger a system reset.
-            --
-            if RESET_MACHINE = '1' then
-                RESET_MACHINE <= '0';
+            REGISTER_MODEL   <= CFG_MODEL;
+            REGISTER_DISPLAY <= CFG_DISPLAY;
+            -- Certain GRAM I/O address ranges are blocked by the underlying machine.
+            if CFG_DISPLAY2(7 downto 4) /= "1111" and CFG_DISPLAY2(7 downto 4) /= "1110" and CFG_DISPLAY2(7 downto 4) /= "1101" then
+                REGISTER_DISPLAY2 <= CFG_DISPLAY2;
             end if;
+            REGISTER_DISPLAY3<= CFG_DISPLAY3;
+            REGISTER_CPU     <= CFG_CPU;
+            REGISTER_AUDIO   <= CFG_AUDIO;
+            REGISTER_CMT     <= CFG_CMT;
+            REGISTER_USERROM <= CFG_USERROM;
+            REGISTER_FDCROM  <= CFG_FDCROM;
         end if;
     end process;
 
@@ -599,10 +506,10 @@ begin
             end if;
 
         elsif CLKBUS(CKMASTER)'event and CLKBUS(CKMASTER) = '1' then
-            if delay /= 0 then
-                delay <= delay + 1;
-            elsif delay >= 63 then
+            if delay = 63 then
                 delay <= 0;
+            elsif delay /= 0 then
+                delay <= delay + 1;
             end if;
         end if;
     end process;

@@ -166,7 +166,7 @@ static bool parse_args(int argc, char **argv, Options &o)
 }
 
 // ---------------------------------------------------------------------------
-// Machine configuration, as sharpmz.sv writes it from the OSD status bits.
+// Machine configuration, as sharpmz.sv derives it from the OSD status bits.
 // ---------------------------------------------------------------------------
 struct ModelInfo { const char *name; uint8_t code; uint8_t display; };
 static const ModelInfo MODELS[] = {
@@ -314,24 +314,12 @@ void Sim::write_config()
 {
     const ModelInfo *m = nullptr;
     for (auto &x : MODELS) if (opt.model == x.name) m = &x;
-    uint8_t vmode = opt.vmode == "native" ? 3 : 1;   // sharpmz.sv: 2'b11 native, 2'b01 640x480@60
-    uint8_t regs[10] = {
-        m->code,                                   // 0 model
-        m->display,                                // 1 display type, video/graphics/VRAM wait/PCG bits off
-        vmode,                                     // 2 video timing
-        0,                                         // 3
-        (uint8_t)(opt.turbo & 7),                  // 4 CPU speed
-        0,                                         // 5 audio
-        (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)), // 6 CMT: buttons auto, fast tape
-        0, 0, 0,                                   // 7 unused, 8 user ROM, 9 FDC ROM
-    };
-    for (int r = 0; r < 10; r++) {
-        if (r == 3 || r == 7) continue;
-        ioctl_write(0x1000000 | r, regs[r]);
-        if (getenv("SIM_DEBUG_CFG"))
-            fprintf(stderr, "[cfg] reg %d <= %02x  cycle %llu  model %d rm %d delay %d\n", r, regs[r],
-                    (unsigned long long)cycle, (int)(top->dbg_config[0] & 0xFF), top->dbg_rm, top->dbg_delay);
-    }
+    top->cfg_model    = m->code;
+    top->cfg_display  = m->display;                            // video/graphics/VRAM wait/PCG bits off
+    top->cfg_display2 = opt.vmode == "native" ? 3 : 1;         // sharpmz.sv: 2'b11 native, 2'b01 640x480@60
+    top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
+    top->cfg_audio    = 0;
+    top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape
 }
 
 // Same address mapping as sharpmz.sv (mz_ioctl_addr_map).
@@ -474,10 +462,10 @@ int Sim::run()
     top->reset = 1;
     top->warm_reset = 0;
     top->ps2_key = 0;
+    write_config();
     for (int i = 0; i < 256; i++) clock();
     top->reset = 0;
-    for (int i = 0; i < 16; i++) clock();
-    write_config();
+    for (int i = 0; i < 128; i++) clock();
     // Reset the frame count and counters so frame 0 starts with the configured machine.
     frame = 0; cpu_cycles = 0; fb.clear(); fb_h = 0; line.clear();
 

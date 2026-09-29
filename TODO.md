@@ -62,23 +62,26 @@ Status: new `clkgen.vhd` (accumulator CEs, `CLK_HZ` = 70.9376 MHz) and the emu `
 
 - **Baseline build (master):** Quartus 17.0 crashes in synthesis (internal error in `sta_scc.cpp`) because of the old `sharpmz.sdc`. With that SDC emptied: 10,947 ALMs (26%), 3.94 Mbit block RAM (70%), 487/553 RAM blocks (88%), 5/6 PLLs, worst setup slack -25.8 ns (every domain fails). The qsf is identical to Template's.
 - **MZ-700 sound pitch bug:** v1 fed the 8253 counter 0 about 1 MHz. The real clock is 1.1088 MHz (17.7344/16), so pitch was ~10% low. Fixed in the new clkgen.
-- **MZ-80B RTC speed never selected:** `mctrl.vhd` tests `REGISTER_MODEL = "110" and REGISTER_MODEL = "111"`, which is always false. Fix in Phase 2.
-- **Reset one-shot:** `mctrl.vhd`'s `delay` counter only ends reset by wrapping 63→0; the `elsif delay >= 63` branch is unreachable. Works, but clean up in Phase 2.
+- **MZ-80B RTC speed never selected:** `mctrl.vhd` tested `REGISTER_MODEL = "110" and REGISTER_MODEL = "111"`, which is always false. Fixed (`or`).
+- **Reset one-shot:** `mctrl.vhd`'s `delay` counter only ended reset by wrapping 63→0; the `elsif delay >= 63` branch was unreachable. Fixed to stop explicitly at 63.
 - **`DEBUG_ENABLE = 1`** in `config_pkg.vhd`: debug LED/sampling logic is in the release build. Remove in Phase 5.
 - **VHDL conformance:** added `when others` to 19 case statements and `init_file => ""` for `null` (no behaviour change). Split `clkgen_pkg`/`mctrl_pkg` into their own files (circular dependency).
 - **GHDL 5.1 bug:** `ghdl synth --out=verilog` drops port-alias assignments (`SIG <= in_port;` where SIG only feeds instances). `verilator/fix_port_aliases.py` restores them from the VHDL netlist. It hit the ioctl bus, ps2_key and the 8255/PIO keyboard inputs.
 - **MZ-80B Z80 PIO interrupt never fires:** `z8420.vhd` connects `RST_n` (active low) to `Interrupt`'s active-high `RESET`, so the interrupt logic is held in reset during normal operation. Kept as-is (behaviour-preserving refactor); verify against MZ-80B software before enabling.
 - **Tape lead-in:** the core plays the full 22,000-pulse long gap (~10–11 s, matching real hardware), so a `.mzf` loaded from the monitor takes ~1,050 frames. mz800emu generates a much shorter lead-in, so compare tape-load *results* rather than frame numbers. Check its option for a real-length gap.
+- **Model coverage in simulation (after Phase 2 config change):** MZ-80K (SP-1002), MZ-80C (MZ_MONITOR 4.4), MZ-1200 (SP-1002), MZ-80A (SA-1510) and MZ-700 (1Z-013A) boot to their monitor prompts. MZ-80B shows "IPL is looking for a program" (correct). **MZ-2000 shows a black screen**: its ROM slot (0x17800) holds the MZ-80B IPL (`IPL.rom`), not a real MZ-2000 IPL. The CPU loops between 0038h and 1038h (RST 38h with the bank-swap bit toggling), and it counts only 33,280 T-states per frame (MZ-80B: 66,560 = 4 MHz at 60 Hz), so either its CPU runs at 2 MHz or its frame rate doubles. Check on hardware whether master behaves the same, and look at v2's MZ-2000 handling.
 - **Sim speed:** ~1.6M clk_sys cycles/s, about 1/44 real time. A 100-frame boot takes ~90 s.
 
 ## Phase 2: Config and I/O
 
-- [ ] Remove the fake config bus (status → ioctl writes to 0x1000000+ in `sharpmz.sv`) and wire OSD status straight into the `mctrl` CONFIG vector.
-- [ ] Remove `bridge.vhd` (STORM/NEO430 remnants) and instantiate `sharpmz` directly.
+Status: config bus and bridge removed; timing still closes (worst setup +0.54 ns on HDMI), 10,947 ALMs, 481/553 RAM blocks. Test RBF: `output_files/SharpMZ_standard-core_phase2.rbf`. MZ-700 tape load regression passes in simulation.
+
+- [x] Remove the fake config bus (status → ioctl writes to 0x1000000+ in `sharpmz.sv`) and wire OSD status straight into the `mctrl` CONFIG vector. `mctrl` now takes `CFG_*` inputs; model/display/boot-reset changes reset the machine via change detection. The Main-era read-back registers (CMT2 APSS status, READ_STATUS, registers 10–12, debug registers) are gone; Phase 3 redoes APSS in the core.
+- [x] Remove `bridge.vhd` (STORM/NEO430 remnants) and instantiate `sharpmz` directly. Also removed `jtag_uart_0`, `sysid`, `spi_master`.
 - [ ] ROM, keymap and CGROM loading through standard ioctl indexes. Defaults depend on the embedded-ROM decision.
-- [ ] Clean up direct-to-RAM MZF load: replace the 64-cycle reset hack with a proper reset/jump.
-- [ ] Rename the "Map Header" OSD option to what it does: Sharp ASCII ↔ ASCII filename conversion (`CMTASCII_IN`/`OUT`).
-- [ ] Expose audio source (status[20]) in the OSD, or remove it.
+- [ ] Direct-to-RAM MZF load: behaves like the legacy driver (program in RAM, run it with the monitor's `J` command). Optional: auto-run via keyboard injection or a CPU jump. Verify in simulation.
+- [x] Rename the "Map Header" OSD option to what it does (now "Sharp ASCII Name"): Sharp ASCII ↔ ASCII filename conversion (`CMTASCII_IN`/`OUT`).
+- [x] Expose audio source (status[20]) in the OSD (Tape page: Sound / Tape).
 
 ## Phase 3: Tape (restore what the legacy Main driver did)
 

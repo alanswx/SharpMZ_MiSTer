@@ -5,7 +5,7 @@
 // Author(s):       Philip Smart
 // Description:     Sharp MZ series compatible logic.
 //
-//                  This module bridges the emulator (sharpmz.vhd) to the modern MiSTer framework.
+//                  MiSTer top level for the emulator (rtl/sharpmz.vhd): OSD, configuration and downloads.
 //                  The sys/ directory is expected to be the stock Template_MiSTer sys drop-in.
 //
 // Copyright:       (C) 2018 Sorgelig
@@ -92,7 +92,8 @@ localparam CONF_STR =
 	"P2F2,MZF,Load Direct to RAM;",
 	"P2O[25:24],Tape Buttons,Auto,Off,Play,Record;",
 	"P2O[23:21],Fast Tape,Default,Off,2x,4x,8x,16x,32x,Default;",
-	"P2O[27:26],Map Header,Off,Record,Play,Both;",
+	"P2O[27:26],Sharp ASCII Name,Off,On Save,On Load,Both;",
+	"P2O[20],Audio Source,Sound,Tape;",
 	"-;",
 	"P3,Display;",
 	"P3O[8:7],Display Type,Default,Mono 80x25,Colour 40x25,Colour 80x25;",
@@ -278,63 +279,6 @@ wire [7:0] cfg_reg6_cmt     = {1'b0, status[27], status[26], cfg_tape_buttons, c
 wire [7:0] cfg_reg8_userrom = cfg_userrom;
 wire [7:0] cfg_reg9_fdcrom  = cfg_fdcrom;
 
-wire [71:0] cfg_pack = {
-	cfg_reg9_fdcrom,
-	cfg_reg8_userrom,
-	cfg_reg6_cmt,
-	cfg_reg5_audio,
-	cfg_reg4_cpu,
-	cfg_reg3_display,
-	cfg_reg2_display,
-	cfg_reg1_display,
-	cfg_reg0_model
-};
-
-reg [71:0] cfg_pack_shadow = ~72'd0;
-reg [3:0] cfg_step = 0;
-reg cfg_active = 0;
-reg cfg_wr = 0;
-reg [24:0] cfg_addr = 0;
-reg [15:0] cfg_dout = 0;
-
-wire hps_ioctl_active = hps_ioctl_download | hps_ioctl_upload | hps_ioctl_wr | hps_ioctl_rd;
-
-always @(posedge clk_sys) begin
-	cfg_wr <= 0;
-
-	if(RESET) begin
-		cfg_active <= 0;
-		cfg_step <= 0;
-		cfg_pack_shadow <= ~72'd0;
-	end
-	else if(!cfg_active && (cfg_pack != cfg_pack_shadow) && !hps_ioctl_active) begin
-		cfg_active <= 1;
-		cfg_step <= 0;
-	end
-	else if(cfg_active && !hps_ioctl_active) begin
-		cfg_wr <= 1;
-		case(cfg_step)
-			4'd0: begin cfg_addr <= 25'h1000000; cfg_dout <= {8'd0, cfg_reg0_model};   end
-			4'd1: begin cfg_addr <= 25'h1000001; cfg_dout <= {8'd0, cfg_reg1_display}; end
-			4'd2: begin cfg_addr <= 25'h1000002; cfg_dout <= {8'd0, cfg_reg2_display}; end
-			4'd3: begin cfg_addr <= 25'h1000003; cfg_dout <= {8'd0, cfg_reg3_display}; end
-			4'd4: begin cfg_addr <= 25'h1000004; cfg_dout <= {8'd0, cfg_reg4_cpu};     end
-			4'd5: begin cfg_addr <= 25'h1000005; cfg_dout <= {8'd0, cfg_reg5_audio};   end
-			4'd6: begin cfg_addr <= 25'h1000006; cfg_dout <= {8'd0, cfg_reg6_cmt};     end
-			4'd7: begin cfg_addr <= 25'h1000008; cfg_dout <= {8'd0, cfg_reg8_userrom}; end
-			default: begin cfg_addr <= 25'h1000009; cfg_dout <= {8'd0, cfg_reg9_fdcrom}; end
-		endcase
-
-		if(cfg_step == 4'd8) begin
-			cfg_active <= 0;
-			cfg_pack_shadow <= cfg_pack;
-		end
-		else begin
-			cfg_step <= cfg_step + 1'd1;
-		end
-	end
-end
-
 /////////////////  DOWNLOAD ROUTING  //////////////
 
 localparam [5:0] FILE_TAPE_CMT    = 6'd1;
@@ -402,13 +346,9 @@ endfunction
 
 wire [24:0] hps_ioctl_addr_mapped = mz_ioctl_addr_map(active_file_slot, hps_ioctl_addr, mzf_load_addr);
 
-wire        bridge_ioctl_wr   = cfg_wr ? 1'b1  : (hps_ioctl_wr && mzf_direct_wr_valid);
-wire        bridge_ioctl_rd   = cfg_wr ? 1'b0  : hps_ioctl_rd;
-wire [24:0] bridge_ioctl_addr = cfg_wr ? cfg_addr : hps_ioctl_addr_mapped;
-wire [15:0] bridge_ioctl_dout = cfg_wr ? cfg_dout : {8'd0, hps_ioctl_dout};
-wire [15:0] bridge_ioctl_din;
+wire [31:0] mz_ioctl_din;
 
-assign hps_ioctl_din = bridge_ioctl_din[7:0];
+assign hps_ioctl_din = mz_ioctl_din[7:0];
 
 /////////////////  RESET  /////////////////////////
 
@@ -433,61 +373,53 @@ wire vblank_emu;
 wire hsync_emu;
 wire vsync_emu;
 wire [7:0] main_leds;
-wire bridge_uart_tx;
-wire bridge_sd_sck;
-wire bridge_sd_mosi;
-wire bridge_sd_cs;
-wire bridge_sd_cd;
 
-bridge sharp_mz
+sharpmz sharp_mz
 (
 	// System clock; the core runs everything on it with clock enables.
-	.clkmaster(clk_sys),
-	.clksys(),
+	.CLKMASTER(clk_sys),
+	.CLKSYS(),
+	.CLKVID(clk_video_in),
+	.CLKIOP(),
 
-	// Clocks output by the emulator.
-	.clkvid(clk_video_in),
+	.COLD_RESET(reset),
+	.WARM_RESET(warm_reset),
 
-	// Reset
-	.cold_reset(reset),
-	.warm_reset(warm_reset),
+	.MAIN_LEDS(main_leds),
 
-	// LED on MB
-	.main_leds(main_leds),
+	.PS2_KEY(ps2_key),
 
-	// PS2 via USB.
-	.ps2_key(ps2_key),
+	.VGA_HB_O(hblank_emu),
+	.VGA_VB_O(vblank_emu),
+	.VGA_HS_O(hsync_emu),
+	.VGA_VS_O(vsync_emu),
+	.VGA_R_O(R_emu),
+	.VGA_G_O(G_emu),
+	.VGA_B_O(B_emu),
 
-	// VGA on IO daughter card.
-	.vga_hb_o(hblank_emu),
-	.vga_vb_o(vblank_emu),
-	.vga_hs_o(hsync_emu),
-	.vga_vs_o(vsync_emu),
-	.vga_r_o(R_emu),
-	.vga_g_o(G_emu),
-	.vga_b_o(B_emu),
+	.AUDIO_L_O(audio_l_emu),
+	.AUDIO_R_O(audio_r_emu),
 
-	// AUDIO on IO daughter card.
-	.audio_l_o(audio_l_emu),
-	.audio_r_o(audio_r_emu),
+	// Machine configuration from the OSD.
+	.CFG_MODEL(cfg_reg0_model),
+	.CFG_DISPLAY(cfg_reg1_display),
+	.CFG_DISPLAY2(cfg_reg2_display),
+	.CFG_DISPLAY3(cfg_reg3_display),
+	.CFG_CPU(cfg_reg4_cpu),
+	.CFG_AUDIO(cfg_reg5_audio),
+	.CFG_CMT(cfg_reg6_cmt),
+	.CFG_USERROM(cfg_reg8_userrom),
+	.CFG_FDCROM(cfg_reg9_fdcrom),
 
-	.uart_rx(UART_RXD),
-	.uart_tx(bridge_uart_tx),
-	.sd_sck(bridge_sd_sck),
-	.sd_mosi(bridge_sd_mosi),
-	.sd_miso(SD_MISO),
-	.sd_cs(bridge_sd_cs),
-	.sd_cd(bridge_sd_cd),
-
-	// HPS Interface
-	.ioctl_download(hps_ioctl_download),
-	.ioctl_upload(hps_ioctl_upload),
-	.ioctl_clk(clk_sys),
-	.ioctl_wr(bridge_ioctl_wr),
-	.ioctl_rd(bridge_ioctl_rd),
-	.ioctl_addr(bridge_ioctl_addr),
-	.ioctl_dout(bridge_ioctl_dout),
-	.ioctl_din(bridge_ioctl_din)
+	// ROM, keymap and tape downloads.
+	.IOCTL_DOWNLOAD(hps_ioctl_download),
+	.IOCTL_UPLOAD(hps_ioctl_upload),
+	.IOCTL_CLK(clk_sys),
+	.IOCTL_WR(hps_ioctl_wr && mzf_direct_wr_valid),
+	.IOCTL_RD(hps_ioctl_rd),
+	.IOCTL_ADDR(hps_ioctl_addr_mapped),
+	.IOCTL_DOUT({24'd0, hps_ioctl_dout}),
+	.IOCTL_DIN(mz_ioctl_din)
 );
 
 assign LED_USER = hps_ioctl_download;

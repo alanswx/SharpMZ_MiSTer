@@ -102,6 +102,16 @@ entity sharpmz is
         --------------------                        AUDIO                       ------------------------------
         AUDIO_L_O             : out    std_logic;
         AUDIO_R_O             : out    std_logic;
+        --------------------                   Machine configuration              ------------------------------
+        CFG_MODEL             : in     std_logic_vector(7 downto 0);            -- See mctrl.vhd for the bit layout.
+        CFG_DISPLAY           : in     std_logic_vector(7 downto 0);
+        CFG_DISPLAY2          : in     std_logic_vector(7 downto 0);
+        CFG_DISPLAY3          : in     std_logic_vector(7 downto 0);
+        CFG_CPU               : in     std_logic_vector(7 downto 0);
+        CFG_AUDIO             : in     std_logic_vector(7 downto 0);
+        CFG_CMT               : in     std_logic_vector(7 downto 0);
+        CFG_USERROM           : in     std_logic_vector(7 downto 0);
+        CFG_FDCROM            : in     std_logic_vector(7 downto 0);
         --------------------                      HPS Interface                 ------------------------------
         IOCTL_DOWNLOAD        : in     std_logic;                               -- Downloading to FPGA.
         IOCTL_UPLOAD          : in     std_logic;                               -- Uploading from FPGA.
@@ -153,7 +163,6 @@ signal MZ_IOCTL_DIN_SYSRAM   :     std_logic_vector(7 downto 0);
 signal MZ_IOCTL_DIN_VIDEO    :     std_logic_vector(31 downto 0);
 signal MZ_IOCTL_DIN_MZ80C    :     std_logic_vector(31 downto 0);
 signal MZ_IOCTL_DIN_MZ80B    :     std_logic_vector(31 downto 0);
-signal MZ_IOCTL_DIN_MCTRL    :     std_logic_vector(31 downto 0);
 signal MZ_IOCTL_DIN_CMT      :     std_logic_vector(31 downto 0);
 signal MZ_IOCTL_DIN_KEY      :     std_logic_vector(31 downto 0);
 signal MZ_IOCTL_WENROM       :     std_logic;
@@ -402,13 +411,16 @@ component mctrl
           WARM_RESET         : in  std_logic;
           SYSTEM_RESET       : out std_logic;
 
-          -- HPS Interface
-          IOCTL_CLK          : in  std_logic;                            -- HPS I/O Clock
-          IOCTL_WR           : in  std_logic;                            -- HPS Write Enable to FPGA.
-          IOCTL_RD           : in  std_logic;                            -- HPS Read Enable from FPGA.
-          IOCTL_ADDR         : in  std_logic_vector(24 downto 0);        -- HPS Address in FPGA to write into.
-          IOCTL_DOUT         : in  std_logic_vector(31 downto 0);        -- HPS Data to be written into FPGA.
-          IOCTL_DIN          : out std_logic_vector(31 downto 0);        -- HPS Data to be read into HPS.
+          -- Machine configuration.
+          CFG_MODEL          : in  std_logic_vector(7 downto 0);
+          CFG_DISPLAY        : in  std_logic_vector(7 downto 0);
+          CFG_DISPLAY2       : in  std_logic_vector(7 downto 0);
+          CFG_DISPLAY3       : in  std_logic_vector(7 downto 0);
+          CFG_CPU            : in  std_logic_vector(7 downto 0);
+          CFG_AUDIO          : in  std_logic_vector(7 downto 0);
+          CFG_CMT            : in  std_logic_vector(7 downto 0);
+          CFG_USERROM        : in  std_logic_vector(7 downto 0);
+          CFG_FDCROM         : in  std_logic_vector(7 downto 0);
 
           -- Different operations modes.
           CONFIG             : out std_logic_vector(CONFIG_WIDTH);
@@ -810,13 +822,16 @@ begin
             WARM_RESET       => warm_reset,
             SYSTEM_RESET     => MZ_SYSTEM_RESET,
 
-            -- HPS Interface
-            IOCTL_CLK        => MZ_IOCTL_CLK,                            -- HPS I/O Clock
-            IOCTL_WR         => MZ_IOCTL_WR,
-            IOCTL_RD         => MZ_IOCTL_RD,
-            IOCTL_ADDR       => MZ_IOCTL_ADDR,
-            IOCTL_DOUT       => MZ_IOCTL_DOUT,
-            IOCTL_DIN        => MZ_IOCTL_DIN_MCTRL,
+            -- Machine configuration.
+            CFG_MODEL        => CFG_MODEL,
+            CFG_DISPLAY      => CFG_DISPLAY,
+            CFG_DISPLAY2     => CFG_DISPLAY2,
+            CFG_DISPLAY3     => CFG_DISPLAY3,
+            CFG_CPU          => CFG_CPU,
+            CFG_AUDIO        => CFG_AUDIO,
+            CFG_CMT          => CFG_CMT,
+            CFG_USERROM      => CFG_USERROM,
+            CFG_FDCROM       => CFG_FDCROM,
 
             -- Different operations modes.
             CONFIG           => CONFIG,
@@ -1154,8 +1169,6 @@ begin
                                 MZ_IOCTL_DIN_VIDEO          when IOCTL_ADDR(24 downto 20) = "00110"                  -- PCG
                                 else
                                 MZ_IOCTL_DIN_VIDEO          when IOCTL_ADDR(24 downto 20) = "00101"                  -- CGROM
-                                else
-                                MZ_IOCTL_DIN_MCTRL          when IOCTL_ADDR(24)           = '1'                      -- MCTRL Registers
                                 else
                                 MZ_IOCTL_DIN_CMT            when IOCTL_ADDR(24 downto 20) = "00100"                  -- CMT
                                 else                               

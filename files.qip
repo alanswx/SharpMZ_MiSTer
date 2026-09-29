@@ -1,11 +1,9 @@
 set_global_assignment -name SYSTEMVERILOG_FILE sharpmz.sv
 set_global_assignment -name SDC_FILE sharpmz.sdc
 
-set_global_assignment -name VHDL_FILE rtl/jtag_uart_0.vhd
 set_global_assignment -name VHDL_FILE rtl/config_pkg.vhd
 set_global_assignment -name VHDL_FILE rtl/clkgen_pkg.vhd
 set_global_assignment -name VHDL_FILE rtl/mctrl_pkg.vhd
-set_global_assignment -name VHDL_FILE rtl/bridge.vhd
 set_global_assignment -name VHDL_FILE rtl/sharpmz.vhd
 
 #============================================================

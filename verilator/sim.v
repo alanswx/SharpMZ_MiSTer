@@ -6,9 +6,9 @@
 // netlist produced by "ghdl synth" -- see the Makefile. Its RAMs and ROMs are
 // black boxes filled by rtl_v/dpram.v and rtl_v/dprom.v.
 //
-// This stands in for sharpmz.sv + bridge.vhd: the C++ harness drives the ioctl
-// bus directly, including the config register writes and MZF address mapping
-// that sharpmz.sv does on hardware.
+// This stands in for sharpmz.sv: the C++ harness drives the configuration
+// inputs and the ioctl bus, including the MZF address mapping that sharpmz.sv
+// does on hardware.
 //
 module top(
    input         clk_sys /*verilator public_flat*/,
@@ -35,6 +35,14 @@ module top(
    output [7:0]  ioctl_din,
 
    input  [10:0] ps2_key,
+
+   // Machine configuration, as sharpmz.sv derives it from the OSD status bits.
+   input  [7:0]  cfg_model,
+   input  [7:0]  cfg_display,
+   input  [7:0]  cfg_display2,
+   input  [7:0]  cfg_cpu,
+   input  [7:0]  cfg_audio,
+   input  [7:0]  cfg_cmt,
 
    output [15:0] cpu_pc /*verilator public_flat*/,
    output        cpu_ce /*verilator public_flat*/,
@@ -63,6 +71,15 @@ module top(
       .COLD_RESET     (reset),
       .WARM_RESET     (warm_reset),
       .PS2_KEY        (ps2_key),
+      .CFG_MODEL      (cfg_model),
+      .CFG_DISPLAY    (cfg_display),
+      .CFG_DISPLAY2   (cfg_display2),
+      .CFG_DISPLAY3   (8'd0),
+      .CFG_CPU        (cfg_cpu),
+      .CFG_AUDIO      (cfg_audio),
+      .CFG_CMT        (cfg_cmt),
+      .CFG_USERROM    (8'd0),
+      .CFG_FDCROM     (8'd0),
       .IOCTL_DOWNLOAD (ioctl_download),
       .IOCTL_UPLOAD   (1'b0),
       .IOCTL_CLK      (clk_sys),
