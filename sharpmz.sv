@@ -101,7 +101,6 @@ localparam CONF_STR =
 	"P3O[16],Video,On,Off;",
 	"P3O[17],Graphics,On,Off;",
 	"P3O[18],VRAM Wait,Off,On;",
-	"P3O[19],PCG,ROM,RAM;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
 	"P4,ROM and RAM;",
@@ -114,8 +113,7 @@ localparam CONF_STR =
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
-	"J,Fire;",
-	"v,4;",
+	"v,5;",
 	"V,v",`BUILD_DATE
 };
 
@@ -285,7 +283,7 @@ wire [7:0] cfg_userrom = status[28] ? (8'd1 << cfg_model) : 8'd0;
 wire [7:0] cfg_fdcrom  = status[29] ? (8'd1 << cfg_model) : 8'd0;
 
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
-wire [7:0] cfg_reg1_display = {status[19], status[18], status[17], status[16], 1'b0, cfg_display};
+wire [7:0] cfg_reg1_display = {1'b0, status[18], status[17], status[16], 1'b0, cfg_display};  // PCG is software controlled (E010-E012).
 wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
 wire [7:0] cfg_reg3_display = 8'd0;
 wire [7:0] cfg_reg4_cpu     = {status[30], 4'd0, status[6:4]};
@@ -421,9 +419,11 @@ wire warm_reset = status[0] | buttons[1] | direct_load_active | (direct_load_res
 
 wire audio_l_emu;
 wire audio_r_emu;
-assign AUDIO_L = {audio_l_emu, 15'd0};
-assign AUDIO_R = {audio_r_emu, 15'd0};
-assign AUDIO_S = 1;
+// 1-bit sound (8253 or tape signal, per the Audio Source option) at half scale; the framework's
+// DC blocker centres it. Full scale was harsh and sat at a large DC offset.
+assign AUDIO_L = {1'b0, audio_l_emu, 14'd0};
+assign AUDIO_R = {1'b0, audio_r_emu, 14'd0};
+assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
 wire clk_video_in;
