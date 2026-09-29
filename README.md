@@ -7,13 +7,14 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 | MZ-80K | Working | MZ-80C | Working |
 | MZ-1200 | Working | MZ-80A | Working |
 | MZ-700 | Working | MZ-80B | Boots to IPL; limited testing |
-| MZ-2000 | Not working (needs a real MZ-2000 IPL ROM) | MZ-800 | MZ-700 compatible mode only |
+| MZ-2000 | Not working (needs a real MZ-2000 IPL ROM) | MZ-800 | IPL, monitor, graphics and PSG; testing |
 
 ## Features
 
 * Z80 CPU at the original speed (2 MHz MZ-80K/C/1200/A, 3.547 MHz MZ-700/800, 4 MHz MZ-80B/2000), with turbo steps up to about 32–35 MHz.
 * Native video timing (MZ-700/800 are 50 Hz PAL, the others 60 Hz), scaled by the MiSTer framework: HDMI, analog, scandoubler, scanlines and aspect ratio work as in other cores.
 * 40x25 and 80x25, mono and colour character modes; programmable character generator (PCG); MZ-80B/2000 graphics RAM.
+* MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, 320x200/640x200 graphics, palette, and the SN76489 sound chip.
 * 8253 sound or the tape signal on the audio output.
 * Cassette: MZF loading onto the virtual tape or straight into RAM, and a **Tape Image** slot that loads multi-program tapes and **saves** programs written with SAVE. MZ-80B/2000 APSS (automatic program search) works against the tape image. Fast tape up to 32x.
 * Monitor ROMs, character generator ROMs and keymaps for every model are built in, and can be replaced from the OSD.
@@ -33,6 +34,7 @@ The core boots as an MZ-80A with the SA-1510 monitor. Press F12 for the OSD.
 | Model | MZ-80A, MZ-80K, MZ-80C, MZ-1200, MZ-700, MZ-80B, MZ-2000 or MZ-800. Changing model resets the machine. |
 | CPU Speed | Default is the original speed. Each step doubles it up to the core's limit of about 32–35 MHz (MZ-700: +4; MZ-80K/A/B: +4 or +5); higher steps fall back to the original speed. |
 | Boot Reset | MZ-80B/2000: reset back into the IPL. |
+| MZ-800 Mode | The MZ-800 rear switch. In MZ-800 mode the IPL switches to MZ-800 graphics before starting a program loaded from tape; in MZ-700 mode (default) programs start in MZ-700 mode, which MZ-700 software needs. Reset after changing it. |
 
 ### Tape
 
@@ -70,7 +72,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 ## Known Issues
 
 * MZ-2000: the ROM slot holds the MZ-80B IPL, which doesn't boot the MZ-2000; a real MZ-2000 IPL dump is needed. Its colour graphics RAM isn't in the memory decode yet.
-* MZ-800: only the MZ-700 compatible mode. MZ-800 graphics, sound (SN76489) and memory map are planned, using the author's newer design.
+* MZ-800: new and only checked in simulation against mz800emu (IPL, monitor, 320x200 graphics, CG-RAM, PSG). 640x200, scrolling, the border, the Z80 PIO and joysticks are untested or missing. The screen shows the 320x200 area without the MZ-800 border.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B has had little testing beyond the IPL screen.
 * No floppy disk or Quick Disk support yet.

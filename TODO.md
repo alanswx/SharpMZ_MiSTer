@@ -159,7 +159,21 @@ Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `
 ## Later: v2 donor features
 
 - [ ] **Floppy:** v2 `fdd.vhd` + `wd1793.vhd` (MB8866/WD1773). It caches one sector and has its management CPU fetch sectors, which maps onto hps_io `S` slots (`sd_lba`/`sd_rd`/`sd_wr`). Covers the MZ-80B/2000 and MZ-700/800 FD units.
-- [ ] **MZ-800:** v2 `mz80k_hw.vhd` bank switching (ROM/RAM/CG/VRAM enables), `sn76489_audio` PSG and joystick strobes; plus MZ-800 graphics modes (check VideoController coverage). Verify against mz800emu.
+- [ ] **MZ-800** (plan: `docs/mz800-plan.md`). The machine logic is written in v1's `mz80c.vhd` following mz800emu; v2's `mz80k_hw.vhd` is used as a reference only.
+  - [x] Clocks: MZ-700 CPU (70,886.5 T/frame, same as mz800emu) and sound clocks.
+  - [x] 16 KB ROM (1Z-013B, CG, IPL/9Z-504M from mz800emu) at 0x1C000 of the combined ROM; MZ-800 CG in the CG ROM slot (`tools/add_mz800_rom.py`).
+  - [x] Memory map register, bank ports E0-E6 with the IN side effects, 700/800 mode maps, E000-E00F ports / 1A / FF, prohibited mode, D0-D7 in 800 mode, IN CE status, rear mode switch on the OSD.
+  - [x] IPL screen and 9Z-504M monitor match mz800emu (tests `boot_mz800`, `mon_mz800`).
+  - [x] 320x200 graphics planes and palette match mz800emu (`gfx_mz800`). Colours use mz800emu's palette.
+  - [x] SN76489 PSG at F2 on a fixed 3.547 MHz enable, mixed into the 16-bit audio (`psg_mz800`, 439.8 Hz).
+  - [x] 700 mode CG-RAM at C000 (PCG), read/write (`pcg_mz800`).
+  - [x] Tape loading from the IPL (`C`) runs ramtest as mz800emu does (`tape_mz800`). The CMT had been using MZ-80B timings for the MZ-800.
+  - [x] Rear mode switch: bit 1 of IN CE = 1 is MZ-800 (the IPL switches to MZ-800 graphics before starting a loaded program). Default MZ-700, as mz800emu.
+  - [ ] 640x200 mode, frame B, scroll (GCRTC CF), border colour: untested. The framework shows the 320x200 area only (no border).
+  - [ ] Z80 PIO at FC-FF (interrupts, printer), joystick reads (F0/F1 return FF).
+  - [ ] VideoController IN CE read returns the mode register (not used: the machine side answers CE reads).
+  - [ ] Real software: run MZ-800 titles from `software/`.
+  - [x] All v2 video modes lost the leftmost pixel (horizontal blank started at count 1); the 40/80 column rows now start at 0.
 - [ ] **MZ-1500, MZ-2200:** config slots exist in v2 (dual PSG on the MZ-1500; the MZ-2200 is MZ-2000-family).
 - [ ] Machine options from v2 `mctrl`: RAM installed, GRAM I/II/III, PCG, MZ-1R25.
 - [ ] Remove `support/sharpmz/` from Main_MiSTer upstream once no 0xA7 builds are in use.

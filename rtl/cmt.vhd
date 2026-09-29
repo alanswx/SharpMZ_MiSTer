@@ -897,7 +897,7 @@ begin
                     -- Pulse periods for MZ80C type machines
                     if CONFIG(MZ_KC) = '1' or CONFIG(MZ_A) = '1' then
                         RCV_CNT                         <= to_unsigned(736, 16);     -- 368uS @ 2Mhz
-                    elsif CONFIG(MZ700) = '1' then
+                    elsif (CONFIG(MZ700) = '1' or CONFIG(MZ800) = '1') then
                         -- The 1Z-013A monitor writes pulses with a 676 T-state (short) or 1300 T-state (long) high
                         -- phase and reads them back ~960-990 T-states after the rising edge (EDGE + DLY3, real Z80
                         -- timing). The documented 368uS read point assumes 18 T-states per delay loop iteration
@@ -1136,13 +1136,13 @@ begin
                                 -- Header = 0, Data = 1
                                 if XMIT_RAM_TYPE = '0' then
                                     -- Setup to send a Long Gap.
-                                    if CONFIG(MZ_80C) = '1' or CONFIG(MZ700) = '1' then
+                                    if CONFIG(MZ_80C) = '1' or (CONFIG(MZ700) = '1' or CONFIG(MZ800) = '1') then
                                         XMIT_PADDING_CNT1<= 22000;
                                     else
                                         XMIT_PADDING_CNT1<= 10000;
                                     end if;
                                 else
-                                    if CONFIG(MZ_80C) = '1' or CONFIG(MZ700) = '1' then
+                                    if CONFIG(MZ_80C) = '1' or (CONFIG(MZ700) = '1' or CONFIG(MZ800) = '1') then
                                         XMIT_PADDING_CNT1<= 11000;
                                     else
                                         XMIT_PADDING_CNT1<= 10000;
@@ -1539,7 +1539,7 @@ process( RST, CLKBUS(CKMASTER), XMIT_LOAD_1, XMIT_LOAD_2 ) begin
                         XMIT_LIMIT                      <=  528;     --  1056;
                         XMIT_COUNT                      <= -480;     --  -960;
                     end if;
-                elsif CONFIG(MZ700) = '1' then
+                elsif (CONFIG(MZ700) = '1' or CONFIG(MZ800) = '1') then
                 -- Pulse periods for MZ700 type machines
                     if (XMIT_LOAD_1 = '1' and XMIT_BIT_1 = '1') or (XMIT_LOAD_2 = '1' and XMIT_BIT_2 = '1') then
                         XMIT_LIMIT                      <= 1729;     --  3458;

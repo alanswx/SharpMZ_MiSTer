@@ -419,10 +419,10 @@ architecture rtl of VideoController is
     --                                H_DSP_START, H_DSP_END,  H_DSP_WND_START, H_DSP_WND_END, H_MNU_START, H_MNU_END, H_HDR_START, H_HDR_END, H_FTR_START, H_FTR_END, V_DSP_START, V_DSP_END, V_DSP_WND_START, V_DSP_WND_END, V_MNU_START, V_MNU_END, V_HDR_START, V_HDR_END, V_FTR_START, V_FTR_END, H_LINE_END, V_LINE_END,      CLOCK,            H_SYNC_START,    H_SYNC_END,      V_SYNC_START,    V_SYNC_END,   H_BLANK_START, H_BLANK_END, V_BLANK_START, V_BLANK_END,  H_POLARITY, V_POLARITY    			
     constant FB_TIMING           : VIDEOTIMINGLUT := (
       -- MZ-700 60Hz Display
-      /* TIMING_MONO40_60HZ */       ( 0,          320,            0,               320,             0,          320,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,       511,         259,    SEL_CLOCK_8MHZ,     320  + 43,       320 + 43  + 45,    200 + 19,      200 + 19 + 4,        1,          320,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines have a monochrome 60Hz display with scan of 512 x 260 for a 320x200 viewable area.               
-      /* TIMING_MONO80_60HZ */       ( 0,          640,            0,               640,            64,          576,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,      1023,         259,    SEL_CLOCK_16MHZ,    640  + 106,      640 + 106 + 90,    200 + 19,      200 + 19 + 4,        1,          640,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines with an adapted monochrome 60Hz display with scan of 1024 x 260 for a 640x200 viewable area.			
-      /* TIMING_COLOUR40_60HZ */     ( 0,          320,            0,               320,             0,          320,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,       567,         259,    SEL_CLOCK_8_8MHZ,   320  + 80,       320 + 80  + 40,    200 + 19,      200 + 19 + 4,        1,          320,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines with MZ700 style colour @ 60Hz display with scan of 512 x 260 for a 320x200 viewable area.			
-      /* TIMING_COLOUR80_60HZ */     ( 0,          640,            0,               640,            64,          576,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,      1135,         259,    SEL_CLOCK_17_7MHZ,  640  + 160,      640 + 160 + 80,    200 + 19,      200 + 19 + 4,        1,          640,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines with MZ700 style colour @ 60Hz display with scan of 1024 x 260 for a 640x200 viewable area.			
+      /* TIMING_MONO40_60HZ */       ( 0,          320,            0,               320,             0,          320,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,       511,         259,    SEL_CLOCK_8MHZ,     320  + 43,       320 + 43  + 45,    200 + 19,      200 + 19 + 4,        0,          320,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines have a monochrome 60Hz display with scan of 512 x 260 for a 320x200 viewable area.               
+      /* TIMING_MONO80_60HZ */       ( 0,          640,            0,               640,            64,          576,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,      1023,         259,    SEL_CLOCK_16MHZ,    640  + 106,      640 + 106 + 90,    200 + 19,      200 + 19 + 4,        0,          640,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines with an adapted monochrome 60Hz display with scan of 1024 x 260 for a 640x200 viewable area.			
+      /* TIMING_COLOUR40_60HZ */     ( 0,          320,            0,               320,             0,          320,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,       567,         259,    SEL_CLOCK_8_8MHZ,   320  + 80,       320 + 80  + 40,    200 + 19,      200 + 19 + 4,        0,          320,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines with MZ700 style colour @ 60Hz display with scan of 512 x 260 for a 320x200 viewable area.			
+      /* TIMING_COLOUR80_60HZ */     ( 0,          640,            0,               640,            64,          576,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,      1135,         259,    SEL_CLOCK_17_7MHZ,  640  + 160,      640 + 160 + 80,    200 + 19,      200 + 19 + 4,        0,          640,          0,           200,        0,         0),         -- MZ80K/C/1200/A machines with MZ700 style colour @ 60Hz display with scan of 1024 x 260 for a 640x200 viewable area.			
 
       -- 640 x 480 @ 60Hz
       /* TIMING_VGA640X480_60HZ */   ( 0,          640,            0,               640,            64,          576,         0,        640,         0,         640,           0,       480,           48,           448,         112,          368,         0,          39,        440,          479,       799,         524,    SEL_CLOCK_25MHZ,    640  + 10,       640 + 10  + 96,    480 + 8,       480 +  8 + 2,        1,          640,          0,           480,        0,         0),         -- Mode 0 upscaled as 640x480 @ 60Hz timings for 40Char mode monochrome. 			
@@ -431,8 +431,8 @@ architecture rtl of VideoController is
       /* TIMING_VGA800X600_60HZ */   ( 0,          800,           80,               720,           144,          656,         0,         80,       720,         800,           0,       600,            0,           600,         112,          368,         0,         600,          0,          600,      1055,         627,    SEL_CLOCK_40MHZ,    800  + 40,      800 + 40  + 128,    600 + 1,       600 +  1 + 4,        0,          800,          0,           600,        1,         1),         -- Mode 0 upscaled as 800x600 @ 60Hz timings for 40Char mode monochrome. 			
 
       -- MZ-700 50Hz Display
-      /* TIMING_COLOUR40_50HZ */     ( 0,          320,            0,               320,             0,          320,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,       567,         311,    SEL_CLOCK_8_8MHZ,   320  + 80,       320 + 80  + 40,    200 + 50,      200 + 50 + 3,        1,          320,          0,           200,        0,         0),         -- MZ-700/800 PAL colour @ 50Hz: scan of 568 x 312.
-      /* TIMING_COLOUR80_50HZ */     ( 0,          640,            0,               640,            64,          576,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,      1135,         311,    SEL_CLOCK_17_7MHZ,  640  + 160,      640 + 160 + 80,    200 + 50,      200 + 50 + 3,        1,          640,          0,           200,        0,         0),         -- MZ-700/800 PAL colour @ 50Hz: scan of 1136 x 312.
+      /* TIMING_COLOUR40_50HZ */     ( 0,          320,            0,               320,             0,          320,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,       567,         311,    SEL_CLOCK_8_8MHZ,   320  + 80,       320 + 80  + 40,    200 + 50,      200 + 50 + 3,        0,          320,          0,           200,        0,         0),         -- MZ-700/800 PAL colour @ 50Hz: scan of 568 x 312.
+      /* TIMING_COLOUR80_50HZ */     ( 0,          640,            0,               640,            64,          576,         0,          0,         0,           0,           0,       200,            0,           200,          36,          164,         0,           0,          0,            0,      1135,         311,    SEL_CLOCK_17_7MHZ,  640  + 160,      640 + 160 + 80,    200 + 50,      200 + 50 + 3,        0,          640,          0,           200,        0,         0),         -- MZ-700/800 PAL colour @ 50Hz: scan of 1136 x 312.
 
       -- Deprecated: 1024 x 768 @ 60Hz
     --/* TIMING_VGA1024X768_60HZ */  ( 0,         1024,           32,               992,            64,          576,         0,          0,         0,           0,           0,       768,           79,           679,         111,          367,         0,           0,          0,            0,      1343,         805,    SEL_CLOCK_8MHZ,     1024  + 24,     1024 + 24  + 136,    768 + 3,       768 +  3 + 6,       0,          640,          0,           200,         0,         0),        -- Mode 0 upscaled as 1024x768 @ 60Hz timings for 40Char mode monochrome. 			
@@ -935,6 +935,10 @@ architecture rtl of VideoController is
     --
     signal CGROM_BIT_DO          :     std_logic_vector(7 downto 0);
     signal CGROM_DO              :     std_logic_vector(31 downto 0);
+    signal CG_CPU_SEL            :     std_logic;                            -- CPU access to the CG ROM (MZ-800 CG-RAM at C000 in 700 mode).
+    signal CG_B_ADDR             :     std_logic_vector(14 downto 0);
+    signal CG_B_DI               :     std_logic_vector(7 downto 0);
+    signal CG_B_DO               :     std_logic_vector(7 downto 0);
     signal CGROM_PAGE            :     std_logic;
     signal CGROM_WEN             :     std_logic;
     signal CGROM_WEN_BYTE        :     std_logic;                            -- CGROM Write byte enable signal.
@@ -1340,19 +1344,28 @@ begin
         wren_a               => '0',
         q_a                  => CGROM_BIT_DO,
 
-        -- Port B: ioctl load/read.
+        -- Port B: the CPU (MZ-800 CG-RAM), otherwise ioctl load/read.
         clock_b              => SYS_CLK,
         clocken_b            => '1',
-        address_b            => CG_IOCTL_ADDR,
-        data_b               => CG_IOCTL_DOUT,
-        wren_b               => CG_IOCTL_WR,
-        q_b                  => CG_IOCTL_DIN
+        address_b            => CG_B_ADDR,
+        data_b               => CG_B_DI,
+        wren_b               => CG_IOCTL_WR or (CGROM_WEN and CG_CPU_SEL),
+        q_b                  => CG_B_DO
     );
+    -- The MZ-800 in 700 mode has its CG in RAM at C000 (the IPL copies the CG ROM there). Here the CPU reads and writes
+    -- the MZ-800 bank of the CG ROM, which holds the same (bit-reversed) font.
+    CG_CPU_SEL               <= '1' when CS_CXXXn = '0' and CS_VIDEO_LEGACYn = '0' and MODE_VIDEO_BASE = MODE_MZ800 and MODE_VIDEO_MZ700 = '1'
+                                else '0';
+    CG_B_ADDR                <= CG_BANK(3 downto 1) & VIDEO_ADDRi(11 downto 0) when CG_CPU_SEL = '1'
+                                else CG_IOCTL_ADDR;
+    CG_B_DI                  <= VIDEO_DATA_INi(7 downto 0) when CG_CPU_SEL = '1'
+                                else CG_IOCTL_DOUT;
+    CG_IOCTL_DIN             <= CG_B_DO;
     VGA_MODE_SEL             <= "000" & VIDEO_50HZ;                           -- Only native timings on MiSTer.
     CG_ROM_ADDR              <= CG_BANK(3 downto 1) & CG_ADDR(11) & CG_ADDR(10 downto 0) when CG_4K = '1'
                                 else
                                 CG_BANK & CG_ADDR(10 downto 0);
-    CGROM_DO                 <= (others => '0');                                  -- No CPU read-back of the CG ROM.
+    CGROM_DO                 <= X"000000" & CG_B_DO;                              -- CPU read-back (MZ-800 CG-RAM).
     
     -- Programmable Character Generator RAM. This is instantiated for compatibility with original hardware upgrades and software that makes use of it.
     -- If writing new software, it is easier to just write to the CGROM as per above.

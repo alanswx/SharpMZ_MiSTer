@@ -49,6 +49,10 @@ module top(
    output [15:0] cpu_pc /*verilator public_flat*/,
    output        cpu_ce /*verilator public_flat*/,
    output        cpu_m1_n /*verilator public_flat*/,
+   output        dbg_io_wr /*verilator public_flat*/,
+   output [7:0]  dbg_io_port /*verilator public_flat*/,
+   output [7:0]  dbg_io_data /*verilator public_flat*/,
+   output [3:0]  dbg_m8_dmd /*verilator public_flat*/,
    output [7:0]  leds /*verilator public_flat*/,
    output        dbg_sysreset /*verilator public_flat*/,
    output [5:0]  dbg_delay /*verilator public_flat*/,
@@ -154,6 +158,10 @@ module top(
    assign cpu_pc = core.cpu0.u0.pc;
    assign cpu_ce = core.clkgen0.ckencpui;
    assign cpu_m1_n = core.cpu0.u0.m1_n;
+   assign dbg_io_wr = ~core.t80_iorq_n & ~core.t80_wr_n;
+   assign dbg_io_port = core.t80_a16[7:0];
+   assign dbg_io_data = core.t80_do;
+   assign dbg_m8_dmd = core.mz80hw.m8_dmd;
    assign dbg_sysreset = core.mz_system_reset;
    assign dbg_delay = core.ctrl0.delay;
    assign dbg_rm = core.ctrl0.reset_machine;

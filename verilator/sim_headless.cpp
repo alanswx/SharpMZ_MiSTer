@@ -42,7 +42,7 @@ struct TypeCmd { uint32_t frame; std::string text; };
 struct Options {
     std::string model = "mz700";
     std::string vmode = "native";
-    bool mz800_700 = false;
+    bool mz800_700 = true;
     int      turbo = 0;
     int      fast_tape = 1;           // Menu step 1 = off (real speed), as the reference emulator runs.
     uint32_t stop_frame = 0;
@@ -62,6 +62,7 @@ struct Options {
     std::vector<MemDump> memdumps;
     std::string trace_file;
     std::string wav_file;
+    std::string io_file;
     uint32_t trace_from = 0, trace_to = UINT32_MAX;
     bool     quiet = false;
     bool     verbose = false;
@@ -78,7 +79,7 @@ static void usage()
 "Machine and run:\n"
 "  --model M              mz80k|mz80c|mz1200|mz80a|mz700|mz800|mz80b|mz2000 (default mz700)\n"
 "  --vmode native|vga60   video timing (default native)\n"
-"  --mz800-mode 800|700   MZ-800 rear mode switch (default 800)\n"
+"  --mz800-mode 700|800   MZ-800 rear mode switch (default 700, as mz800emu)\n"
 "  --turbo N              CPU speed menu step 0..7 (default 0 = machine speed)\n"
 "  --fast-tape N          tape speed menu step 0..7 (default 1 = off, real speed)\n"
 "  --stop-at-frame N      exit after frame N (frames count vsyncs from reset)\n"
@@ -107,6 +108,7 @@ static void usage()
 "  --dump-mem A:L:FILE    write main RAM A..A+L-1 at exit (physical RAM, not the\n"
 "                         CPU's banked view; addresses in hex or decimal)\n"
 "  --trace-cpu FILE       PC of each instruction fetch\n"
+"  --trace-io FILE        each I/O write: frame,pc,port,data,MZ-800 DMD\n"
 "  --wav FILE             audio at 48 kHz, 16-bit mono (sound/tape bit + MZ-800 PSG, as sharpmz.sv)\n"
 "  --trace-from N         start tracing at frame N; --trace-to N stops after frame N\n"
 "\n"
@@ -178,6 +180,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
         else if (a == "--trace-cpu") o.trace_file = next();
         else if (a == "--wav") o.wav_file = next();
+        else if (a == "--trace-io") o.io_file = next();
         else if (a == "--trace-from") o.trace_from = parse_num(next());
         else if (a == "--trace-to") o.trace_to = parse_num(next());
         else { fprintf(stderr, "unknown option %s (try --help)\n", a.c_str()); return false; }
@@ -235,6 +238,8 @@ private:
 
     // Audio capture (--wav): 48 kHz samples of AUDIO_L as sharpmz.sv mixes it.
     FILE    *fwav = nullptr;
+    FILE    *fio = nullptr;
+    bool     prev_io_wr = false;
     uint64_t wav_acc = 0, wav_samples = 0;
     void wav_header();
 
@@ -360,6 +365,13 @@ void Sim::clock()
     cycle++;
 
     if (top->cpu_ce) cpu_cycles++;
+
+    if (fio) {
+        bool w = top->dbg_io_wr;
+        if (w && !prev_io_wr)
+            fprintf(fio, "%u,%04X,%02X,%02X,%X\n", frame, top->cpu_pc, top->dbg_io_port, top->dbg_io_data, top->dbg_m8_dmd);
+        prev_io_wr = w;
+    }
 
     if (fwav) {
         wav_acc += 48000;
@@ -628,6 +640,7 @@ int Sim::run()
         fprintf(stderr, "cannot write %s\n", opt.frame_log.c_str()); return 2;
     }
     if (flog) fprintf(flog, "frame,fb_hash,cpu_cycles,pc\n");
+    if (!opt.io_file.empty() && !(fio = fopen(opt.io_file.c_str(), "w"))) { fprintf(stderr, "cannot write %s\n", opt.io_file.c_str()); return 2; }
     if (!opt.wav_file.empty()) {
         if (!(fwav = fopen(opt.wav_file.c_str(), "wb"))) { fprintf(stderr, "cannot write %s\n", opt.wav_file.c_str()); return 2; }
         wav_header();
@@ -669,6 +682,7 @@ int Sim::run()
     dump_memory();
     if (flog) fclose(flog);
     if (fwav) { wav_header(); fclose(fwav); }
+    if (fio) fclose(fio);
     if (ftrace) fclose(ftrace);
     return exit_code;
 }
