@@ -106,6 +106,8 @@ The old `sharpmz.cpp` handled save, a 5-entry tape queue and MZ-80B APSS. The co
 
 ## Phase 4: Video
 
+Detailed port plan: `docs/video-port-plan.md` (clock domains, decode hazards, what to strip, BRAM budget, step order).
+
 - [ ] **Evaluate v2 `VideoController`** before investing in v1 `video.vhd`:
   - [ ] Port its native timing tables (MONO40/80, COLOUR40/80 at 60 Hz and 50 Hz) and the character/graphics/OSD layered renderer.
   - [ ] MZ-80B 320x200 and MZ-2000 640x200 GRAM (complete in v2).
