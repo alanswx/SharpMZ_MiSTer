@@ -247,7 +247,7 @@ begin
                             when "111" => CONFIG(CPUSPEED) <= "0001";   -- 3.5MHz
                             when others => null;
                         end case;
-                    elsif REGISTER_MODEL(2 downto 0)  = "110" or  REGISTER_MODEL(2 downto 0)  = "110" then
+                    elsif REGISTER_MODEL(2 downto 0)  = "110" or  REGISTER_MODEL(2 downto 0)  = "111" then
                         case REGISTER_CMT(2 downto 0) is
                             when "000" => CONFIG(CPUSPEED) <= "0010";   -- 4MHz
                             when "001" => CONFIG(CPUSPEED) <= "0100";   -- 8MHz
@@ -287,7 +287,7 @@ begin
                             when "111" => CONFIG(CPUSPEED) <= "0001";   -- 3.5MHz
                             when others => null;
                         end case;
-                    elsif REGISTER_MODEL(2 downto 0)  = "110" or  REGISTER_MODEL(2 downto 0)  = "110" then
+                    elsif REGISTER_MODEL(2 downto 0)  = "110" or  REGISTER_MODEL(2 downto 0)  = "111" then
                         case REGISTER_CPU(2 downto 0) is
                             when "000" => CONFIG(CPUSPEED) <= "0010";   -- 4MHz
                             when "001" => CONFIG(CPUSPEED) <= "0100";   -- 8MHz

@@ -166,7 +166,16 @@ module top(
    assign dbg_pc1 = core.mz80hw.i8255_pc_o[1];
    assign dbg_readbit = core.tape0.readbit;
 
+`ifdef VIDEO_V1
    assign vram_q   = core.video0.vram0.mem[vram_addr];
+`else
+   // v2 VideoController VRAM: four byte lanes, byte address = lane + 4 * index.
+   wire [7:0] vl0 = core.videov2_video0.vc.vram0.lanes_n1_ram.mem[vram_addr[11:2]];
+   wire [7:0] vl1 = core.videov2_video0.vc.vram0.lanes_n2_ram.mem[vram_addr[11:2]];
+   wire [7:0] vl2 = core.videov2_video0.vc.vram0.lanes_n3_ram.mem[vram_addr[11:2]];
+   wire [7:0] vl3 = core.videov2_video0.vc.vram0.lanes_n4_ram.mem[vram_addr[11:2]];
+   assign vram_q = vram_addr[1:0] == 2'd0 ? vl0 : vram_addr[1:0] == 2'd1 ? vl1 : vram_addr[1:0] == 2'd2 ? vl2 : vl3;
+`endif
    assign sysram_q = core.sysram.mem[sysram_addr];
 
 endmodule

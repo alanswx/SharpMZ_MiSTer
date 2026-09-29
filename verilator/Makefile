@@ -52,6 +52,11 @@ VHD_SRC = \
 	$(RTL)/cmt.vhd \
 	$(RTL)/mz80c/mz80c.vhd \
 	$(RTL)/mz80b/mz80b.vhd \
+	$(RTL)/vc/vc_mctrl_pkg.vhd \
+	$(RTL)/vc/VideoController_pkg.vhd \
+	$(RTL)/vc/vc_rams.vhd \
+	$(RTL)/vc/VideoController.vhd \
+	$(RTL)/vc/video_vc.vhd \
 	$(RTL)/sharpmz.vhd
 
 GEN_V = $(GEN)/sharpmz.v

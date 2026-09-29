@@ -5,6 +5,11 @@ set_global_assignment -name SDC_FILE sharpmz.sdc
 set_global_assignment -name VHDL_FILE rtl/config_pkg.vhd
 set_global_assignment -name VHDL_FILE rtl/clkgen_pkg.vhd
 set_global_assignment -name VHDL_FILE rtl/mctrl_pkg.vhd
+set_global_assignment -name VHDL_FILE rtl/vc/vc_mctrl_pkg.vhd -hdl_version VHDL_2008
+set_global_assignment -name VHDL_FILE rtl/vc/VideoController_pkg.vhd -hdl_version VHDL_2008
+set_global_assignment -name VHDL_FILE rtl/vc/vc_rams.vhd -hdl_version VHDL_2008
+set_global_assignment -name VHDL_FILE rtl/vc/VideoController.vhd -hdl_version VHDL_2008
+set_global_assignment -name VHDL_FILE rtl/vc/video_vc.vhd -hdl_version VHDL_2008
 set_global_assignment -name VHDL_FILE rtl/sharpmz.vhd
 
 #============================================================

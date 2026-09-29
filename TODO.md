@@ -71,6 +71,7 @@ Status: new `clkgen.vhd` (accumulator CEs, `CLK_HZ` = 70.9376 MHz) and the emu `
 - **Tape lead-in:** the core plays the full 22,000-pulse long gap (~10–11 s, matching real hardware), so a `.mzf` loaded from the monitor takes ~1,050 frames. mz800emu generates a much shorter lead-in, so compare tape-load *results* rather than frame numbers. Check its option for a real-length gap.
 - **Model coverage in simulation (after Phase 2 config change):** MZ-80K (SP-1002), MZ-80C (MZ_MONITOR 4.4), MZ-1200 (SP-1002), MZ-80A (SA-1510) and MZ-700 (1Z-013A) boot to their monitor prompts. MZ-80B shows "IPL is looking for a program" (correct). **MZ-2000 shows a black screen**: its ROM slot (0x17800) holds the MZ-80B IPL (`IPL.rom`), not a real MZ-2000 IPL. The CPU loops between 0038h and 1038h (RST 38h with the bank-swap bit toggling), and it counts only 33,280 T-states per frame (MZ-80B: 66,560 = 4 MHz at 60 Hz), so either its CPU runs at 2 MHz or its frame rate doubles. Check on hardware whether master behaves the same, and look at v2's MZ-2000 handling.
 - **Tape record decoder never worked (MZ-700):** `cmt.vhd` sampled recorded pulses 1302 T-states after the rising edge, from the documented "368 µs read point". Measured in simulation and confirmed against the 1Z-013A listing, the monitor writes pulses with a 676 T-state (short) or 1300 T-state (long) high phase and reads its own tapes ~960–990 T-states after the edge. The documented µs figures assume 18 T-states per delay-loop iteration (`DEC A; JP NZ` is really 14). The sample landed at the very end of a long pulse, so every bit decoded as 0 and SAVE never produced a file. Now 988. mz800emu agrees on CPU timing (70,886.5 T-states/frame, no per-access wait states). Checked from the ROMs: SP-1002/SA-1510 (MZ-80K/80A) write 480/940 T-state pulses and sample at 681 T, so 736 is fine; the MZ-800 path (1020) also falls between the 1Z-013A pulse widths. **Still to check: the MZ-80B IPL (1020 @ 4 MHz, different tape format).**
+- **MZ-2000 ran at 2 MHz:** `mctrl.vhd`'s CPU speed selection tested `= "110" or ... = "110"` (twice MZ-80B), so the MZ-2000 fell through to the 2 MHz default. Fixed in both branches; it now runs at 4 MHz.
 - **Sim speed:** ~1.6M clk_sys cycles/s, about 1/44 real time. A 100-frame boot takes ~90 s.
 
 ## Phase 2: Config and I/O
@@ -108,6 +109,14 @@ The old `sharpmz.cpp` handled save, a 5-entry tape queue and MZ-80B APSS. The co
 ## Phase 4: Video
 
 Detailed port plan: `docs/video-port-plan.md` (clock domains, decode hazards, what to strip, BRAM budget, step order).
+
+Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `config_pkg.vhd`; v1 `video.vhd` is still there for comparison).
+- Clocks: both video PLLs, the FFCLK switch and the gated `VID_CLK` are gone. Everything runs on `SYS_CLK` with a `VID_CE` enable at 2x the dot clock chosen by `CLOCKSEL`; `CE_PIXEL` is exported.
+- RAMs: `rtl/vc/vc_rams.vhd` rebuilds the v2 RAM entities on `rtl/dpram`. The CG ROM is v1's 32 KB `combined_cgrom.mif`, banked per model and loaded over ioctl at 0x500000. The palette RAMs are replaced by a fixed LUT (on/off, MZ-800 IRGB).
+- Fixes to v2: 50 Hz timing rows restored (568/1136 x 312), with a `VIDEO_50HZ` input (MZ-700/800) replacing the management CPU's mode register. The config is applied after reset (it was skipped when the model didn't change after reset), and the 80-column/colour flags follow the config instead of toggling.
+- Wrapper `rtl/vc/video_vc.vhd`: CONFIG translation to the v2 layout, MREQ gated by the machine's decode, v1 VRAM wait states.
+- Verified in simulation: MZ-80K/80C/1200/80A/700 boot tests pass. MZ-700 is 50 Hz (70,886 T-states per frame, same as v1 and mz800emu); MZ-80A is green mono; the MZ-80B IPL screen renders.
+- Still to do from the plan: strip the GPU/OSD/VGA/composite logic, gate the A0–BF and MZ-80B snoop decode (section 2), fix the read-latency path for turbo, verify the MZ-80B GRAM and 40/80 switching, remove v1 `video.vhd`, and check BRAM and timing in Quartus.
 
 - [ ] **Evaluate v2 `VideoController`** before investing in v1 `video.vhd`:
   - [ ] Port its native timing tables (MONO40/80, COLOUR40/80 at 60 Hz and 50 Hz) and the character/graphics/OSD layered renderer.
