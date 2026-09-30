@@ -81,6 +81,14 @@ localparam CONF_STR =
 {
 	"SharpMZ;;",
 	"-;",
+	// Tape and disk entries stay on the top level: MGL files can only load F/S entries that are
+	// not on a sub-page.
+	"F1,MZF,Load Tape to CMT;",
+	"F2,MZF,Load Direct to RAM;",
+	"S0,MZTMZF,Tape Image;",
+	"S1,DSK,Floppy Drive A;",
+	"S2,DSK,Floppy Drive B;",
+	"-;",
 	"P1,Machine;",
 	"P1O[3:1],Model,MZ80A,MZ80K,MZ80C,MZ1200,MZ700,MZ80B,MZ2000,MZ800;",
 	"P1O[6:4],CPU Speed,Default,+1,+2,+3,+4,+5,+6,+7;",
@@ -88,9 +96,6 @@ localparam CONF_STR =
 	"P1O[32],MZ-800 Mode,MZ-700,MZ-800;",
 	"-;",
 	"P2,Tape;",
-	"P2F1,MZF,Load Tape to CMT;",
-	"P2F2,MZF,Load Direct to RAM;",
-	"P2S0,MZTMZF,Tape Image;",
 	"P2T[31],Rewind Tape Image;",
 	"P2O[25:24],Tape Buttons,Auto,Off,Play,Record;",
 	"P2O[23:21],Fast Tape,Default,Off,2x,4x,8x,16x,32x,Default;",
@@ -105,8 +110,6 @@ localparam CONF_STR =
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
 	"P5,Floppy;",
-	"P5S1,DSK,Drive A;",
-	"P5S2,DSK,Drive B;",
 	"P5O[34:33],Floppy Interface,Auto,On,Off;",
 	"-;",
 	"P4,ROM and RAM;",

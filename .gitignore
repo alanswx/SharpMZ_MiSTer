@@ -50,3 +50,4 @@ verilator/ghdl_work/
 verilator/obj_dir*/
 verilator/software/
 verilator/out/
+out/
