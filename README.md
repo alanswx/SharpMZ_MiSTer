@@ -28,6 +28,8 @@ Copy `SharpMZ_<date>.rbf` from `releases/` to the `_Computer` folder of your MiS
 
 The core boots as an MZ-80A with the SA-1510 monitor. Press F12 for the OSD.
 
+The tape loads, the tape image and the two floppy drives are on the OSD's first page; the other settings are in the Machine, Tape, Display, Floppy and ROM and RAM pages below. MGL files can load any of the first-page entries (`<file type="f" index="1">` for Load Tape to CMT, `type="s" index="0"` for the tape image, `index="1"`/`"2"` for the drives).
+
 ### Machine
 
 | Option | Description |
@@ -58,7 +60,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 
 | Option | Description |
 | ------ | ----------- |
-| Drive A / Drive B | Mount an Extended DSK image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
+| Floppy Drive A / B | Mount an Extended DSK image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
 | Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
 
 Writes go back to the image; mount a copy if you want to keep the original.

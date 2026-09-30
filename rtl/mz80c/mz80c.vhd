@@ -364,7 +364,7 @@ begin
             WR_n             => T80_WR_n,
             RD_n             => T80_RD_n,
             CLK0             => CLKBUS(CKSOUND),
-            GATE0            => SOUND_ENABLE or (M8 and not M8_700),
+            GATE0            => SOUND_ENABLE,                            -- E008 bit 0 on every model; the MZ-800 only decodes E008 in 700 mode (as mz800emu).
             OUT0             => SOUND_PULSE_X2,
             CLK1             => CLKBUS(CKRTC),
             GATE1            => '1',
@@ -958,12 +958,14 @@ begin
                   else
                   CMT_BUS_OUT(READBIT);
 
-    -- The signal coming out of the 8254 is not a square wave and twice the frequency. The addition of a flip-flop to divide the
-    -- frequency by 2 results in a square wave of the correct audio frequency.
+    -- MZ-80K family: counter 0 runs from 2 MHz and a flip-flop halves its output. The MZ-700/800 clock counter 0 at
+    -- 1.1088 MHz and use its mode 3 square wave directly: the monitor's BELL (count 04ECh) is 880 Hz, as documented.
     process( CLKBUS(CKMASTER) ) begin
         if rising_edge(CLKBUS(CKMASTER)) then
             SOUND_PULSE_X2_LAST <= SOUND_PULSE_X2;
-            if SOUND_PULSE_X2 = '1' and SOUND_PULSE_X2_LAST = '0' then
+            if CONFIG(MZ700) = '1' or M8 = '1' then
+                SOUND <= SOUND_PULSE_X2;
+            elsif SOUND_PULSE_X2 = '1' and SOUND_PULSE_X2_LAST = '0' then
                 SOUND <= not SOUND;
             end if;
         end if;
