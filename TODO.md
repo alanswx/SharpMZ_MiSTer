@@ -177,7 +177,8 @@ Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `
   - [ ] Border colour (CF register 6): the core outputs only the 320x200/640x200 area, so the border isn't visible.
   - [ ] Z80 PIO at FC-FF (interrupts, printer), joystick reads (F0/F1 return FF).
   - [ ] VideoController IN CE read returns the mode register (not used: the machine side answers CE reads).
-  - [ ] Real software: run MZ-800 titles from `software/`.
+  - [x] Real software (sim, 2026-09-29): 12 MZ-800 games from the user's archive load through the IPL from a tape image and reach the same title/attract screens as mz800emu: Cauldron II, Alien 8, Atic Atac, World Series Baseball, Blue Max, Bubbler, Cookie, Cybernoid, Dark Side, Draconus, Total Eclipse 2, Enduro Racer.
+  - [ ] More software on hardware: the other 557 MZ-800 games; turbo-loader titles (header types 00/08/76, exec below load address).
   - [x] All v2 video modes lost the leftmost pixel (horizontal blank started at count 1); the 40/80 column rows now start at 0.
 - [ ] **MZ-1500, MZ-2200:** config slots exist in v2 (dual PSG on the MZ-1500; the MZ-2200 is MZ-2000-family).
 - [ ] Machine options from v2 `mctrl`: RAM installed, GRAM I/II/III, PCG, MZ-1R25.
