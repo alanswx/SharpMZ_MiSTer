@@ -103,6 +103,15 @@ entity sharpmz is
         AUDIO_L_O             : out    std_logic;
         AUDIO_R_O             : out    std_logic;
         AUDIO_PSG_O           : out    std_logic_vector(13 downto 0);   -- MZ-800 PSG mix, unsigned.
+        --------------------          External I/O (floppy controller)              ------------------------------
+        EXT_IO_ADDR           : out    std_logic_vector(7 downto 0);            -- Z80 I/O port address.
+        EXT_IO_RD             : out    std_logic;                               -- Z80 I/O read cycle (IORQ, RD, not M1).
+        EXT_IO_WR             : out    std_logic;                               -- Z80 I/O write cycle.
+        EXT_IO_DOUT           : out    std_logic_vector(7 downto 0);            -- Z80 data out.
+        EXT_IO_DIN            : in     std_logic_vector(7 downto 0);            -- Data for an external I/O read.
+        EXT_IO_OE             : in     std_logic;                               -- External device answers this read.
+        EXT_INT_n             : in     std_logic;                               -- External interrupt (MZ-700/800 family).
+        EXT_CE_CPU            : out    std_logic;                               -- CPU clock enable.
         --------------------                      Tape status                   ------------------------------
         CMT_STATUS            : out    std_logic_vector(13 downto 0);           -- CMT_BUS_OUT, see mctrl_pkg.vhd.
         --------------------                   Machine configuration              ------------------------------
@@ -1072,7 +1081,7 @@ begin
     -- Multiplexer -> Signals to enabled hardware.
     --
     T80_WAIT_n               <= VIDEO_WAIT_n      when VIDEO_WAIT_n = '0'     else MZ80C_WAIT_n      when CONFIG(MZ_80C) = '1'   else MZ80B_WAIT_n;
-    T80_INT_n                <= MZ80C_INT_n       when CONFIG(MZ_80C) = '1'   else MZ80B_INT_n;
+    T80_INT_n                <= (MZ80C_INT_n and EXT_INT_n) when CONFIG(MZ_80C) = '1'   else MZ80B_INT_n;
     T80_NMI_n                <= MZ80C_NMI_n       when CONFIG(MZ_80C) = '1'   else MZ80B_NMI_n;
     T80_BUSRQ_n              <= MZ80C_BUSRQ_n     when CONFIG(MZ_80C) = '1'   else MZ80B_BUSRQ_n;
     T80_DI                   <= SYSRAM_DO         when MZ_CS_RAM_n ='0' and T80_RD_n = '0'                    -- Read from System RAM
@@ -1080,6 +1089,8 @@ begin
                                 SYSROM_DO         when MZ_CS_ROM_n ='0' and T80_RD_n = '0'                    -- Read from System ROM        
                                 else 
                                 VRAM_DO           when (MZ_CS_VRAM_n ='0' or MZ_CS_GRAM_n = '0' or MZ_CS_GRAM_80B_n = '0') and T80_RD_n = '0' -- Read from Graphics/Video RAM.
+                                else 
+                                EXT_IO_DIN        when EXT_IO_OE = '1' and T80_IORQ_n = '0' and T80_RD_n = '0'                                  -- External I/O (floppy controller).
                                 else 
                                 MZ80C_DI          when CONFIG(MZ_80C) = '1'  
                                 else
@@ -1116,6 +1127,11 @@ begin
     -- Parent signals onto local wires.
     --
     CMT_STATUS               <= MZ_CMT_BUS_OUT;
+    EXT_IO_ADDR              <= T80_A16(7 downto 0);
+    EXT_IO_RD                <= '1' when T80_IORQ_n = '0' and T80_RD_n = '0' and T80_M1_n = '1' else '0';
+    EXT_IO_WR                <= '1' when T80_IORQ_n = '0' and T80_WR_n = '0' and T80_M1_n = '1' else '0';
+    EXT_IO_DOUT              <= T80_DO;
+    EXT_CE_CPU               <= CLKBUS(CKENCPU);
     MZ_PS2_KEY               <= ps2_key;
     MZ_IOCTL_DOWNLOAD        <= ioctl_download;
     MZ_IOCTL_UPLOAD          <= ioctl_upload;

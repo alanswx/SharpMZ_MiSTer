@@ -49,6 +49,7 @@ VHD_SRC = \
 	$(RTL)/keymatrix.vhd \
 	$(RTL)/cmt.vhd \
 	$(RTL)/sn76489_audio.vhd \
+	$(RTL)/mz80c/mz800_pio.vhd \
 	$(RTL)/mz80c/mz80c.vhd \
 	$(RTL)/mz80b/mz80b.vhd \
 	$(RTL)/vc/vc_mctrl_pkg.vhd \
@@ -59,7 +60,7 @@ VHD_SRC = \
 	$(RTL)/sharpmz.vhd
 
 GEN_V = $(GEN)/sharpmz.v
-V_SRC = sim.v $(GEN_V) rtl_v/dpram.v rtl_v/dprom.v $(RTL)/tape_image.sv
+V_SRC = sim.v $(GEN_V) rtl_v/dpram.v rtl_v/dprom.v $(RTL)/tape_image.sv $(RTL)/mz_fdc.sv $(RTL)/wd1793.sv $(RTL)/wd1793_mem.v
 
 MIFS    = $(wildcard $(RTL)/software/mif/*.mif)
 MIF_HEX = $(patsubst $(RTL)/software/mif/%.mif,software/mif/%.mif.hex,$(MIFS))

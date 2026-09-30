@@ -75,6 +75,17 @@ module top(
    output [7:0]  sd_buff_din,
    input         sd_buff_wr,
    input         tape_rewind,
+   // Floppy drive A (hps_io S1); the sd_buff_* bus above is shared, as in hps_io.
+   input         fdd_mounted,
+   input         fdd_readonly,
+   input  [63:0] fdd_size,
+   output [31:0] fdd_lba,
+   output        fdd_rd,
+   output        fdd_wr,
+   input         fdd_ack,
+   output [7:0]  fdd_buff_din,
+   input  [1:0]  fdc_mode,
+   output        fdd_busy /*verilator public_flat*/,
    output        tape_active /*verilator public_flat*/,
    output        tape_full /*verilator public_flat*/,
    output [7:0]  tape_record /*verilator public_flat*/,
@@ -113,6 +124,27 @@ module top(
    wire [7:0]  mz_dout = tape_active ? tape_dout : ioctl_dout;
    wire        clksys_out, clkiop_unused;
 
+   wire [7:0]  ext_io_addr, ext_io_dout, ext_io_din;
+   wire        ext_io_rd, ext_io_wr, ext_io_oe, ext_int_n, ext_ce_cpu;
+   wire [31:0] fdc_lba[2];
+   wire [1:0]  fdc_rd, fdc_wr;
+   wire [7:0]  fdc_buff_din[2];
+
+   mz_fdc fdc(
+      .clk_sys(clk_sys), .reset(reset | warm_reset), .ce_cpu(ext_ce_cpu),
+      .model_ok(cfg_model[2:1] == 2'b10), .mode(fdc_mode),                     // MZ-700 (100) or MZ-800 (101)
+      .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),
+      .io_din(ext_io_din), .io_oe(ext_io_oe), .int_n(ext_int_n),
+      .img_mounted({1'b0, fdd_mounted}), .img_readonly(fdd_readonly), .img_size(fdd_size),
+      .sd_lba(fdc_lba), .sd_rd(fdc_rd), .sd_wr(fdc_wr), .sd_ack({1'b0, fdd_ack}),
+      .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(fdc_buff_din), .sd_buff_wr(sd_buff_wr),
+      .busy(fdd_busy)
+   );
+   assign fdd_lba = fdc_lba[0];
+   assign fdd_rd = fdc_rd[0];
+   assign fdd_wr = fdc_wr[0];
+   assign fdd_buff_din = fdc_buff_din[0];
+
    sharpmz core(
       .CLKMASTER      (clk_sys),
       .COLD_RESET     (reset),
@@ -149,6 +181,14 @@ module top(
       .AUDIO_R_O      (AUDIO_R),
       .AUDIO_PSG_O    (AUDIO_PSG),
       .CMT_STATUS     (cmt_status),
+      .EXT_IO_ADDR    (ext_io_addr),
+      .EXT_IO_RD      (ext_io_rd),
+      .EXT_IO_WR      (ext_io_wr),
+      .EXT_IO_DOUT    (ext_io_dout),
+      .EXT_IO_DIN     (ext_io_din),
+      .EXT_IO_OE      (ext_io_oe),
+      .EXT_INT_n      (ext_int_n),
+      .EXT_CE_CPU     (ext_ce_cpu),
       .IOCTL_DIN      (din32)
    );
 

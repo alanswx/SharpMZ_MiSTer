@@ -254,6 +254,11 @@ signal M8_TEMPO              :     std_logic;
 signal M8_TEMPO_CNT          :     integer range 0 to 228;
 signal M8_HBLANK_LAST        :     std_logic;
 signal M8_PSG_CS_n           :     std_logic;
+signal M8_PIO_CS             :     std_logic;
+signal M8_PIO_DO             :     std_logic_vector(7 downto 0);
+signal M8_PIO_VOE            :     std_logic;
+signal M8_PIO_INT_n          :     std_logic;
+signal M8_PIO_PA             :     std_logic_vector(7 downto 0);
 signal M8_PSG_MIX            :     unsigned(13 downto 0);
 --
 -- Debug
@@ -391,6 +396,29 @@ begin
             pcm14s_o         => open
         );
     M8_PSG_CS_n              <= '0' when M8 = '1' and M8_IO = X"F2" else '1';
+
+    -- MZ-800 Z80 PIO at FC-FF. Port A: 0 printer /RDA, 1 printer STA, 4 /CTC0, 5 /VBLN; CP/M runs its
+    -- keyboard and clock from the /VBLN bit mode interrupt (IM 2).
+    --
+    PIO800 : entity work.mz800_pio
+        port map (
+            CLK              => CLKBUS(CKMASTER),
+            RESET            => MZ_RESET or not M8,
+            CS               => M8_PIO_CS,
+            A                => T80_A16(1 downto 0),
+            RD_n             => T80_RD_n,
+            WR_n             => T80_WR_n,
+            IORQ_n           => T80_IORQ_n,
+            M1_n             => T80_M1_n,
+            DI               => T80_DO,
+            DO               => M8_PIO_DO,
+            VECTOR_OE        => M8_PIO_VOE,
+            INT_n            => M8_PIO_INT_n,
+            PA_IN            => M8_PIO_PA,
+            PB_IN            => x"FF"
+        );
+    M8_PIO_CS                <= '1' when M8 = '1' and M8_IO(7 downto 2) = "111111" else '0';
+    M8_PIO_PA                <= "11" & (not VBLANK) & (not SOUND_PULSE_X2) & "0010";
     AUDIO_PSG                <= std_logic_vector(M8_PSG_MIX) when M8 = '1' and CONFIG(AUDIOSRC) = '0' else (others => '0');
 
     -- Parent signals onto local wires.
@@ -404,6 +432,7 @@ begin
     -- MZ-80A - Mask interrupt from 8254 if INTMSK low.
     -- MZ-80K - Interrupt is from 8254 direct.
     T80_INT_ni               <= '0' when ((CONFIG(MZ_A)='1' or CONFIG(MZ700) = '1' or M8 = '1') and INTX='1' and INTMSK='1') or ((CONFIG(MZ_KC)='1' and INTX='1'))
+                                     or (M8 = '1' and M8_PIO_INT_n = '0')
                                 else '1';
     T80_INT_n                <= T80_INT_ni;
 
@@ -445,7 +474,9 @@ begin
     --
     -- Data Bus Multiplexing, plex all the output devices onto the Z80 Data Input according to the CS.
     --
-    T80_DI                   <= X"1A"     when M8 = '1' and T80_MREQ_n = '0' and T80_RD_n = '0' and T80_A16(15 downto 13) = "111" and M8_PROH = '1'
+    T80_DI                   <= M8_PIO_DO when M8 = '1' and (M8_PIO_VOE = '1' or (M8_PIO_CS = '1' and T80_RD_n = '0'))   -- MZ-800 Z80 PIO, and its vector
+                                else
+                                X"1A"     when M8 = '1' and T80_MREQ_n = '0' and T80_RD_n = '0' and T80_A16(15 downto 13) = "111" and M8_PROH = '1'
                                 else
                                 X"1A"     when M8 = '1' and M8_CS_E_n = '0' and T80_RD_n = '0' and T80_A16(3 downto 0) > "1000"
                                 else

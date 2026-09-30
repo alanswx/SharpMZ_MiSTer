@@ -10,6 +10,9 @@
 #   m800_<test>   MZ-800 graphics modes, write/read modes and hardware scroll (tests/mz800/make_gfx_modes.py);
 #                 frame hash. The pictures match mz800emu (tests/mz800/compare_emu.sh).
 #   psg_mz800     MZ-800: tests/mz800/psg440.mzf plays 439.8 Hz on the PSG; the frequency is measured from --wav
+#   fdd_cpm       MZ-800: CP/M 4.1 boots from ../software/dsk/CPMv41 System.dsk, DIR; frame hash (matches
+#                 mz800emu pixel for pixel). fdd_hry: CPMv41 Hry COM A autostarts its file manager.
+#                 Skipped when the disk images aren't there (they are not in the repository).
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
 #   tape_image    load ramtest from an MZT through the tape image slot (fast tape)
 #
@@ -49,6 +52,21 @@ for t in gfx640 gfx640h gfx320h gfx320b gfx320x gfxwm gfxwm640 gfxrw gfxscr gfxs
       awk -F, '$1==400 {print $2}' "$OUT/m800_$t.csv" > "$OUT/m800_$t.txt" ) &
     pids+=($!); names+=("m800_$t")
 done
+DSK=../software/dsk
+if [ -f "$DSK/CPMv41 System.dsk" ]; then
+    cp "$DSK/CPMv41 System.dsk" "$OUT/fdd_cpm.dsk"
+    ( $BIN --model mz800 --fdd "$OUT/fdd_cpm.dsk" --fdd-readonly --type '200:DIR\n' --stop-at-frame 451 \
+          --frame-log "$OUT/fdd_cpm.csv" --quiet > /dev/null 2> "$OUT/fdd_cpm.log"
+      awk -F, '$1==450 {print $2}' "$OUT/fdd_cpm.csv" > "$OUT/fdd_cpm.txt" ) &
+    pids+=($!); names+=("fdd_cpm")
+fi
+if [ -f "$DSK/CPMv41 Hry COM A.dsk" ]; then
+    cp "$DSK/CPMv41 Hry COM A.dsk" "$OUT/fdd_hry.dsk"
+    ( $BIN --model mz800 --fdd "$OUT/fdd_hry.dsk" --fdd-readonly --stop-at-frame 601 \
+          --frame-log "$OUT/fdd_hry.csv" --quiet > /dev/null 2> "$OUT/fdd_hry.log"
+      awk -F, '$1==600 {print $2}' "$OUT/fdd_hry.csv" > "$OUT/fdd_hry.txt" ) &
+    pids+=($!); names+=("fdd_hry")
+fi
 ( $BIN --model mz800 --mzf tests/mz800/psg440.mzf --mzf-direct --mzf-direct-frame 20 --type 200:M --type '280:J2000\n' \
       --stop-at-frame 400 --wav "$OUT/psg_mz800.wav" --quiet > /dev/null 2> "$OUT/psg_mz800.log"
   python3 tests/wav_freq.py "$OUT/psg_mz800.wav" 7.0 1.0 > "$OUT/psg_mz800.txt" ) &
@@ -70,7 +88,7 @@ for p in "${pids[@]}"; do wait $p; done
 fail=0
 for n in "${names[@]}"; do
     case $n in
-        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*)
+        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*)
             if diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
                 echo "PASS $n"
             else

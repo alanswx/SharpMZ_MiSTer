@@ -104,6 +104,11 @@ localparam CONF_STR =
 	"P3O[18],VRAM Wait,Off,On;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
+	"P5,Floppy;",
+	"P5S1,DSK,Drive A;",
+	"P5S2,DSK,Drive B;",
+	"P5O[34:33],Floppy Interface,Auto,On,Off;",
+	"-;",
 	"P4,ROM and RAM;",
 	"P4O[28],User ROM,Off,On;",
 	"P4O[29],FDC ROM,Off,On;",
@@ -150,21 +155,22 @@ wire  [7:0] hps_ioctl_dout;
 wire  [7:0] hps_ioctl_din;
 wire [31:0] hps_ioctl_file_ext;
 
-wire        img_mounted;
+// Image slots: S0 tape image, S1/S2 floppy drives A/B.
+wire  [2:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
-wire [31:0] sd_lba;
-wire        sd_rd;
-wire        sd_wr;
-wire        sd_ack;
+wire [31:0] sd_lba[3];
+wire  [2:0] sd_rd;
+wire  [2:0] sd_wr;
+wire  [2:0] sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din;
+wire  [7:0] sd_buff_din[3];
 wire        sd_buff_wr;
 
 wire        tape_active;
 
-hps_io #(.CONF_STR(CONF_STR)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -200,14 +206,14 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
 	.img_size(img_size),
-	.sd_lba('{sd_lba}),
-	.sd_blk_cnt('{6'd0}),
+	.sd_lba(sd_lba),
+	.sd_blk_cnt('{6'd0, 6'd0, 6'd0}),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din('{sd_buff_din}),
+	.sd_buff_din(sd_buff_din),
 	.sd_buff_wr(sd_buff_wr),
 
 	.info_req(1'b0),
@@ -378,16 +384,16 @@ tape_image tape_image
 	.clk(clk_sys),
 	.reset(reset),
 
-	.img_mounted(img_mounted),
+	.img_mounted(img_mounted[0]),
 	.img_readonly(img_readonly),
 	.img_size(img_size),
-	.sd_lba(sd_lba),
-	.sd_rd(sd_rd),
-	.sd_wr(sd_wr),
-	.sd_ack(sd_ack),
+	.sd_lba(sd_lba[0]),
+	.sd_rd(sd_rd[0]),
+	.sd_wr(sd_wr[0]),
+	.sd_ack(sd_ack[0]),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din(sd_buff_din),
+	.sd_buff_din(sd_buff_din[0]),
 	.sd_buff_wr(sd_buff_wr),
 
 	.rewind(status[31]),
@@ -438,6 +444,48 @@ wire hsync_emu;
 wire vsync_emu;
 wire [7:0] main_leds;
 
+// Floppy disk interface (MZ-700/MZ-800), drives A/B on image slots S1/S2.
+wire [7:0] ext_io_addr, ext_io_dout, ext_io_din;
+wire       ext_io_rd, ext_io_wr, ext_io_oe, ext_int_n, ext_ce_cpu;
+wire       fdd_busy;
+wire [31:0] fdc_lba[2];
+wire [7:0]  fdc_buff_din[2];
+
+mz_fdc mz_fdc
+(
+	.clk_sys(clk_sys),
+	.reset(reset),
+	.ce_cpu(ext_ce_cpu),
+	.model_ok(cfg_model == 3'b100 || cfg_model == 3'b101),
+	.mode(status[34:33]),
+
+	.io_addr(ext_io_addr),
+	.io_rd(ext_io_rd),
+	.io_wr(ext_io_wr),
+	.io_dout(ext_io_dout),
+	.io_din(ext_io_din),
+	.io_oe(ext_io_oe),
+	.int_n(ext_int_n),
+
+	.img_mounted(img_mounted[2:1]),
+	.img_readonly(img_readonly),
+	.img_size(img_size),
+	.sd_lba(fdc_lba),
+	.sd_rd(sd_rd[2:1]),
+	.sd_wr(sd_wr[2:1]),
+	.sd_ack(sd_ack[2:1]),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(fdc_buff_din),
+	.sd_buff_wr(sd_buff_wr),
+
+	.busy(fdd_busy)
+);
+assign sd_lba[1] = fdc_lba[0];
+assign sd_lba[2] = fdc_lba[1];
+assign sd_buff_din[1] = fdc_buff_din[0];
+assign sd_buff_din[2] = fdc_buff_din[1];
+
 sharpmz sharp_mz
 (
 	// System clock; the core runs everything on it with clock enables.
@@ -466,6 +514,14 @@ sharpmz sharp_mz
 	.AUDIO_PSG_O(audio_psg),
 
 	.CMT_STATUS(cmt_status),
+	.EXT_IO_ADDR(ext_io_addr),
+	.EXT_IO_RD(ext_io_rd),
+	.EXT_IO_WR(ext_io_wr),
+	.EXT_IO_DOUT(ext_io_dout),
+	.EXT_IO_DIN(ext_io_din),
+	.EXT_IO_OE(ext_io_oe),
+	.EXT_INT_n(ext_int_n),
+	.EXT_CE_CPU(ext_ce_cpu),
 
 	// Machine configuration from the OSD.
 	.CFG_MODEL(cfg_reg0_model),
@@ -490,7 +546,7 @@ sharpmz sharp_mz
 );
 
 assign LED_USER = hps_ioctl_download;
-assign LED_DISK = {1'b0, tape_active | cmt_status[4]};    // Tape image access or CMT activity.
+assign LED_DISK = {1'b0, tape_active | cmt_status[4] | fdd_busy};    // Tape image, CMT or floppy activity.
 
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL  = clk_video_in;

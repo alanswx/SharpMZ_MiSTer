@@ -1,5 +1,8 @@
 set_global_assignment -name SYSTEMVERILOG_FILE sharpmz.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/tape_image.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/wd1793.sv
+set_global_assignment -name VERILOG_FILE rtl/wd1793_mem.v
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mz_fdc.sv
 set_global_assignment -name SDC_FILE sharpmz.sdc
 
 set_global_assignment -name VHDL_FILE rtl/config_pkg.vhd
@@ -37,6 +40,7 @@ set_global_assignment -name VHDL_FILE rtl/i8255/i8255.vhd
 # MZ80C specific modules.
 #============================================================
 set_global_assignment -name VHDL_FILE rtl/sn76489_audio.vhd
+set_global_assignment -name VHDL_FILE rtl/mz80c/mz800_pio.vhd
 set_global_assignment -name VHDL_FILE rtl/mz80c/mz80c.vhd
 
 #============================================================

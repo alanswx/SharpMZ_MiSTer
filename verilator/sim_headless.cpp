@@ -67,6 +67,9 @@ struct Options {
     bool     quiet = false;
     bool     verbose = false;
     std::string tape_image;
+    std::string fdd;
+    bool        fdd_readonly = false;
+    int         fdc_mode = 0;
     bool     tape_readonly = false;
     std::set<uint32_t> tape_rewinds;
 };
@@ -91,6 +94,8 @@ static void usage()
 "  --mzf-direct-frame N   frame to do the direct load at (default 0)\n"
 "Tape image (the OSD Tape Image slot):\n"
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
+"  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
+"  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
 "  --tape-rewind N        pulse Rewind Tape Image at frame N (repeatable)\n"
 "Typing:\n"
@@ -176,6 +181,9 @@ static bool parse_args(int argc, char **argv, Options &o)
             o.memdumps.push_back({parse_num(v.substr(0, c1)), parse_num(v.substr(c1 + 1, c2 - c1 - 1)), v.substr(c2 + 1)});
         }
         else if (a == "--tape-image") o.tape_image = next();
+        else if (a == "--fdd") o.fdd = next();
+        else if (a == "--fdd-readonly") o.fdd_readonly = true;
+        else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
         else if (a == "--tape-readonly") o.tape_readonly = true;
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
         else if (a == "--trace-cpu") o.trace_file = next();
@@ -244,8 +252,13 @@ private:
     void wav_header();
 
     // Tape image slot, emulating Main_MiSTer's side of hps_io's sd_* handshake.
+    // Image slots: 0 = tape (S0), 1 = floppy drive A (S1). The buffer bus is shared.
     FILE    *img = nullptr;
     uint64_t img_size = 0;
+    FILE    *fdd = nullptr;
+    uint64_t fdd_size = 0;
+    int      sd_slot = 0;
+    void mount_fdd();
     enum { SD_IDLE, SD_READ, SD_READ_END, SD_WRITE } sd_state = SD_IDLE;
     int      sd_idx = 0;
     uint32_t sd_cur_lba = 0;
@@ -269,24 +282,35 @@ private:
 
 void Sim::sd_step()
 {
+    // Slot accessors: the tape (S0) and floppy drive A (S1) share sd_buff_*.
+    auto req_rd = [&](int k) -> bool { return k ? top->fdd_rd : top->sd_rd; };
+    auto req_wr = [&](int k) -> bool { return k ? top->fdd_wr : top->sd_wr; };
+    auto lba    = [&](int k) -> uint32_t { return k ? top->fdd_lba : top->sd_lba; };
+    auto ack    = [&](int k, int v) { if (k) top->fdd_ack = v; else top->sd_ack = v; };
+    auto file   = [&](int k) -> FILE * { return k ? fdd : img; };
+    auto size   = [&](int k) -> uint64_t { return k ? fdd_size : img_size; };
+
     top->sd_buff_wr = 0;
     switch (sd_state) {
     case SD_IDLE:
-        if (img && (top->sd_rd || top->sd_wr)) {
-            sd_cur_lba = top->sd_lba;
+        for (int k = 0; k < 2; k++) {
+            if (!file(k) || !(req_rd(k) || req_wr(k))) continue;
+            sd_slot = k;
+            sd_cur_lba = lba(k);
             sd_idx = 0;
-            top->sd_ack = 1;
-            if (top->sd_rd) {
+            ack(k, 1);
+            if (req_rd(k)) {
                 memset(sd_data, 0, sizeof(sd_data));
                 uint64_t off = (uint64_t)sd_cur_lba * 512;
-                if (off < img_size) {
-                    fseeko(img, (off_t)off, SEEK_SET);
-                    fread(sd_data, 1, (size_t)std::min<uint64_t>(512, img_size - off), img);
+                if (off < size(k)) {
+                    fseeko(file(k), (off_t)off, SEEK_SET);
+                    fread(sd_data, 1, (size_t)std::min<uint64_t>(512, size(k) - off), file(k));
                 }
                 sd_state = SD_READ;
             } else {
                 sd_state = SD_WRITE;
             }
+            break;
         }
         break;
     case SD_READ:
@@ -296,27 +320,41 @@ void Sim::sd_step()
         if (++sd_idx == 512) sd_state = SD_READ_END;
         break;
     case SD_READ_END:
-        top->sd_ack = 0;
+        ack(sd_slot, 0);
         sd_state = SD_IDLE;
         break;
     case SD_WRITE:
         // sd_buff_din is registered: it holds the byte addressed on the previous clock.
-        if (sd_idx > 0) sd_data[sd_idx - 1] = top->sd_buff_din;
+        if (sd_idx > 0) sd_data[sd_idx - 1] = sd_slot ? top->fdd_buff_din : top->sd_buff_din;
         if (sd_idx < 512) {
             top->sd_buff_addr = sd_idx++;
         } else {
             // Like Main, never grow the image: write only what fits.
             uint64_t off = (uint64_t)sd_cur_lba * 512;
-            if (off < img_size) {
-                fseeko(img, (off_t)off, SEEK_SET);
-                fwrite(sd_data, 1, (size_t)std::min<uint64_t>(512, img_size - off), img);
-                fflush(img);
+            if (off < size(sd_slot)) {
+                fseeko(file(sd_slot), (off_t)off, SEEK_SET);
+                fwrite(sd_data, 1, (size_t)std::min<uint64_t>(512, size(sd_slot) - off), file(sd_slot));
+                fflush(file(sd_slot));
             }
-            top->sd_ack = 0;
+            ack(sd_slot, 0);
             sd_state = SD_IDLE;
         }
         break;
     }
+}
+
+void Sim::mount_fdd()
+{
+    fdd = fopen(opt.fdd.c_str(), opt.fdd_readonly ? "rb" : "r+b");
+    if (!fdd) { fprintf(stderr, "cannot open disk image %s\n", opt.fdd.c_str()); exit_code = 2; return; }
+    fseeko(fdd, 0, SEEK_END);
+    fdd_size = (uint64_t)ftello(fdd);
+    top->fdd_size = fdd_size;
+    top->fdd_readonly = opt.fdd_readonly;
+    top->fdd_mounted = 1;
+    clock();
+    top->fdd_mounted = 0;
+    if (!opt.quiet) fprintf(stderr, "[sim] disk image '%s' mounted, %llu bytes\n", opt.fdd.c_str(), (unsigned long long)fdd_size);
 }
 
 void Sim::mount_tape()
@@ -492,6 +530,7 @@ void Sim::write_config()
     top->cfg_display  = m->display;                            // video/graphics/VRAM wait/PCG bits off
     top->cfg_display2 = opt.vmode == "native" ? 3 : 1;         // sharpmz.sv: 2'b11 native, 2'b01 640x480@60
     top->cfg_display3 = opt.mz800_700 ? 0 : 4;                   // bit 2: MZ-800 mode switch
+    top->fdc_mode     = opt.fdc_mode;
     top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
     top->cfg_audio    = 0;
     top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape
@@ -668,6 +707,7 @@ int Sim::run()
     if (!opt.mzf.empty() && (!opt.mzf_direct || opt.mzf_direct_frame == 0))
         if (!load_mzf(opt.mzf_direct)) return exit_code;
     if (!opt.tape_image.empty()) { mount_tape(); if (exit_code) return exit_code; }
+    if (!opt.fdd.empty()) { mount_fdd(); if (exit_code) return exit_code; }
 
     uint32_t last = opt.stop_set ? opt.stop_frame : 150;
     while (frame <= last && !Verilated::gotFinish()) clock();

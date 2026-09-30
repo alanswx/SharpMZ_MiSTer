@@ -162,7 +162,15 @@ Status: the v2 VideoController is in (`rtl/vc/`, selected by `VIDEO_V2 = 1` in `
 
 ## Later: v2 donor features
 
-- [ ] **Floppy:** v2 `fdd.vhd` + `wd1793.vhd` (MB8866/WD1773). It caches one sector and has its management CPU fetch sectors, which maps onto hps_io `S` slots (`sd_lba`/`sd_rd`/`sd_wr`). Covers the MZ-80B/2000 and MZ-700/800 FD units.
+- [ ] **Floppy (MZ-700/MZ-800):** `rtl/mz_fdc.sv` = Sharp glue (D8-DB inverted MB8876 registers, DC motor/drive, DD side, DF EINT interrupt) + two instances of Sorgelig's `wd1793.sv` (from FM-7_MiSTer: Extended DSK parsing, image slots S1/S2), OSD page "Floppy" (Drive A/B, Interface Auto/On/Off; Auto = present only while a disk is mounted).
+  - [x] `wd1793.sv`: Force Interrupt during a Type II command keeps the Type II status (the IPL needs 00); RAM module renamed `wd1793_mem`.
+  - [x] MZ-800 Z80 PIO (`rtl/mz80c/mz800_pio.vhd`, FC-FF): bit mode interrupts, IM 2 vector. PA4 /CTC0, PA5 /VBLN. CP/M 4.1 runs its keyboard and clock from it.
+  - [x] Sim: `--fdd`, `--fdd-readonly`, `--fdc-mode`; CP/M 4.1 (CPMv41 System) boots, DIR matches mz800emu pixel for pixel; CPMv41 Hry COM A's file manager matches.
+  - [ ] Drive B in the sim; writes (copy a file on a writable image); more disks (CPM80, CPMv13/14/23 systems, games); turbo CPU speeds.
+  - [ ] 1.44 MB images (`_Vzor144`, `_Vzor_Nova`): wd1793.sv addresses 1 MB.
+  - [ ] RAM disk board (ports EA/EB, CP/M drive E:).
+  - [ ] MZ-700: MZ-1E05 FD ROM in the FDC ROM slot (`quickdisk_mz-1e05.rom` is actually the floppy ROM) and boot with the monitor F command; no MZ-700 DSK images yet.
+  - [ ] Hardware test.
 - [ ] **MZ-800** (plan: `docs/mz800-plan.md`). The machine logic is written in v1's `mz80c.vhd` following mz800emu; v2's `mz80k_hw.vhd` is used as a reference only.
   - [x] Clocks: MZ-700 CPU (70,886.5 T/frame, same as mz800emu) and sound clocks.
   - [x] 16 KB ROM (1Z-013B, CG, IPL/9Z-504M from mz800emu) at 0x1C000 of the combined ROM; MZ-800 CG in the CG ROM slot (`tools/add_mz800_rom.py`).
