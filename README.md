@@ -7,21 +7,22 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 | MZ-80K | Working | MZ-80C | Working |
 | MZ-1200 | Working | MZ-80A | Working |
 | MZ-700 | Working | MZ-80B | Boots to IPL; limited testing |
-| MZ-2000 | Not working (needs a real MZ-2000 IPL ROM) | MZ-800 | IPL, monitor, graphics and PSG; testing |
+| MZ-2000 | Not working (needs a real MZ-2000 IPL ROM) | MZ-800 | Working in simulation (IPL, graphics, PSG, tape, floppy, CP/M); hardware testing |
 
 ## Features
 
 * Z80 CPU at the original speed (2 MHz MZ-80K/C/1200/A, 3.547 MHz MZ-700/800, 4 MHz MZ-80B/2000), with turbo steps up to about 32–35 MHz.
 * Native video timing (MZ-700/800 are 50 Hz PAL, the others 60 Hz), scaled by the MiSTer framework: HDMI, analog, scandoubler, scanlines and aspect ratio work as in other cores.
 * 40x25 and 80x25, mono and colour character modes; programmable character generator (PCG); MZ-80B/2000 graphics RAM.
-* MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, 320x200/640x200 graphics, palette, and the SN76489 sound chip.
+* MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, all 320x200/640x200 graphics modes with hardware scroll, the SN76489 sound chip and the Z80 PIO.
+* Floppy disk (MZ-700/MZ-800 interface): two drives from Extended DSK (`.dsk`) images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks.
 * 8253 sound or the tape signal on the audio output.
 * Cassette: MZF loading onto the virtual tape or straight into RAM, and a **Tape Image** slot that loads multi-program tapes and **saves** programs written with SAVE. MZ-80B/2000 APSS (automatic program search) works against the tape image. Fast tape up to 32x.
 * Monitor ROMs, character generator ROMs and keymaps for every model are built in, and can be replaced from the OSD.
 
 ## Installation
 
-Copy `SharpMZ_<date>.rbf` from `releases/` to the `_Computer` folder of your MiSTer SD card, and put your tape files (`.mzf`, `.mzt`) in `games/SharpMZ/`.
+Copy `SharpMZ_<date>.rbf` from `releases/` to the `_Computer` folder of your MiSTer SD card, and put your tape files (`.mzf`, `.mzt`) and disk images (`.dsk`) in `games/SharpMZ/`.
 
 ## Using the Emulator
 
@@ -53,6 +54,15 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 
 **Saving programs.** MiSTer can't grow a mounted file, so saving needs a tape image with spare room. Make a blank one with `tools/make_blank_tape.py` (default 1 MB, zero-filled), mount it as the Tape Image, and SAVE as usual (for example `S120012FF1200` then a file name in the MZ-700 monitor). Each program is appended after the last one. If the image is read-only or full, the save is skipped.
 
+### Floppy
+
+| Option | Description |
+| ------ | ----------- |
+| Drive A / Drive B | Mount an Extended DSK image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 IPL boots it at reset. |
+| Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
+
+Writes go back to the image; mount a copy if you want to keep the original.
+
 ### Display
 
 | Option | Description |
@@ -72,10 +82,11 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 ## Known Issues
 
 * MZ-2000: the ROM slot holds the MZ-80B IPL, which doesn't boot the MZ-2000; a real MZ-2000 IPL dump is needed. Its colour graphics RAM isn't in the memory decode yet.
-* MZ-800: new and only checked in simulation against mz800emu (IPL, monitor, 320x200 graphics, CG-RAM, PSG). 640x200, scrolling, the border, the Z80 PIO and joysticks are untested or missing. The screen shows the 320x200 area without the MZ-800 border.
+* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour isn't shown (only the 320x200/640x200 area is output), and joysticks, the printer port and the RAM disk board aren't implemented.
+* Floppy: 1.44 MB images aren't supported, the MZ-700 needs its floppy ROM added before it can boot from disk, and writing to disk is untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B has had little testing beyond the IPL screen.
-* No floppy disk or Quick Disk support yet.
+* No Quick Disk support.
 
 ## Design Summary
 
@@ -83,12 +94,14 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 * **Standard MiSTer framework.** The `sys/` folder is stock Template_MiSTer, the OSD is a normal configuration string, and files come in through the standard ioctl and image-slot interfaces. Main_MiSTer's old Sharp MZ driver isn't used.
 * **Video** is the author's v2 VideoController from the [tranZPUter](https://git.eaw.app/eaw/tranZPUter) project, moved onto the core clock (`rtl/vc/`).
 * **Tape images** are handled in the FPGA by `rtl/tape_image.sv`, which moves programs between the image and the core's cassette buffer.
+* **Floppy** is `rtl/mz_fdc.sv`: the Sharp interface around Sorgelig's `wd1793.sv` (from the FM-7 core), reading DSK images through the image slots.
+* More detail in `docs/design.md`.
 
 ## Building and Simulation
 
 * **FPGA:** open `sharpmz.qpf` in Quartus Prime Lite 17.0 and compile.
 * **Simulation:** `verilator/` runs the core headless with GHDL and Verilator: boot any model, type at it, load and save tapes, and write screenshots. `make test` runs the regression tests. See `verilator/README.md`.
-* **Plans and notes:** `TODO.md` and `docs/`.
+* **Status and open work:** `TODO.md`. **Design notes:** `docs/design.md`.
 
 ## Links
 

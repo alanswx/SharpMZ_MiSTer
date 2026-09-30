@@ -1,3 +1,5 @@
+> **Note:** this is the original author's documentation for his v1 core (with its custom sys, Main_MiSTer driver, menu queue and VGA scaling), kept for reference. For this standard MiSTer version see [../README.md](../README.md), [design.md](design.md) and [../TODO.md](../TODO.md).
+
 <br>
 This project aims to provide full hardware emulation (along with extensions) of the Sharp MZ Series Computers. 
 

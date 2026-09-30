@@ -621,7 +621,7 @@ void Sim::wav_header()
 void Sim::write_png(uint32_t f)
 {
     if (fb_w == 0 || fb_h == 0) return;
-    char name[64];
+    char name[1024];
     snprintf(name, sizeof(name), "%s/frame_%06u.png", opt.out_dir.c_str(), f);
     if (!stbi_write_png(name, fb_w, fb_h, 3, fb.data(), fb_w * 3)) {
         fprintf(stderr, "cannot write %s\n", name);
