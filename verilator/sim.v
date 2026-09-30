@@ -119,9 +119,9 @@ module top(
    );
 
    // Same bus mux as sharpmz.sv.
-   wire        mz_wr   = tape_active ? tape_wr   : ioctl_wr;
-   wire [24:0] mz_addr = tape_active ? tape_addr : ioctl_download ? ioctl_addr : 25'h1000000;
-   wire [7:0]  mz_dout = tape_active ? tape_dout : ioctl_dout;
+   wire        mz_wr   = ioctl_download ? ioctl_wr   : tape_active & tape_wr;     // as sharpmz.sv: downloads first
+   wire [24:0] mz_addr = ioctl_download ? ioctl_addr : tape_active ? tape_addr : 25'h1000000;
+   wire [7:0]  mz_dout = ioctl_download ? ioctl_dout : tape_dout;
    wire        clksys_out, clkiop_unused;
 
    wire [7:0]  ext_io_addr, ext_io_dout, ext_io_din;

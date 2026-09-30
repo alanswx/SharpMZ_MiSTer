@@ -204,7 +204,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.ioctl_file_ext(hps_ioctl_file_ext),
 	.ioctl_upload_req(1'b0),
 	.ioctl_upload_index(8'd0),
-	.ioctl_wait(tape_active),
+	.ioctl_wait(1'b0),                      // Never stall the HPS link: tape_image yields to downloads instead.
 
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
@@ -417,9 +417,9 @@ tape_image tape_image
 
 // Core download bus: the tape engine, an OSD download, or parked on an unused address. The CMT clears
 // its record-ready flag whenever the bus points at its buffers, so it must not idle there.
-wire        mz_ioctl_wr   = tape_active ? tape_wr   : (hps_ioctl_wr && mzf_direct_wr_valid);
-wire [24:0] mz_ioctl_addr = tape_active ? tape_addr : hps_ioctl_download ? hps_ioctl_addr_mapped : 25'h1000000;
-wire  [7:0] mz_ioctl_dout = tape_active ? tape_dout : hps_ioctl_dout;
+wire        mz_ioctl_wr   = hps_ioctl_download ? (hps_ioctl_wr && mzf_direct_wr_valid) : tape_active & tape_wr;
+wire [24:0] mz_ioctl_addr = hps_ioctl_download ? hps_ioctl_addr_mapped : tape_active ? tape_addr : 25'h1000000;
+wire  [7:0] mz_ioctl_dout = hps_ioctl_download ? hps_ioctl_dout : tape_dout;
 
 /////////////////  RESET  /////////////////////////
 

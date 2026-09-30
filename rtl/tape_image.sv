@@ -56,7 +56,7 @@ module tape_image
 
 	// Controls.
 	input             rewind,          // Pulse: go back to the start of the tape.
-	input             host_busy,       // An OSD download is using the core bus (and may be filling the CMT).
+	input             host_busy,       // An OSD download is using the core bus (and may be filling the CMT); the engine holds still.
 	input      [13:0] cmt_status,      // CMT_BUS_OUT from the core (see mctrl_pkg.vhd).
 
 	// Core download bus (the core's ioctl interface). active is high while this module owns it.
@@ -192,6 +192,12 @@ always @(posedge clk) begin
 			active <= 0;
 			state  <= S_IDLE;
 		end
+	end
+	// While an OSD download runs it owns the core bus, so the engine holds its state. It must not stall the
+	// download instead (ioctl_wait): that freezes the whole HPS link, and with it the sector reads this engine
+	// waits for. Main finishes any sector transfer before a download starts and serves none during one, so a
+	// pending sd_rd/sd_wr simply waits.
+	else if (host_busy) begin
 	end
 	else case (state)
 
