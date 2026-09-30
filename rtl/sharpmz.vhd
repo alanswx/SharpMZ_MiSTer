@@ -1225,15 +1225,51 @@ begin
     -- MZ-800: one 16KB ROM at 0x1C000 (1Z-013B, CG, IPL/9Z-504M), addressed by A13..A0 (E000 -> 2000).
     MROM_BANK                <= "111" & T80_A16(13 downto 11) when CONFIG(MZ800)          = '1'
                                 else
-                                "00000" & T80_A16(11)     when CONFIG(MZ80K)                 = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
-                                else
-                                "00001" & T80_A16(11)     when CONFIG(MZ80K)                 = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
-                                else
                                 "000100"                  when CONFIG(MZ80K)                 = '1' and T80_A16(15 downto 11) = "11101"
                                 else
                                 "000101"                  when CONFIG(MZ80K)                 = '1' and T80_A16(15 downto 11) = "11110"
                                 else
                                 "000110"                  when CONFIG(MZ80K)                 = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "001011"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(15 downto 11) = "11101"
+                                else
+                                "001100"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(15 downto 11) = "11110"
+                                else
+                                "001101"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "010010"                  when CONFIG(MZ1200)                = '1' and T80_A16(15 downto 11) = "11101"
+                                else
+                                "010011"                  when CONFIG(MZ1200)                = '1' and T80_A16(15 downto 11) = "11110"
+                                else
+                                "010100"                  when CONFIG(MZ1200)                = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "011001"                  when CONFIG(MZ80A)                 = '1' and T80_A16(15 downto 11) = "11101"
+                                else
+                                "011010"                  when CONFIG(MZ80A)                 = '1' and T80_A16(15 downto 11) = "11110"
+                                else
+                                "011011"                  when CONFIG(MZ80A)                 = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "100000"                  when CONFIG(MZ700)                 = '1' and T80_A16(15 downto 11) = "11101"
+                                else
+                                "100001"                  when CONFIG(MZ700)                 = '1' and T80_A16(15 downto 11) = "11110"
+                                else
+                                "100010"                  when CONFIG(MZ700)                 = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "101100"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11101"
+                                else
+                                "101101"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11110"
+                                else
+                                "101110"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "110001"                  when CONFIG(MZ2000)                = '1' and T80_A16(15 downto 11) = "11101"
+                                else
+                                "110010"                  when CONFIG(MZ2000)                = '1' and T80_A16(15 downto 11) = "11110"
+                                else
+                                "110011"                  when CONFIG(MZ2000)                = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "00000" & T80_A16(11)     when CONFIG(MZ80K)                 = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
+                                else
+                                "00001" & T80_A16(11)     when CONFIG(MZ80K)                 = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
                                 else
                                 "000111"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(11) = '0'                 and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
@@ -1243,21 +1279,9 @@ begin
                                 else
                                 "001010"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(11) = '1'                 and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
                                 else
-                                "001011"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(15 downto 11) = "11101"
-                                else
-                                "001100"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(15 downto 11) = "11110"
-                                else
-                                "001101"                  when CONFIG(pkgs.mctrl_pkg.MZ80C)  = '1' and T80_A16(15 downto 11) = "11111"
-                                else
                                 "00111" & T80_A16(11)     when CONFIG(MZ1200)                = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
                                 "01000" & T80_A16(11)     when CONFIG(MZ1200)                = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
-                                else
-                                "010010"                  when CONFIG(MZ1200)                = '1' and T80_A16(15 downto 11) = "11101"
-                                else
-                                "010011"                  when CONFIG(MZ1200)                = '1' and T80_A16(15 downto 11) = "11110"
-                                else
-                                "010100"                  when CONFIG(MZ1200)                = '1' and T80_A16(15 downto 11) = "11111"
                                 else
                                 "010101"                  when CONFIG(MZ80A)                 = '1' and T80_A16(11) = '0'                 and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
@@ -1267,21 +1291,9 @@ begin
                                 else
                                 "011000"                  when CONFIG(MZ80A)                 = '1' and T80_A16(11) = '1'                 and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
                                 else
-                                "011001"                  when CONFIG(MZ80A)                 = '1' and T80_A16(15 downto 11) = "11101"
-                                else
-                                "011010"                  when CONFIG(MZ80A)                 = '1' and T80_A16(15 downto 11) = "11110"
-                                else
-                                "011011"                  when CONFIG(MZ80A)                 = '1' and T80_A16(15 downto 11) = "11111"
-                                else
                                 "01110" & T80_A16(11)     when CONFIG(MZ700)                 = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
                                 "01111" & T80_A16(11)     when CONFIG(MZ700)                 = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
-                                else
-                                "100000"                  when CONFIG(MZ700)                 = '1' and T80_A16(15 downto 11) = "11101"
-                                else
-                                "100001"                  when CONFIG(MZ700)                 = '1' and T80_A16(15 downto 11) = "11110"
-                                else
-                                "100010"                  when CONFIG(MZ700)                 = '1' and T80_A16(15 downto 11) = "11111"
                                 else
                                 "100011"                  when CONFIG(MZ800)                 = '1' and T80_A16(11) = '0'                 and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
@@ -1302,21 +1314,9 @@ begin
                                 else
                                 "101011"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
                                 else
-                                "101100"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11101"
+                                "101111"                  when CONFIG(MZ2000)                = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
-                                "101101"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11110"
-                                else
-                                "101110"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11111"
-                                else
-                                "101111"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
-                                else
-                                "110000"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
-                                else
-                                "110001"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11101"
-                                else
-                                "110010"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11110"
-                                else
-                                "110011"                  when CONFIG(pkgs.mctrl_pkg.MZ80B)  = '1' and T80_A16(15 downto 11) = "11111"
+                                "110000"                  when CONFIG(MZ2000)                = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
                                 else
                                 "000000"; -- Default to K ROM.
 

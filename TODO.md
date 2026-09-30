@@ -14,7 +14,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | Tape | Done. MZF to CMT, direct to RAM, and a Tape Image slot (`rtl/tape_image.sv`) that loads multi-program MZTs, saves into a blank image and does MZ-80B APSS. |
 | MZ-80K/80C/1200/80A/700 | Working in simulation. MZ-700 is also tested on hardware. |
 | MZ-800 | Working in simulation against mz800emu: IPL, 9Z-504M monitor, memory map, MZ-700/800 modes, all graphics modes, PSG, Z80 PIO, tape, floppy and CP/M. 12 native games and 84 of 94 disk images match mz800emu. |
-| Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. |
+| Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. |
 | MZ-80B | Boots to the IPL; little software tested. |
 | MZ-2000 | Not working: no MZ-2000 IPL ROM. |
 | FPGA | Latest build meets timing (core clock +2.0 ns): 17,965 ALMs (43%), 434/553 RAM blocks. |
@@ -35,8 +35,9 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] Turbo-loader tapes (header types 00/08/76, exec below the load address).
 
 ### Other models
-- [ ] User ROM (E800) and FDC ROM (F000): the MROM_BANK select in `sharpmz.vhd` never picks them (the model's monitor clause has no address condition).
-- [ ] MZ-700 floppy: put the MZ-1E05 FD ROM in the FDC ROM slot (`rtl/software/roms/quickdisk_mz-1e05.rom` is really the floppy ROM) and boot with the monitor `F` command.
+- [ ] MZ-700 floppy on hardware; MZ-2Z009 Disk BASIC (loads from tape) on a blank disk.
+- [ ] MZ-80B/MZ-2000 floppy: the IPL boots from the same D8-DF interface; 16 bootable disks in `software/idealine/mz-80b/rb_DSK`.
+- [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
 - [ ] MZ-2000: needs a real IPL ROM dump, then its colour GRAM (C000-FFFF) in the memory decode.
 - [ ] MZ-80B: GRAM and 40/80 column switching with real software; SAVE and APSS.
 - [ ] MZ-80A (probably 80K/1200 too): the cursor keys type 4/6/8/2 and Backspace types `/`. It needs the MZ-80A key matrix.
@@ -64,6 +65,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 Each has a commit; this list is for context.
 - **MZ-700 tape record decoder:** never decoded (sample point 1302 T; the monitor reads at ~990 T), so SAVE never produced a file.
 - **MZ-700 sound pitch:** ~10% low (8253 clock 1 MHz instead of 1.1088 MHz).
+- **ROM banks:** the User ROM (E800) and FDC ROM (F000) banks were never selected (the monitor clauses caught those addresses first), and the MZ-2000's banks were decoded as a second MZ-80B set.
 - **mctrl:** MZ-80B RTC speed never selected; MZ-2000 ran at 2 MHz; the reset one-shot only ended by wrapping.
 - **GHDL 5.1** drops port-alias assignments in Verilog output (`verilator/fix_port_aliases.py`).
 - **v2 VideoController:**

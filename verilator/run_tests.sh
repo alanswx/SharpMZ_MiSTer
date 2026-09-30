@@ -13,6 +13,7 @@
 #   fdd_cpm       MZ-800: CP/M 4.1 boots from ../software/dsk/CPMv41 System.dsk, DIR; frame hash (matches
 #                 mz800emu pixel for pixel). fdd_hry: CPMv41 Hry COM A autostarts its file manager.
 #                 Skipped when the disk images aren't there (they are not in the repository).
+#   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
 #   tape_image    load ramtest from an MZT through the tape image slot (fast tape)
 #
@@ -52,6 +53,10 @@ for t in gfx640 gfx640h gfx320h gfx320b gfx320x gfxwm gfxwm640 gfxrw gfxscr gfxs
       awk -F, '$1==400 {print $2}' "$OUT/m800_$t.csv" > "$OUT/m800_$t.txt" ) &
     pids+=($!); names+=("m800_$t")
 done
+python3 ../tools/make_boot_disk.py ../rtl/software/mzf/ramtest.mzf "$OUT/fdd_mz700.dsk" > /dev/null
+( $BIN --model mz700 --fdd "$OUT/fdd_mz700.dsk" --fdd-readonly --type '120:JF000\n' --stop-at-frame 500 \
+      --ascii-end --quiet > "$OUT/fdd_mz700.txt" 2> "$OUT/fdd_mz700.log" ) &
+pids+=($!); names+=("fdd_mz700")
 DSK=../software/dsk
 if [ -f "$DSK/CPMv41 System.dsk" ]; then
     cp "$DSK/CPMv41 System.dsk" "$OUT/fdd_cpm.dsk"

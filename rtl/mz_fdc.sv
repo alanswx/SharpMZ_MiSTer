@@ -51,24 +51,25 @@ module mz_fdc
 	output  [7:0] sd_buff_din[2],
 	input         sd_buff_wr,
 
-	output        busy            // drive activity (LED)
+	output        busy,           // drive activity (LED)
+	output        present         // the interface is present (MZ-700: its ROM at F000 is on the same card)
 );
 
 // Image presence per drive, and write protect from the mount.
-reg  [1:0] present = 0;
+reg  [1:0] mounted = 0;
 reg  [1:0] wprot = 0;
 always @(posedge clk_sys) begin
 	integer i;
 	for (i = 0; i < 2; i = i + 1)
 		if (img_mounted[i]) begin
-			present[i] <= |img_size;
+			mounted[i] <= |img_size;
 			wprot[i]   <= img_readonly;
 		end
 end
 
 // With no image mounted in Auto mode the interface is absent, so the IPL doesn't stop at
 // "Make ready FD".
-wire       enable = model_ok & ((mode == 2'd1) | ((mode == 2'd0) & |present));
+wire       enable = model_ok & ((mode == 2'd1) | ((mode == 2'd0) & |mounted));
 wire       sel    = enable & (io_addr[7:3] == 5'b11011);       // D8-DF
 wire       chip   = sel & ~io_addr[2];                         // D8-DB
 wire [1:0] reg_a  = io_addr[1:0];
@@ -121,7 +122,7 @@ generate
 			.size_code(3'd2),
 			.layout(1'b0),
 			.side(side),
-			.ready(present[d] & ~fdc_prepare[d]),
+			.ready(mounted[d] & ~fdc_prepare[d]),
 
 			.img_mounted(img_mounted[d]),
 			.img_size(img_size[19:0]),
@@ -161,6 +162,7 @@ end
 assign io_oe  = chip & io_rd;
 assign io_din = drive[1] ? 8'hFF : ~fdc_dout[drive[0]];
 assign int_n  = ~(enable & eint & drq_sel & ~drq_taken);
-assign busy   = |(fdc_busy & present);
+assign busy   = |(fdc_busy & mounted);
+assign present = enable;
 
 endmodule

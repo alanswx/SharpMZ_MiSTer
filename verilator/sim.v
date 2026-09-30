@@ -129,6 +129,7 @@ module top(
    wire [31:0] fdc_lba[2];
    wire [1:0]  fdc_rd, fdc_wr;
    wire [7:0]  fdc_buff_din[2];
+   wire        fdc_present;
 
    mz_fdc fdc(
       .clk_sys(clk_sys), .reset(reset | warm_reset), .ce_cpu(ext_ce_cpu),
@@ -138,7 +139,7 @@ module top(
       .img_mounted({1'b0, fdd_mounted}), .img_readonly(fdd_readonly), .img_size(fdd_size),
       .sd_lba(fdc_lba), .sd_rd(fdc_rd), .sd_wr(fdc_wr), .sd_ack({1'b0, fdd_ack}),
       .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(fdc_buff_din), .sd_buff_wr(sd_buff_wr),
-      .busy(fdd_busy)
+      .busy(fdd_busy), .present(fdc_present)
    );
    assign fdd_lba = fdc_lba[0];
    assign fdd_rd = fdc_rd[0];
@@ -158,7 +159,7 @@ module top(
       .CFG_AUDIO      (cfg_audio),
       .CFG_CMT        (cfg_cmt),
       .CFG_USERROM    (8'd0),
-      .CFG_FDCROM     (8'd0),
+      .CFG_FDCROM     ((fdc_present & cfg_model[2:0] == 3'b100) ? 8'h10 : 8'h00),   // MZ-700 FD ROM with the interface
       .IOCTL_DOWNLOAD (ioctl_download),
       .IOCTL_UPLOAD   (1'b0),
       .IOCTL_CLK      (clk_sys),

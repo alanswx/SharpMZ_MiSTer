@@ -287,7 +287,8 @@ wire [2:0] cfg_display = mz_display_type(status[8:7], cfg_model);
 wire [1:0] cfg_tape_buttons = mz_tape_buttons(status[25:24]);
 wire [2:0] cfg_fast_tape = mz_fast_tape(status[23:21]);
 wire [7:0] cfg_userrom = status[28] ? (8'd1 << cfg_model) : 8'd0;
-wire [7:0] cfg_fdcrom  = status[29] ? (8'd1 << cfg_model) : 8'd0;
+wire       fdc_present;
+wire [7:0] cfg_fdcrom  = (status[29] | (fdc_present & cfg_model == 3'b100)) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700: the MZ-1E05 ROM comes with the interface
 
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, status[18], status[17], status[16], 1'b0, cfg_display};  // PCG is software controlled (E010-E012).
@@ -479,7 +480,8 @@ mz_fdc mz_fdc
 	.sd_buff_din(fdc_buff_din),
 	.sd_buff_wr(sd_buff_wr),
 
-	.busy(fdd_busy)
+	.busy(fdd_busy),
+	.present(fdc_present)
 );
 assign sd_lba[1] = fdc_lba[0];
 assign sd_lba[2] = fdc_lba[1];

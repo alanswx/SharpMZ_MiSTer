@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Add the MZ-800 ROMs to the combined ROM images and rewrite their MIFs.
+"""Add ROMs that romtool's layout has no place for to the combined ROM images, and rewrite their MIFs.
 Run after romtool (build_meminitfiles.sh).
 
   combined_mrom  0x1C000: the 16 KB MZ-800 ROM (1Z-013B, CG, IPL/9Z-504M).
+  combined_mrom  0x10800: the MZ-700 FDC ROM banks (F000-FFFF): the MZ-1E05 floppy interface ROM.
   combined_cgrom 0x3000:  the MZ-800 CG (the MZ-700 CG with each byte bit-reversed).
 
-usage: add_mz800_rom.py ROMDIR MIFDIR
+usage: patch_roms.py ROMDIR MIFDIR
 """
 import sys
 
@@ -32,4 +33,8 @@ def patch(name, offset, data, size=None):
 mz800 = read("MZ800_0000.rom") + read("MZ800_CGROM.rom") + read("MZ800_E000.rom")
 assert len(mz800) == 0x4000
 patch("combined_mrom", 0x1C000, mz800, 0x20000)
+# MROM_BANK "100001"/"100010" (sharpmz.vhd) = MZ-700 F000-F7FF / F800-FFFF.
+fd700 = read("MZ-1E05.rom")
+assert len(fd700) == 0x1000
+patch("combined_mrom", 0x21 * 0x800, fd700)
 patch("combined_cgrom", 0x3000, read("MZ800_CGROM.rom"))
