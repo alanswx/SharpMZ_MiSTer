@@ -1226,6 +1226,7 @@ generate
 		reg  [7:0] tpos;
 		reg  [7:0] tsize;
 		reg  [7:0] tsizes[166];
+		reg        tskip_wait;
 		always @(posedge clk_sys) tsize <= tsizes[tpos];
 
 		wire[127:0] edsk_sig = "EXTENDED CPC DSK";
@@ -1362,6 +1363,19 @@ generate
 			end
 
 			old_wr <= scan_wr;
+
+			// SharpMZ: step over unformatted (size 0) tracks in the EDSK track table between bytes;
+			// the parser only advances while track_size is non-zero, so an image whose first track is
+			// unformatted (e.g. only the MZ-800 boot track on side 1) was never parsed at all.
+			// tsize follows tpos a clock later, hence one step every two clocks.
+			tskip_wait <= 0;
+			if(scan_active & (fmt == FMT_EDSK) & (scan_addr >= 256) & ~|track_size & (tpos < 8'd166) & ~tskip_wait & ~(scan_wr & ~old_wr)) begin
+				track_size <= {tsize, 8'd0};
+				track_pos  <= 0;
+				tpos       <= tpos + 1'd1;
+				tskip_wait <= 1;
+			end
+
 			if(scan_wr & ~old_wr & scan_active) begin
 
 				//---------------------------------------------------------

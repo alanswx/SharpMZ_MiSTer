@@ -13,6 +13,7 @@ VRAM address mapping, pixel order and colour mapping all show up in the picture.
   gfxrw.mzf     DMD=00  RF reads: copy plane II to plane I, and a colour search into plane II
   gfxscr.mzf    DMD=00  full screen hardware scroll (SOF 8 lines), then CPU writes into the scrolled VRAM
   gfxscr640.mzf DMD=06  hardware scroll of a window (SSA/SEA/SW) by 3 lines at 640x200
+  gfxscr640b.mzf DMD=06 full screen scroll with a large offset (SOF 3C0, needs SOF2) and writes before and after
 """
 
 # Patterns: 2 bytes computing A from HL (the VRAM address).
@@ -106,3 +107,8 @@ mzf('gfxscr', bytes(scr + [0x18, 0xFE]))
 scr = header(0x06) + fill(0x01, 'hxl', 0x8000, 16000) + fill(0x04, 'l', 0x8000, 16000)
 scr += crtc([(1, 15), (2, 0), (3, 0x50), (4, 0x14), (5, 0x64)])
 mzf('gfxscr640', bytes(scr + [0x18, 0xFE]))
+
+scr = header(0x06) + fill(0x01, 'hxl', 0x8000, 16000)
+scr += crtc([(1, 0xC0), (2, 0x03), (3, 0x7D), (4, 0x00), (5, 0x7D)])
+scr += fill(0x04, 'l', 0x8000, 16000)                          # plane III through the scrolled addressing
+mzf('gfxscr640b', bytes(scr + [0x18, 0xFE]))

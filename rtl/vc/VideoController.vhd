@@ -835,10 +835,10 @@ architecture rtl of VideoController is
     signal GD_SW_DISPLAY         :     std_logic_vector(13 downto 0);        -- Scroll width regiser (SW) expanded to display address width. 
     signal GD_SSA_DISPLAY        :     std_logic_vector(13 downto 0);        -- Scroll start address register (SSA) expanded to display address width.
     signal GD_SEA_DISPLAY        :     std_logic_vector(13 downto 0);        -- Scroll end address register (SEA) expanded to display address width.
-    signal GD_FB_ADDR_SOFSW      :     std_logic_vector(13 downto 0);        -- Rendering framebuffer address adjusted for SOF and SW.
-    signal GD_FB_ADDR_SOF        :     std_logic_vector(13 downto 0);        -- Rendering framebuffer address adjusted for SOF.
-    signal GD_ADDR_SOFSW         :     std_logic_vector(13 downto 0);        -- CPU GRAM address adjusted for SOF and SW.
-    signal GD_ADDR_SOF           :     std_logic_vector(13 downto 0);        -- CPU GRAM address adjusted for SOF.
+    signal GD_FB_ADDR_SOFSW      :     std_logic_vector(14 downto 0);        -- Rendering framebuffer address adjusted for SOF and SW.
+    signal GD_FB_ADDR_SOF        :     std_logic_vector(14 downto 0);        -- Rendering framebuffer address adjusted for SOF.
+    signal GD_ADDR_SOFSW         :     std_logic_vector(14 downto 0);        -- CPU GRAM address adjusted for SOF and SW.
+    signal GD_ADDR_SOF           :     std_logic_vector(14 downto 0);        -- CPU GRAM address adjusted for SOF.
     signal GD_BCOL               :     std_logic_vector(3 downto 0);         -- Border colour regiser (BCOL), 4 bits
     signal GD_CKSW               :     std_logic;                            -- Superimpose bit (D7)(CKSW), 1 bit
     signal GD_CPUADDR            :     std_logic_vector(15 downto 0);        -- Register to store the CPU address for a read/write operation.
@@ -1228,10 +1228,12 @@ begin
                                 (GD_SOF&"0000");
 
     -- Scroll register offsets.
-    GD_FB_ADDR_SOFSW         <= GD_FB_ADDR_SOF - GD_SW_DISPLAY;
-    GD_FB_ADDR_SOF           <= FB_GFX_ADDR(13 downto 0) + GD_SOF_DISPLAY;
-    GD_ADDR_SOFSW            <= GD_ADDR_SOF - GD_SW_DISPLAY;
-    GD_ADDR_SOF              <= GD_CPUADDR(13 downto 0) + GD_SOF_DISPLAY;
+    -- 15 bits: in 640x200 mode the byte address (up to 3FFF) plus SOF (up to 3E80) overflows 14 bits, which
+    -- skipped the wrap at SEA near the end of the scroll (CP/M 4.1 text drawn over itself after scrolling).
+    GD_FB_ADDR_SOFSW         <= GD_FB_ADDR_SOF - ('0' & GD_SW_DISPLAY);
+    GD_FB_ADDR_SOF           <= ('0' & FB_GFX_ADDR(13 downto 0)) + ('0' & GD_SOF_DISPLAY);
+    GD_ADDR_SOFSW            <= GD_ADDR_SOF - ('0' & GD_SW_DISPLAY);
+    GD_ADDR_SOF              <= ('0' & GD_CPUADDR(13 downto 0)) + ('0' & GD_SOF_DISPLAY);
 
 
     -- Frame buffer graphics rendering address multiplexed to accommodate the MZ800 address mechanism.

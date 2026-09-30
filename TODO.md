@@ -24,11 +24,8 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ### Next
 - [ ] Hardware test of the current build: the MZ-800 (graphics tests, PSG, tape from the IPL) and the floppy (CP/M 4.1).
-- [ ] Floppy disks that differ from mz800emu:
-  - [ ] `Saver-SCR_MZP`: the picture never appears.
-  - [ ] `_Nic`: a stub image with an unformatted track 0 side 0 gives "FD:Loading error" where mz800emu says "Not master".
 - [ ] Floppy writes: copy a file on a writable image and check it in mz800emu; drive B; turbo speeds.
-- [ ] 8253: the CP/M 1.4 loader's one-second wait takes about 1 s here and 2 s in mz800emu (counter 1 on HSYNC, counter 2 counting its output). Find which is right.
+- [ ] 8253: the CP/M 1.x loader waits for counter 2's first clock (the first 1 s pulse of counter 1): about 1 s here, as the 8253 datasheet gives, and 2 s in mz800emu. Only the boot pause differs; confirm on hardware.
 
 ### MZ-800
 - [ ] Border colour (CF register 6): only the 320x200/640x200 area is output.
@@ -80,3 +77,5 @@ Each has a commit; this list is for context.
 - **Keyboard:** extended keys never reached their keymap entries; MZ-700 map errors (4 typed C, missing keys).
 - **Floppy:** `wd1793.sv` Force Interrupt status.
 - **i8255:** a mode set didn't clear the outputs, so CP/M 1.x on the MZ-800 took endless 8253 interrupts.
+- **wd1793.sv:** an EDSK image with an unformatted track before the first formatted one was never parsed.
+- **VideoController:** 640x200 hardware scroll overflowed 14 bits with large offsets, so CP/M 4.1 drew text over itself after scrolling a while.
