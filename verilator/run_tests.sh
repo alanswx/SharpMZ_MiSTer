@@ -13,6 +13,8 @@
 #   fdd_cpm       MZ-800: CP/M 4.1 boots from ../software/dsk/CPMv41 System.dsk, DIR; frame hash (matches
 #                 mz800emu pixel for pixel). fdd_hry: CPMv41 Hry COM A autostarts its file manager.
 #                 Skipped when the disk images aren't there (they are not in the repository).
+#   fdd_mz80b     MZ-80B: the IPL boots SB-6511 Disk BASIC (DISK23) and CP/M 2.2 (fdd_mz80b_cpm, DISK01) from
+#                 ../software/idealine/mz-80b/rb_DSK/DSK; frame hash. Skipped when the images aren't there.
 #   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
 #   tape_image    load ramtest from an MZT through the tape image slot (fast tape)
@@ -87,6 +89,17 @@ if [ -z "$QUICK" ]; then
           --stop-at-frame 700 --ascii-end --quiet > "$OUT/tape_image.txt" 2> "$OUT/tape_image.log" ) &
     pids+=($!); names+=("tape_image")
 fi
+RB=../software/idealine/mz-80b/rb_DSK/DSK
+for t in "fdd_mz80b DISK23 900" "fdd_mz80b_cpm DISK01 1200"; do
+    set -- $t
+    if [ -f "$RB/$2.DSK" ]; then
+        cp "$RB/$2.DSK" "$OUT/$1.dsk"
+        ( $BIN --model mz80b --fdd "$OUT/$1.dsk" --fdd-readonly --stop-at-frame $(($3 + 1)) \
+              --frame-log "$OUT/$1.csv" --quiet > /dev/null 2> "$OUT/$1.log"
+          awk -F, -v f=$3 '$1==f {print $2}' "$OUT/$1.csv" > "$OUT/$1.txt" ) &
+        pids+=($!); names+=("$1")
+    fi
+done
 
 for p in "${pids[@]}"; do wait $p; done
 

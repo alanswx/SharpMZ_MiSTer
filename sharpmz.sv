@@ -457,7 +457,7 @@ mz_fdc mz_fdc
 	.clk_sys(clk_sys),
 	.reset(reset),
 	.ce_cpu(ext_ce_cpu),
-	.model_ok(cfg_model == 3'b100 || cfg_model == 3'b101),
+	.model_ok(cfg_model[2]),                    // MZ-700, MZ-800, MZ-80B, MZ-2000
 	.mode(status[34:33]),
 
 	.io_addr(ext_io_addr),

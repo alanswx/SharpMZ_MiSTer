@@ -26,7 +26,7 @@ module mz_fdc
 	input         clk_sys,
 	input         reset,
 	input         ce_cpu,         // CPU clock enable; the controller timing runs at CPU speed
-	input         model_ok,       // Model has the interface (MZ-700/MZ-800)
+	input         model_ok,       // Model has the interface (MZ-700/800, MZ-80B/2000)
 	input   [1:0] mode,           // 0 Auto (present while a disk image is mounted), 1 On, 2 Off
 
 	// Z80 I/O

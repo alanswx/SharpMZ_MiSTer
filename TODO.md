@@ -14,7 +14,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | Tape | Done. MZF to CMT, direct to RAM, and a Tape Image slot (`rtl/tape_image.sv`) that loads multi-program MZTs, saves into a blank image and does MZ-80B APSS. |
 | MZ-80K/80C/1200/80A/700 | Working in simulation. MZ-700 is also tested on hardware. |
 | MZ-800 | Working in simulation against mz800emu: IPL, 9Z-504M monitor, memory map, MZ-700/800 modes, all graphics modes, PSG, Z80 PIO, tape, floppy and CP/M. 12 native games and 84 of 94 disk images match mz800emu. |
-| Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. |
+| Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. MZ-80B: the IPL boots SB-6511 Disk BASIC and CP/M 2.2 from the idealine.info images. |
 | MZ-80B | Boots to the IPL; little software tested. |
 | MZ-2000 | Not working: no MZ-2000 IPL ROM. |
 | FPGA | Latest build meets timing (core clock +2.0 ns): 17,965 ALMs (43%), 434/553 RAM blocks. |
@@ -36,7 +36,9 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ### Other models
 - [ ] MZ-700 floppy on hardware; MZ-2Z009 Disk BASIC (loads from tape) on a blank disk.
-- [ ] MZ-80B/MZ-2000 floppy: the IPL boots from the same D8-DF interface; 16 bootable disks in `software/idealine/mz-80b/rb_DSK`.
+- [ ] MZ-2000 floppy: the interface is enabled, but the MZ-2000 model has no IPL to boot it; try the MZ-2200 IPL (`software/idealine/mz-2x00/mz2200ipl`).
+- [ ] MZ-80B SB-7010 (DISK29) loads and stops at its monitor's `*` prompt; find out how FDOS is started from there.
+- [ ] wd1793: EDSK sector error flags (ST1/ST2) are ignored, so a sector dumped with a CRC error reads as good data. DISK37/38 are bad dumps: the IPL loads corrupt code and hangs instead of reporting a loading error.
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
 - [ ] MZ-2000: needs a real IPL ROM dump, then its colour GRAM (C000-FFFF) in the memory decode.
 - [ ] MZ-80B: GRAM and 40/80 column switching with real software; SAVE and APSS.

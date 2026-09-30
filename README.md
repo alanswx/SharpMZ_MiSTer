@@ -58,7 +58,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 
 | Option | Description |
 | ------ | ----------- |
-| Drive A / Drive B | Mount an Extended DSK image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 IPL boots it at reset. |
+| Drive A / Drive B | Mount an Extended DSK image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
 | Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
 
 Writes go back to the image; mount a copy if you want to keep the original.
