@@ -15,6 +15,7 @@
 #                 Skipped when the disk images aren't there (they are not in the repository).
 #   fdd_mz80b     MZ-80B: the IPL boots SB-6511 Disk BASIC (DISK23) and CP/M 2.2 (fdd_mz80b_cpm, DISK01) from
 #                 ../software/idealine/mz-80b/rb_DSK/DSK; frame hash. Skipped when the images aren't there.
+#   ipl_mz2000    MZ-2000: the MZ-2200 IPL reaches "IPL is looking for a program" (frame hash at 300)
 #   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
 #   tape_image    load ramtest from an MZT through the tape image slot (fast tape)
@@ -55,6 +56,9 @@ for t in gfx640 gfx640h gfx320h gfx320b gfx320x gfxwm gfxwm640 gfxrw gfxscr gfxs
       awk -F, '$1==400 {print $2}' "$OUT/m800_$t.csv" > "$OUT/m800_$t.txt" ) &
     pids+=($!); names+=("m800_$t")
 done
+( $BIN --model mz2000 --stop-at-frame 301 --frame-log "$OUT/ipl_mz2000.csv" --quiet > /dev/null 2> "$OUT/ipl_mz2000.log"
+  awk -F, '$1==300 {print $2}' "$OUT/ipl_mz2000.csv" > "$OUT/ipl_mz2000.txt" ) &
+pids+=($!); names+=("ipl_mz2000")
 python3 ../tools/make_boot_disk.py ../rtl/software/mzf/ramtest.mzf "$OUT/fdd_mz700.dsk" > /dev/null
 ( $BIN --model mz700 --fdd "$OUT/fdd_mz700.dsk" --fdd-readonly --type '120:JF000\n' --stop-at-frame 500 \
       --ascii-end --quiet > "$OUT/fdd_mz700.txt" 2> "$OUT/fdd_mz700.log" ) &
@@ -106,7 +110,7 @@ for p in "${pids[@]}"; do wait $p; done
 fail=0
 for n in "${names[@]}"; do
     case $n in
-        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*)
+        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*|ipl_*)
             if diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
                 echo "PASS $n"
             else
