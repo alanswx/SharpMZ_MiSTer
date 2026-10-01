@@ -114,6 +114,8 @@ entity sharpmz is
         EXT_CE_CPU            : out    std_logic;                               -- CPU clock enable.
         --------------------                      Tape status                   ------------------------------
         CMT_STATUS            : out    std_logic_vector(13 downto 0);           -- CMT_BUS_OUT, see mctrl_pkg.vhd.
+        CMT_CTRL              : out    std_logic_vector(7 downto 0);            -- CMT_BUS_IN (machine to deck), for debug.
+        CMT_DEBUG             : out    std_logic_vector(31 downto 0);           -- cmt.vhd DEBUG_STATUS_LEDS, for debug.
         --------------------                   Machine configuration              ------------------------------
         CFG_MODEL             : in     std_logic_vector(7 downto 0);            -- See mctrl.vhd for the bit layout.
         CFG_DISPLAY           : in     std_logic_vector(7 downto 0);
@@ -1127,6 +1129,8 @@ begin
     -- Parent signals onto local wires.
     --
     CMT_STATUS               <= MZ_CMT_BUS_OUT;
+    CMT_CTRL                 <= MZ_CMT_BUS_IN;
+    CMT_DEBUG                <= MZ_CMT_DEBUG_LEDS(31 downto 0);
     EXT_IO_ADDR              <= T80_A16(7 downto 0);
     EXT_IO_RD                <= '1' when T80_IORQ_n = '0' and T80_RD_n = '0' and T80_M1_n = '1' else '0';
     EXT_IO_WR                <= '1' when T80_IORQ_n = '0' and T80_WR_n = '0' and T80_M1_n = '1' else '0';

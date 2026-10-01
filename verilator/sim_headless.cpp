@@ -476,6 +476,19 @@ void Sim::clock()
             st_l = st;
         }
     }
+    static uint32_t dbg_last = 0xFFFFFFFF;
+    uint32_t dm = top->dbg_cmt_debug & 0x0F04E700u;   // play state, motor toggle, MZ_80C, deck inputs
+    if (opt.verbose && dm != dbg_last) {
+        fprintf(stderr, "[cmt] frame %u debug %08X\n", frame, dm);
+        dbg_last = dm;
+    }
+    static uint8_t ctrl_last = 0xFF;
+    if (opt.verbose && top->dbg_cmt_ctrl != ctrl_last) {
+        uint8_t c = top->dbg_cmt_ctrl;   // CMT_BUS_IN, mctrl_pkg.vhd
+        fprintf(stderr, "[cmt] frame %u ctrl %02X readbit %d reel %d stop %d play %d seek %d dir %d eject %d wren %d\n", frame, c,
+                c & 1, (c >> 1) & 1, (c >> 2) & 1, (c >> 3) & 1, (c >> 4) & 1, (c >> 5) & 1, (c >> 6) & 1, (c >> 7) & 1);
+        ctrl_last = c;
+    }
     uint16_t cs = top->cmt_status & 0x3E1F;
     if (opt.verbose && cs != cmt_last) {
         fprintf(stderr, "[cmt] frame %u cycle %llu status %04X%s%s%s%s%s  tape_active %d\n", frame, (unsigned long long)cycle, cs,

@@ -131,6 +131,15 @@ signal RECORD_READY_SEQ      :     std_logic_vector(1 downto 0);             -- 
 signal RECORD_BUTTON         :     std_logic;                                -- Virtual Record button.
 signal RECORDING             :     std_logic;                                -- Signal indicating a Record is underway, Active = 1.
 signal RECSEQ                :     std_logic_vector(2 downto 0);             -- Signal, 3 cycles, indicating 
+signal ST_APSS_DIR            :     std_logic;                                -- CMT_BUS_OUT(APSS_DIR), registered in the state process.
+signal ST_APSS_EJECT          :     std_logic;                                -- CMT_BUS_OUT(APSS_EJECT), registered in the state process.
+signal ST_APSS_PLAY           :     std_logic;                                -- CMT_BUS_OUT(APSS_PLAY), registered in the state process.
+signal ST_APSS_SEEK           :     std_logic;                                -- CMT_BUS_OUT(APSS_SEEK), registered in the state process.
+signal ST_APSS_STOP           :     std_logic;                                -- CMT_BUS_OUT(APSS_STOP), registered in the state process.
+signal ST_TAPEREADY           :     std_logic;                                -- CMT_BUS_OUT(TAPEREADY), registered in the state process.
+signal ST_WRITEREADY          :     std_logic;                                -- CMT_BUS_OUT(WRITEREADY), registered in the state process.
+signal STOP_LAST             :     std_logic;                                -- STOP sampled last CPU cycle (MZ-80B/2000 edge commands).
+signal REEL_LAST             :     std_logic;                                -- REEL_MOTOR sampled last CPU cycle.
 signal MOTOR_TOGGLE          :     std_logic_vector(1 downto 0);             -- Signal indicating if the MZ wants to start or toggle the motor.
 signal APSS_TIMER_CNT        :     unsigned(20 downto 0);                    -- 1 second virtual APSS SEEK time.
 signal WRITEBIT              :     std_logic;                                -- Tape data signal sent to the MZ (for playback).
@@ -227,6 +236,15 @@ begin
     CMT_BUS_OUTi(pkgs.mctrl_pkg.PLAYING)      <= PLAYING(2);
     CMT_BUS_OUTi(pkgs.mctrl_pkg.RECORD_READY) <= RECORD_READY;
     CMT_BUS_OUTi(pkgs.mctrl_pkg.RECORDING)    <= RECORDING;
+    -- State bits registered in the CMT state process. Each element of CMT_BUS_OUTi has one driver: GHDL
+    -- synthesis lost the process writes when the vector was split between a process and these assignments.
+    CMT_BUS_OUTi(pkgs.mctrl_pkg.APSS_DIR)    <= ST_APSS_DIR;
+    CMT_BUS_OUTi(pkgs.mctrl_pkg.APSS_EJECT)  <= ST_APSS_EJECT;
+    CMT_BUS_OUTi(pkgs.mctrl_pkg.APSS_PLAY)   <= ST_APSS_PLAY;
+    CMT_BUS_OUTi(pkgs.mctrl_pkg.APSS_SEEK)   <= ST_APSS_SEEK;
+    CMT_BUS_OUTi(pkgs.mctrl_pkg.APSS_STOP)   <= ST_APSS_STOP;
+    CMT_BUS_OUTi(pkgs.mctrl_pkg.TAPEREADY)   <= ST_TAPEREADY;
+    CMT_BUS_OUTi(pkgs.mctrl_pkg.WRITEREADY)  <= ST_WRITEREADY;
     --
     READBIT                                   <= CMT_BUS_IN(pkgs.mctrl_pkg.READBIT); -- Read a bit from the MZ PIO.
     MOTOR_TOGGLE(1)                           <= CMT_BUS_IN(PLAY);
@@ -401,11 +419,11 @@ begin
             RECORDING                               <= '0';
             MOTOR_TOGGLE(0)                         <= '0';
             APSS_TIMER_CNT                          <= (others => '0');
-            CMT_BUS_OUTi(APSS_SEEK)                 <= '0';
-            CMT_BUS_OUTi(APSS_DIR)                  <= '0';
-            CMT_BUS_OUTi(APSS_EJECT)                <= '0';
-            CMT_BUS_OUTi(APSS_PLAY)                 <= '0';
-            CMT_BUS_OUTi(APSS_STOP)                 <= '1';
+            ST_APSS_SEEK                 <= '0';
+            ST_APSS_DIR                  <= '0';
+            ST_APSS_EJECT                <= '0';
+            ST_APSS_PLAY                 <= '0';
+            ST_APSS_STOP                 <= '1';
 
         elsif CLKBUS(CKMASTER)'event and CLKBUS(CKMASTER)='1' then
 
@@ -414,6 +432,8 @@ begin
                 -- Store last state so we detect change.
                 BUTTONS_LAST                            <= CONFIG(BUTTONS);
                 MOTOR_TOGGLE(0)                         <= MOTOR_TOGGLE(1);
+                STOP_LAST                               <= CMT_BUS_IN(pkgs.mctrl_pkg.STOP);
+                REEL_LAST                               <= CMT_BUS_IN(REEL_MOTOR);
     
                 -- Store last state so we can detect a switch to recording or play mode.
                 PLAYING(1 downto 0)                     <= PLAYING(2 downto 1);
@@ -431,22 +451,22 @@ begin
                                 PLAY_BUTTON             <= '0';
                                 RECORD_BUTTON           <= '0';
                                 TAPE_MOTOR_ON_n         <= '1';
-                                CMT_BUS_OUTi(TAPEREADY) <= '1';                         -- Indicates tape ejected.
-                                CMT_BUS_OUTi(WRITEREADY)<= '1';                         -- Indicates write mechanism disabled.
+                                ST_TAPEREADY <= '1';                         -- Indicates tape ejected.
+                                ST_WRITEREADY<= '1';                         -- Indicates write mechanism disabled.
                             when "10" => -- Record
                                 PLAY_BUTTON             <= '0';
                                 RECORD_BUTTON           <= '1';
                                 TAPE_MOTOR_ON_n         <= '0';
-                                CMT_BUS_OUTi(TAPEREADY) <= '0';                         -- Indicates tape loaded, active Low.
-                                CMT_BUS_OUTi(WRITEREADY)<= '1';                         -- Indicates write mechanism enabled.
+                                ST_TAPEREADY <= '0';                         -- Indicates tape loaded, active Low.
+                                ST_WRITEREADY<= '1';                         -- Indicates write mechanism enabled.
                             when "01"|"11" => -- Play/Auto
                                 -- Assume playback mode for Auto unless activity is detected from the MZ,
                                 -- in which case switch to Recording.
                                 PLAY_BUTTON             <= '1';
                                 RECORD_BUTTON           <= '0';
                                 TAPE_MOTOR_ON_n         <= '0';
-                                CMT_BUS_OUTi(TAPEREADY) <= '0';                         -- Indicates tape loaded, active Low.
-                                CMT_BUS_OUTi(WRITEREADY)<= '0';                         -- Indicates write mechanism disabled.
+                                ST_TAPEREADY <= '0';                         -- Indicates tape loaded, active Low.
+                                ST_WRITEREADY<= '0';                         -- Indicates write mechanism disabled.
                             when others => null;
                         end case;
                     end if;
@@ -464,7 +484,7 @@ begin
                         if RCV_SEQ = "11" or RECORDING = '1' then
                             PLAY_BUTTON                 <= '0';
                             RECORD_BUTTON               <= '1';
-                            CMT_BUS_OUTi(WRITEREADY)    <= '1';                         -- Indicates write mechanism disabled.
+                            ST_WRITEREADY    <= '1';                         -- Indicates write mechanism disabled.
                         else
                             PLAY_BUTTON                 <= '1';
                             RECORD_BUTTON               <= '0';
@@ -496,47 +516,48 @@ begin
                 else
                     -- Tape is always ready and able to write.
                     --
-                    CMT_BUS_OUTi(TAPEREADY)             <= '0';                         -- Indicates tape loaded, active low.
-                    CMT_BUS_OUTi(WRITEREADY)            <= '1';                         -- Indicates write mechanism disabled.
+                    ST_TAPEREADY             <= '0';                         -- Indicates tape loaded, active low.
+                    ST_WRITEREADY            <= '1';                         -- Indicates write mechanism disabled.
     
                     -- If seek pulses high, store the direction.
                     --
                     if CMT_BUS_IN(pkgs.mctrl_pkg.SEEK) = '1' then
-                        CMT_BUS_OUTi(APSS_DIR)          <= CMT_BUS_IN(pkgs.mctrl_pkg.DIRECTION);
+                        ST_APSS_DIR          <= CMT_BUS_IN(pkgs.mctrl_pkg.DIRECTION);
                     end if;
         
                     -- If Eject goes active, latch and invert it for reading.
                     --
                     if CMT_BUS_IN(pkgs.mctrl_pkg.EJECT) = '0' then
-                        CMT_BUS_OUTi(APSS_EJECT)        <= '1';
-                        CMT_BUS_OUTi(APSS_SEEK)         <= '0';
-                        CMT_BUS_OUTi(APSS_PLAY)         <= '0';
-                        CMT_BUS_OUTi(APSS_STOP)         <= '0';
+                        ST_APSS_EJECT        <= '1';
+                        ST_APSS_SEEK         <= '0';
+                        ST_APSS_PLAY         <= '0';
+                        ST_APSS_STOP         <= '0';
                     end if;
         
-                    -- The play motor is started/stopped by the PLAY/STOP signals.
+                    -- The deck acts on rising edges of PLAY, STOP and REEL_MOTOR (as MAME's mz80b/mz2000 do). The MZ-80B
+                    -- IPL only pulses them, but the MZ-2200 IPL leaves STOP high and starts the tape with a PLAY edge.
                     --
-                    if MOTOR_TOGGLE = "11"  and CMT_BUS_IN(pkgs.mctrl_pkg.STOP) = '0' then
+                    if MOTOR_TOGGLE = "10" then
                         TAPE_MOTOR_ON_n                 <= '0';
-                        CMT_BUS_OUTi(APSS_PLAY)         <= '1';
-                        CMT_BUS_OUTi(APSS_EJECT)        <= '0';
-                        CMT_BUS_OUTi(APSS_SEEK)         <= '0';
-                        CMT_BUS_OUTi(APSS_STOP)         <= '0';
+                        ST_APSS_PLAY         <= '1';
+                        ST_APSS_EJECT        <= '0';
+                        ST_APSS_SEEK         <= '0';
+                        ST_APSS_STOP         <= '0';
     
-                    elsif MOTOR_TOGGLE /= "11" and CMT_BUS_IN(pkgs.mctrl_pkg.STOP) = '1' then
+                    elsif CMT_BUS_IN(pkgs.mctrl_pkg.STOP) = '1' and STOP_LAST = '0' then
                         TAPE_MOTOR_ON_n                 <= '1';
-                        CMT_BUS_OUTi(APSS_STOP)         <= '1';
-                        CMT_BUS_OUTi(APSS_PLAY)         <= '0';
-                        CMT_BUS_OUTi(APSS_EJECT)        <= '0';
-                        CMT_BUS_OUTi(APSS_SEEK)         <= '0';
+                        ST_APSS_STOP         <= '1';
+                        ST_APSS_PLAY         <= '0';
+                        ST_APSS_EJECT        <= '0';
+                        ST_APSS_SEEK         <= '0';
     
-                    -- If REEL_MOTOR pulses high, then engage APSS seek.
+                    -- A REEL_MOTOR edge starts an APSS seek in the direction latched by SEEK.
                     --
-                    elsif CMT_BUS_IN(REEL_MOTOR) = '1' then
-                        CMT_BUS_OUTi(APSS_SEEK)         <= '1';
-                        CMT_BUS_OUTi(APSS_EJECT)        <= '0';
-                        CMT_BUS_OUTi(APSS_PLAY)         <= '0';
-                        CMT_BUS_OUTi(APSS_STOP)         <= '0';
+                    elsif CMT_BUS_IN(REEL_MOTOR) = '1' and REEL_LAST = '0' then
+                        ST_APSS_SEEK         <= '1';
+                        ST_APSS_EJECT        <= '0';
+                        ST_APSS_PLAY         <= '0';
+                        ST_APSS_STOP         <= '0';
                         APSS_TIMER_CNT                  <= to_unsigned(1, 21);
                     end if;
     
@@ -546,13 +567,13 @@ begin
                         APSS_TIMER_CNT                  <= APSS_TIMER_CNT + 1;
                     end if;
                     if APSS_TIMER_CNT = X"FFFFF" then
-                        CMT_BUS_OUTi(APSS_SEEK)         <= '0';
+                        ST_APSS_SEEK         <= '0';
                     end if;
     
                     -- Update the status as to wether we are playing, recording or idle.
                     --
-                    PLAYING(2)                          <= PLAY_READY and CMT_BUS_OUTi(APSS_PLAY);
-                    RECORDING                           <= not CMT_BUS_IN(pkgs.mctrl_pkg.WRITEENABLE) and CMT_BUS_OUTi(APSS_PLAY);
+                    PLAYING(2)                          <= PLAY_READY and ST_APSS_PLAY;
+                    RECORDING                           <= not CMT_BUS_IN(pkgs.mctrl_pkg.WRITEENABLE) and ST_APSS_PLAY;
                 end if;
             end if;
         end if;
@@ -1592,13 +1613,13 @@ DEBUGCMT: if DEBUG_ENABLE = 1 generate
     DEBUG_STATUS_LEDS(10)                           <= PLAYING(2);
     DEBUG_STATUS_LEDS(11)                           <= PLAYING(1);
     DEBUG_STATUS_LEDS(12)                           <= PLAYING(0);
-    DEBUG_STATUS_LEDS(13)                           <= '0';
-    DEBUG_STATUS_LEDS(14)                           <= '0';
+    DEBUG_STATUS_LEDS(13)                           <= MOTOR_TOGGLE(1);
+    DEBUG_STATUS_LEDS(14)                           <= MOTOR_TOGGLE(0);
     DEBUG_STATUS_LEDS(15)                           <= RECORDING;
     
     DEBUG_STATUS_LEDS(16)                           <= READBIT;
     DEBUG_STATUS_LEDS(17)                           <= RCV_ERROR;
-    DEBUG_STATUS_LEDS(18)                           <= '0';
+    DEBUG_STATUS_LEDS(18)                           <= CONFIG(MZ_80C);
     DEBUG_STATUS_LEDS(19)                           <= RCV_CLR;
     DEBUG_STATUS_LEDS(20)                           <= RCV_DONE;
     DEBUG_STATUS_LEDS(21)                           <= RCV_LOAD;
@@ -1614,7 +1635,10 @@ DEBUGCMT: if DEBUG_ENABLE = 1 generate
     DEBUG_STATUS_LEDS(31 downto 30)                 <= CONFIG(BUTTONS);
 end generate;
 DEBUGCMT1: if DEBUG_ENABLE = 0 generate
-    DEBUG_STATUS_LEDS                               <= (others => '0');
+    -- A few state bits for the simulation (sharpmz.vhd CMT_DEBUG); unused in the FPGA build.
+    DEBUG_STATUS_LEDS                               <= (8 => PLAY_READY, 10 => PLAYING(2), 13 => MOTOR_TOGGLE(1), 14 => MOTOR_TOGGLE(0),
+                                                        18 => CONFIG(MZ_80C), 24 => CMT_BUS_IN(pkgs.mctrl_pkg.STOP),
+                                                        25 => CMT_BUS_IN(pkgs.mctrl_pkg.PLAY), others => '0');
 end generate;
 
 end RTL;
