@@ -108,6 +108,13 @@ entity VideoController is
         -- Reset.
         VRESETn                  : in    std_logic;                                      -- Internal reset.
 
+        -- MZ-1500 PCG (SharpMZ MiSTer): the planes live in video_vc; the character renderer composites them.
+        M15_PCGON                : in    std_logic := '0';                               -- MZ-1500 with port F0 bit 0 set.
+        M15_PRIO                 : in    std_logic := '0';                               -- Port F0 bit 1: 0 = BPF (characters over PCG), 1 = BFP.
+        M15_PAL                  : in    std_logic_vector(23 downto 0) := (others => '0'); -- Port F1: colour of PCG index i in bits 3i+2..3i (b0 B, b1 R, b2 G).
+        PCG_RD_ADDR              : out   std_logic_vector(12 downto 0);                  -- PCG character row address (char * 8 + row).
+        PCG_RD_DATA              : in    std_logic_vector(23 downto 0) := (others => '0'); -- Planes 2, 1, 0.
+
         -- Direct addressing Bus. Normally this is set to 0 during standard Sharp MZ operation, when 23:19 > 0 then direct addressing of the various video
         -- memory's is enabled.
         -- Address    A23 -A16
@@ -601,6 +608,10 @@ architecture rtl of VideoController is
     signal RENDR_VRAM_DATA       :     std_logic_vector(15 downto 0);
     signal RENDR_GRAM_DATA       :     std_logic_vector(23 downto 0);
     signal RENDR_VRAM_ADDR       :     std_logic_vector(10 downto 0);
+    signal RENDR_VRAM_BADDR      :     std_logic_vector(10 downto 0);         -- VRAM read address: the character, or its MZ-1500 PCG word (+400h).
+    signal RENDR_PCG_PHASE       :     std_logic := '0';
+    signal RENDR_CHR_WORD        :     std_logic_vector(15 downto 0);         -- Character and attribute of the cell being rendered.
+    signal RENDR_PCG_CELL        :     std_logic := '0';                      -- MZ-1500: PCG enabled on this cell (PCG high byte bit 3).
     signal RENDR_CGROM_ADDR      :     std_logic_vector(11 downto 0);
     signal RENDR_CHR_NEXT        :     std_logic;                            -- Render next 8 bit character segment for display.
     signal RENDR_GFX_NEXT        :     std_logic;                            -- Render next 8 bit graphics segment for display.
@@ -1131,7 +1142,7 @@ begin
         memARead             => VRAM_VIDEO_DATA,
 
         clkB                 => SYS_CLK,
-        memBAddr             => RENDR_VRAM_ADDR,
+        memBAddr             => RENDR_VRAM_BADDR,
         memBWriteEnable      => '0',
         memBWrite            => (others => '0'),
         memBRead             => RENDR_VRAM_DATA
@@ -1498,12 +1509,13 @@ begin
         end if;
     end process;
     CE_PIXEL <= VID_CE and VIDCLK_DIV;
+    RENDR_VRAM_BADDR <= std_logic_vector(unsigned(RENDR_VRAM_ADDR) + 16#400#) when RENDR_PCG_PHASE = '1' else RENDR_VRAM_ADDR;
 
     -- Clock at maximum system speed to minimise transfer time. The video clock is running at two times the display clock and there are 8 clocks per colour word serialisation, this gives 15 cycles to render the next colour word component of the frame.
     -- The character word output is blended with the graphics and OSD planes to create final output.
     --
     RENDERCHRFRAME: process( VRESETn, SYS_CLK, VIDEOMODE_RESET_TIMER )
-        variable RENDR_CHR_CYCLE : integer range 0 to 6;
+        variable RENDR_CHR_CYCLE : integer range 0 to 7;
         variable RENDR_SRC_COL   : integer range 0 to 80;
         variable RENDR_DST_SUBROW: integer range 0 to 7;
         variable V_CPIX_CNT      : integer range 0 to 3;                 -- Variable to indicate if vertical pixels should be multiplied (for conversion to alternate formats).
@@ -1557,6 +1569,8 @@ begin
                             when 1 =>
                                 -- Setup the PCG address based on the read character.
                                 RENDR_CGROM_ADDR <= RENDR_VRAM_DATA(15) & RENDR_VRAM_DATA(7 downto 0) & std_logic_vector(to_unsigned(RENDR_DST_SUBROW, 3));
+                                RENDR_CHR_WORD               <= RENDR_VRAM_DATA;
+                                RENDR_PCG_PHASE              <= M15_PCGON;              -- MZ-1500: read the cell's PCG word next.
                                 RENDR_CHR_CYCLE              := 2;
 
                             --   Graphics mode:- 7/6 = Operator (00=OR,01=AND,10=NAND,11=XOR),
@@ -1567,6 +1581,14 @@ begin
                             --
                             -- Extra cycle for CGROM to latch, use time to decide which mode we are processing.
                             when 2 =>
+                                -- MZ-1500: the PCG word (low byte = PCG character bits 7-0, high byte bits 7-6 = bits 9-8, bit 3 = enable).
+                                if RENDR_PCG_PHASE = '1' then
+                                    PCG_RD_ADDR              <= RENDR_VRAM_DATA(15 downto 14) & RENDR_VRAM_DATA(7 downto 0) & std_logic_vector(to_unsigned(RENDR_DST_SUBROW, 3));
+                                    RENDR_PCG_CELL           <= RENDR_VRAM_DATA(11);
+                                else
+                                    RENDR_PCG_CELL           <= '0';
+                                end if;
+                                RENDR_PCG_PHASE              <= '0';
                                 -- Check to see if VRAM is disabled, if it is, skip.
                                 --
                                 if    GRAM_MODE_REG(4) = '0' and (MODE_VIDEO_MONO = '1'   or MODE_VIDEO_MONO80 = '1') then --or MODE_VIDEO_MZ80B = '1' or MODE_VIDEO_MZ2000 = '1') then
@@ -1587,78 +1609,82 @@ begin
                             --
                             when 3 =>
                                 if CGROM_DATA(7) = '0' then
-                                    FB_CHR_DATA(7)           <= RENDR_VRAM_DATA(9);              -- Red
-                                    FB_CHR_DATA(15)          <= RENDR_VRAM_DATA(8);              -- Blue
-                                    FB_CHR_DATA(23)          <= RENDR_VRAM_DATA(10);             -- Green
+                                    FB_CHR_DATA(7)           <= RENDR_CHR_WORD(9);              -- Red
+                                    FB_CHR_DATA(15)          <= RENDR_CHR_WORD(8);              -- Blue
+                                    FB_CHR_DATA(23)          <= RENDR_CHR_WORD(10);             -- Green
                                 else
-                                    FB_CHR_DATA(7)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(15)          <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(23)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(7)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(15)          <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(23)          <= RENDR_CHR_WORD(14);
                                 end if;
                                 if CGROM_DATA(6) = '0' then
-                                    FB_CHR_DATA(6)           <= RENDR_VRAM_DATA(9);
-                                    FB_CHR_DATA(14)          <= RENDR_VRAM_DATA(8);
-                                    FB_CHR_DATA(22)          <= RENDR_VRAM_DATA(10);
+                                    FB_CHR_DATA(6)           <= RENDR_CHR_WORD(9);
+                                    FB_CHR_DATA(14)          <= RENDR_CHR_WORD(8);
+                                    FB_CHR_DATA(22)          <= RENDR_CHR_WORD(10);
                                 else
-                                    FB_CHR_DATA(6)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(14)          <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(22)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(6)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(14)          <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(22)          <= RENDR_CHR_WORD(14);
                                 end if;
                                 if CGROM_DATA(5) = '0' then
-                                    FB_CHR_DATA(5)           <= RENDR_VRAM_DATA(9);
-                                    FB_CHR_DATA(13)          <= RENDR_VRAM_DATA(8);
-                                    FB_CHR_DATA(21)          <= RENDR_VRAM_DATA(10);
+                                    FB_CHR_DATA(5)           <= RENDR_CHR_WORD(9);
+                                    FB_CHR_DATA(13)          <= RENDR_CHR_WORD(8);
+                                    FB_CHR_DATA(21)          <= RENDR_CHR_WORD(10);
                                 else
-                                    FB_CHR_DATA(5)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(13)          <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(21)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(5)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(13)          <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(21)          <= RENDR_CHR_WORD(14);
                                 end if;
                                 if CGROM_DATA(4) = '0' then
-                                    FB_CHR_DATA(4)           <= RENDR_VRAM_DATA(9);
-                                    FB_CHR_DATA(12)          <= RENDR_VRAM_DATA(8);
-                                    FB_CHR_DATA(20)          <= RENDR_VRAM_DATA(10);
+                                    FB_CHR_DATA(4)           <= RENDR_CHR_WORD(9);
+                                    FB_CHR_DATA(12)          <= RENDR_CHR_WORD(8);
+                                    FB_CHR_DATA(20)          <= RENDR_CHR_WORD(10);
                                 else
-                                    FB_CHR_DATA(4)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(12)          <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(20)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(4)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(12)          <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(20)          <= RENDR_CHR_WORD(14);
                                 end if;
                                 if CGROM_DATA(3) = '0' then
-                                    FB_CHR_DATA(3)           <= RENDR_VRAM_DATA(9);
-                                    FB_CHR_DATA(11)          <= RENDR_VRAM_DATA(8);
-                                    FB_CHR_DATA(19)          <= RENDR_VRAM_DATA(10);
+                                    FB_CHR_DATA(3)           <= RENDR_CHR_WORD(9);
+                                    FB_CHR_DATA(11)          <= RENDR_CHR_WORD(8);
+                                    FB_CHR_DATA(19)          <= RENDR_CHR_WORD(10);
                                 else
-                                    FB_CHR_DATA(3)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(11)          <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(19)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(3)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(11)          <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(19)          <= RENDR_CHR_WORD(14);
                                 end if;
                                 if CGROM_DATA(2) = '0' then
-                                    FB_CHR_DATA(2)           <= RENDR_VRAM_DATA(9);
-                                    FB_CHR_DATA(10)          <= RENDR_VRAM_DATA(8);
-                                    FB_CHR_DATA(18)          <= RENDR_VRAM_DATA(10);
+                                    FB_CHR_DATA(2)           <= RENDR_CHR_WORD(9);
+                                    FB_CHR_DATA(10)          <= RENDR_CHR_WORD(8);
+                                    FB_CHR_DATA(18)          <= RENDR_CHR_WORD(10);
                                 else
-                                    FB_CHR_DATA(2)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(10)          <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(18)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(2)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(10)          <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(18)          <= RENDR_CHR_WORD(14);
                                 end if;
                                 if CGROM_DATA(1) = '0' then
-                                    FB_CHR_DATA(1)           <= RENDR_VRAM_DATA(9);
-                                    FB_CHR_DATA(9)           <= RENDR_VRAM_DATA(8);
-                                    FB_CHR_DATA(17)          <= RENDR_VRAM_DATA(10);
+                                    FB_CHR_DATA(1)           <= RENDR_CHR_WORD(9);
+                                    FB_CHR_DATA(9)           <= RENDR_CHR_WORD(8);
+                                    FB_CHR_DATA(17)          <= RENDR_CHR_WORD(10);
                                 else
-                                    FB_CHR_DATA(1)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(9)           <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(17)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(1)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(9)           <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(17)          <= RENDR_CHR_WORD(14);
                                 end if;
                                 if CGROM_DATA(0) = '0' then
-                                    FB_CHR_DATA(0)           <= RENDR_VRAM_DATA(9);
-                                    FB_CHR_DATA(8)           <= RENDR_VRAM_DATA(8);
-                                    FB_CHR_DATA(16)          <= RENDR_VRAM_DATA(10);
+                                    FB_CHR_DATA(0)           <= RENDR_CHR_WORD(9);
+                                    FB_CHR_DATA(8)           <= RENDR_CHR_WORD(8);
+                                    FB_CHR_DATA(16)          <= RENDR_CHR_WORD(10);
                                 else
-                                    FB_CHR_DATA(0)           <= RENDR_VRAM_DATA(13);
-                                    FB_CHR_DATA(8)           <= RENDR_VRAM_DATA(12);
-                                    FB_CHR_DATA(16)          <= RENDR_VRAM_DATA(14);
+                                    FB_CHR_DATA(0)           <= RENDR_CHR_WORD(13);
+                                    FB_CHR_DATA(8)           <= RENDR_CHR_WORD(12);
+                                    FB_CHR_DATA(16)          <= RENDR_CHR_WORD(14);
                                 end if;
-                                RENDR_CHR_CYCLE              := 6;
+                                if RENDR_PCG_CELL = '1' then
+                                    RENDR_CHR_CYCLE          := 7;                      -- MZ-1500 PCG composite.
+                                else
+                                    RENDR_CHR_CYCLE          := 6;
+                                end if;
             
                             -- Monochrome modes?
                             -- Expand and store the slice of the character in monochrome according to machine mode. MZ80K/C = white, MZ80A/1200 = Green.
@@ -1730,6 +1756,24 @@ begin
                                 end if;
                                 RENDR_CHR_CYCLE              := 6;
             
+                            -- MZ-1500 PCG composite (mz800emu mz1500_framebuffer.c): PCG colour index = planes 2,1,0 bit, mapped
+                            -- through the F1 palette. BFP: a non-zero index covers the character; BPF: the PCG replaces the
+                            -- background and character foreground pixels stay on top.
+                            when 7 =>
+                                for i in 0 to 7 loop
+                                    if (M15_PRIO = '1' and (PCG_RD_DATA(16+i) or PCG_RD_DATA(8+i) or PCG_RD_DATA(i)) = '1') or
+                                       (M15_PRIO = '0' and CGROM_DATA(i) = '0') then
+                                        for c in 0 to 7 loop
+                                            if unsigned'(PCG_RD_DATA(16+i) & PCG_RD_DATA(8+i) & PCG_RD_DATA(i)) = c then
+                                                FB_CHR_DATA(i)      <= M15_PAL(c*3+1);   -- Red
+                                                FB_CHR_DATA(8+i)    <= M15_PAL(c*3);     -- Blue
+                                                FB_CHR_DATA(16+i)   <= M15_PAL(c*3+2);   -- Green
+                                            end if;
+                                        end loop;
+                                    end if;
+                                end loop;
+                                RENDR_CHR_CYCLE              := 6;
+
                             when 6 =>
                                 -- For each source character, we generate pixels on 8 rows/lines. We need to process the same source row 8 times,
                                 -- each time incrementing the sub-row which is used to extract the next pixel set from the CG. The data is thus 

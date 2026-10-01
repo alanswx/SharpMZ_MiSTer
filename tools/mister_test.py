@@ -27,13 +27,13 @@ FAT = '/media/fat'
 HW = f'{FAT}/games/SharpMZ/HWTest'
 CFG_VER = '_v5'           # CONF_STR "v,5"
 
-# Model menu entries (status[3:1]), in CONF_STR order.
-MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5, 'MZ2000': 6, 'MZ800': 7}
+# Model menu entries (status[38:35]), in CONF_STR order.
+MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5, 'MZ2000': 6, 'MZ800': 7, 'MZ1500': 8}
 
 
 def status_bytes(model, opts=()):
     """16-byte CFG: status bit n is byte n/8, bit n%8. opts: (low_bit, width, value)."""
-    st = MODEL[model] << 1
+    st = MODEL[model] << 35
     for lo, width, val in opts:
         st |= (val & ((1 << width) - 1)) << lo
     return st.to_bytes(16, 'little')

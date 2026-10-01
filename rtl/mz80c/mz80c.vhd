@@ -106,7 +106,15 @@ entity mz80c is
           -- Audio.
           AUDIO_L            : out std_logic;
           AUDIO_R            : out std_logic;
-          AUDIO_PSG          : out std_logic_vector(13 downto 0);        -- MZ-800 PSG (SN76489) mix, unsigned.
+          AUDIO_PSG          : out std_logic_vector(13 downto 0);        -- MZ-800 PSG (SN76489) mix, unsigned. MZ-1500: PSG0, left.
+          AUDIO_PSG_R        : out std_logic_vector(13 downto 0);        -- MZ-1500 PSG1 (right); the MZ-800 PSG otherwise.
+
+          -- MZ-1500 PCG and display registers.
+          M15_PCG_CS         : out std_logic;                            -- CPU access to a PCG plane (OUT E5 1-3: D000-EFFF).
+          M15_PCG_PLANE      : out std_logic_vector(1 downto 0);         -- Plane 0-2.
+          M15_PCG_DI         : in  std_logic_vector(7 downto 0);         -- PCG read data.
+          M15_DMD            : out std_logic_vector(1 downto 0);         -- Port F0: 0 PCG on, 1 priority (0 = BPF, 1 = BFP).
+          M15_PAL            : out std_logic_vector(23 downto 0);        -- Port F1: colour of PCG index i in bits 3i+2..3i.
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -254,6 +262,14 @@ signal M8_TEMPO              :     std_logic;
 signal M8_TEMPO_CNT          :     integer range 0 to 228;
 signal M8_HBLANK_LAST        :     std_logic;
 signal M8_PSG_CS_n           :     std_logic;
+signal M15                   :     std_logic;                            -- MZ-1500 (CONFIG(MZ700) is also set).
+signal M15_SPEC              :     std_logic_vector(2 downto 0);         -- OUT E5: 1 = CG ROM, 2-4 = PCG plane 1-3 at D000-EFFF.
+signal M15_SPEC_ON           :     std_logic;
+signal M15_WIN               :     std_logic;                            -- CPU access inside the special window.
+signal M15_DMD_R             :     std_logic_vector(1 downto 0);
+signal M15_PAL_R             :     std_logic_vector(23 downto 0);
+signal M15_PSG1_CS_n         :     std_logic;
+signal M15_PSG1_MIX          :     unsigned(13 downto 0);
 signal M8_PIO_CS             :     std_logic;
 signal M8_PIO_DO             :     std_logic_vector(7 downto 0);
 signal M8_PIO_VOE            :     std_logic;
@@ -395,7 +411,31 @@ begin
             mix_audio_o      => M8_PSG_MIX,
             pcm14s_o         => open
         );
-    M8_PSG_CS_n              <= '0' when M8 = '1' and M8_IO = X"F2" else '1';
+    M8_PSG_CS_n              <= '0' when M8 = '1' and M8_IO = X"F2" else
+                                '0' when M15 = '1' and (M8_IO = X"F2" or M8_IO = X"E9") else '1';       -- MZ-1500: F2 left, E9 both
+
+    -- MZ-1500 second PSG (right channel) at F3; E9 writes both.
+    --
+    PSG1 : entity work.sn76489_audio
+        generic map (
+            FAST_IO_G        => '1',
+            MIN_PERIOD_CNT_G => 6
+        )
+        port map (
+            clk_i            => CLKBUS(CKMASTER),
+            en_clk_psg_i     => CLKBUS(CKENPSG),
+            ce_n_i           => M15_PSG1_CS_n,
+            wr_n_i           => T80_WR_n,
+            ready_o          => open,
+            data_i           => T80_DO,
+            ch_a_o           => open,
+            ch_b_o           => open,
+            ch_c_o           => open,
+            noise_o          => open,
+            mix_audio_o      => M15_PSG1_MIX,
+            pcm14s_o         => open
+        );
+    M15_PSG1_CS_n            <= '0' when M15 = '1' and (M8_IO = X"F3" or M8_IO = X"E9") else '1';
 
     -- MZ-800 Z80 PIO at FC-FF. Port A: 0 printer /RDA, 1 printer STA, 4 /CTC0, 5 /VBLN; CP/M runs its
     -- keyboard and clock from the /VBLN bit mode interrupt (IM 2).
@@ -403,7 +443,7 @@ begin
     PIO800 : entity work.mz800_pio
         port map (
             CLK              => CLKBUS(CKMASTER),
-            RESET            => MZ_RESET or not M8,
+            RESET            => MZ_RESET or not (M8 or M15),
             CS               => M8_PIO_CS,
             A                => T80_A16(1 downto 0),
             RD_n             => T80_RD_n,
@@ -417,9 +457,11 @@ begin
             PA_IN            => M8_PIO_PA,
             PB_IN            => x"FF"
         );
-    M8_PIO_CS                <= '1' when M8 = '1' and M8_IO(7 downto 2) = "111111" else '0';
+    M8_PIO_CS                <= '1' when (M8 = '1' or M15 = '1') and M8_IO(7 downto 2) = "111111" else '0';   -- MZ-800 and MZ-1500
     M8_PIO_PA                <= "11" & (not VBLANK) & (not SOUND_PULSE_X2) & "0010";
-    AUDIO_PSG                <= std_logic_vector(M8_PSG_MIX) when M8 = '1' and CONFIG(AUDIOSRC) = '0' else (others => '0');
+    AUDIO_PSG                <= std_logic_vector(M8_PSG_MIX)   when (M8 = '1' or M15 = '1') and CONFIG(AUDIOSRC) = '0' else (others => '0');
+    AUDIO_PSG_R              <= std_logic_vector(M15_PSG1_MIX) when M15 = '1' and CONFIG(AUDIOSRC) = '0' else
+                                std_logic_vector(M8_PSG_MIX)   when M8 = '1'  and CONFIG(AUDIOSRC) = '0' else (others => '0');
 
     -- Parent signals onto local wires.
     --
@@ -432,7 +474,7 @@ begin
     -- MZ-80A - Mask interrupt from 8254 if INTMSK low.
     -- MZ-80K - Interrupt is from 8254 direct.
     T80_INT_ni               <= '0' when ((CONFIG(MZ_A)='1' or CONFIG(MZ700) = '1' or M8 = '1') and INTX='1' and INTMSK='1') or ((CONFIG(MZ_KC)='1' and INTX='1'))
-                                     or (M8 = '1' and M8_PIO_INT_n = '0')
+                                     or ((M8 = '1' or M15 = '1') and M8_PIO_INT_n = '0')
                                 else '1';
     T80_INT_n                <= T80_INT_ni;
 
@@ -474,7 +516,11 @@ begin
     --
     -- Data Bus Multiplexing, plex all the output devices onto the Z80 Data Input according to the CS.
     --
-    T80_DI                   <= M8_PIO_DO when M8 = '1' and (M8_PIO_VOE = '1' or (M8_PIO_CS = '1' and T80_RD_n = '0'))   -- MZ-800 Z80 PIO, and its vector
+    T80_DI                   <= M8_PIO_DO when (M8 = '1' or M15 = '1') and (M8_PIO_VOE = '1' or (M8_PIO_CS = '1' and T80_RD_n = '0'))   -- MZ-800/1500 Z80 PIO, and its vector
+                                else
+                                M15_PCG_DI when M15_WIN = '1' and M15_SPEC /= "001" and T80_RD_n = '0'                -- MZ-1500 PCG plane
+                                else
+                                X"FF"     when M15_WIN = '1' and T80_RD_n = '0'                                      -- MZ-1500 CG ROM window (not readable yet)
                                 else
                                 X"1A"     when M8 = '1' and T80_MREQ_n = '0' and T80_RD_n = '0' and T80_A16(15 downto 13) = "111" and M8_PROH = '1'
                                 else
@@ -522,7 +568,7 @@ begin
     --                          else '1';
 
     -- D000 - DFFF
-    CS_VRAM_ni          <= '0'  when ( (T80_A16(15 downto 12)="1101" and T80_MREQ_n = '0' and MZ_GRAM_ENABLE = '0')
+    CS_VRAM_ni          <= '0'  when ( (T80_A16(15 downto 12)="1101" and T80_MREQ_n = '0' and MZ_GRAM_ENABLE = '0' and M15_SPEC_ON = '0')
                                        and
                                        ( (CONFIG(MZ_KC)='1' or CONFIG(MZ_A)='1')
                                          or
@@ -531,7 +577,7 @@ begin
                                      ) 
                                 else '1';
     -- E000 - EFFF
-    CS_E_ni             <= '0'  when ( (T80_A16(15 downto 12)="1110" and T80_MREQ_n = '0' and MZ_GRAM_ENABLE = '0')
+    CS_E_ni             <= '0'  when ( (T80_A16(15 downto 12)="1110" and T80_MREQ_n = '0' and MZ_GRAM_ENABLE = '0' and M15_SPEC_ON = '0')
                                        and
                                        ( (CONFIG(MZ_KC)='1' or CONFIG(MZ_A)='1')
                                          or
@@ -590,6 +636,8 @@ begin
                                        )
                                        or
                                        ( T80_A16(15 downto 11) = "11101"                                                                  -- E800 -> EFFF User ROM memory.
+                                         and
+                                         M15_SPEC_ON = '0'                                                                                -- MZ-1500: not under the CG/PCG window.
                                          and
                                          (CONFIG(USERROM) and CONFIG(CURRENTMACHINE)) /= "00000000"                                       -- Active machine has the user rom enabled.
                                          and
@@ -706,6 +754,44 @@ begin
     --           (E000-E008, E009-E00F read 1A) and reads FF in 800 mode. M8_PROH makes all of E000-FFFF read 1A.
     --
     M8                  <= CONFIG(MZ800);
+    M15                 <= CONFIG(IS_MZ1500);
+
+    -- MZ-1500 special window (mz800emu mz1500_memory.c): OUT E5 n maps the CG ROM (n=0) or PCG plane n (1-3) over
+    -- D000-EFFF while the upper ROM area is mapped, hiding VRAM, the E000 ports and the E800 ROM; E3, E4 and E6 unmap it.
+    -- F0 is the display mode (0: PCG on, 1: priority), F1 the PCG palette (bits 6-4 index, 2-0 colour).
+    M15_SPEC_ON         <= '1' when M15 = '1' and M15_SPEC /= "000" and MZ_HIGH_RAM_ENABLE = '0' else '0';
+    M15_WIN             <= '1' when M15_SPEC_ON = '1' and T80_MREQ_n = '0' and (T80_A16(15 downto 12) = "1101" or T80_A16(15 downto 12) = "1110") else '0';
+    M15_PCG_CS          <= '1' when M15_WIN = '1' and M15_SPEC(2 downto 1) /= "00" else '0';
+    M15_PCG_PLANE       <= std_logic_vector(unsigned(M15_SPEC(1 downto 0)) - 2) when M15_SPEC(2) = '0' else "10";
+    M15_DMD             <= M15_DMD_R;
+    M15_PAL             <= M15_PAL_R;
+
+    process( MZ_RESET, CLKBUS(CKMASTER) ) begin
+        if MZ_RESET = '1' then
+            M15_SPEC   <= "000";
+            M15_DMD_R  <= "00";
+            M15_PAL_R  <= (others => '0');
+        elsif rising_edge(CLKBUS(CKMASTER)) then
+            if CLKBUS(CKENCPU) = '1' and M15 = '1' then
+                if CS_IO_E5_n = '0' then
+                    M15_SPEC <= std_logic_vector(unsigned('0' & T80_DO(1 downto 0)) + 1);
+                elsif CS_IO_E6_n = '0' or CS_IO_E3_n = '0' or CS_IO_E4_n = '0' then
+                    M15_SPEC <= "000";
+                end if;
+                if T80_IORQ_n = '0' and T80_WR_n = '0' and T80_M1_n = '1' then
+                    if T80_A16(7 downto 0) = X"F0" then
+                        M15_DMD_R <= T80_DO(1 downto 0);
+                    elsif T80_A16(7 downto 0) = X"F1" then
+                        for i in 0 to 7 loop
+                            if unsigned(T80_DO(6 downto 4)) = i then
+                                M15_PAL_R(i*3+2 downto i*3) <= T80_DO(2 downto 0);
+                            end if;
+                        end loop;
+                    end if;
+                end if;
+            end if;
+        end if;
+    end process;
     M8_700              <= M8_DMD(3);
     M8_E00X             <= '1'  when T80_A16(15 downto 4) = X"E00" else '0';
     M8_IO               <= T80_A16(7 downto 0) when T80_IORQ_n = '0' and T80_M1_n = '1' else X"00";
@@ -844,6 +930,9 @@ begin
                 elsif(CS_IO_E4_n = '0') then
                     MZ_HIGH_RAM_ENABLE  <= '0';
                     MZ_INHIBIT_RESET    <= '1';
+
+                elsif(CS_IO_E5_n = '0' and M15 = '1') then                  -- MZ-1500: E5 also maps the upper ROM area.
+                    MZ_HIGH_RAM_ENABLE  <= '0';
     
                 elsif(MZ_HIGH_RAM_INHIBIT = '0' and MZ_INHIBIT_RESET = '1') then
                     MZ_INHIBIT_RESET    <= '0';
@@ -862,7 +951,7 @@ begin
 
             if CLKBUS(CKENCPU) = '1' then
 
-                if(CS_IO_E5_n = '0') then
+                if(CS_IO_E5_n = '0' and M15 = '0') then                     -- MZ-1500: E5 selects the CG/PCG window instead.
                     MZ_HIGH_RAM_INHIBIT <= '1';
 
                 elsif(CS_IO_E6_n = '0' or MZ_INHIBIT_RESET = '1') then

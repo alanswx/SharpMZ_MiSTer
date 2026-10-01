@@ -3,6 +3,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/tape_image.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/wd1793.sv
 set_global_assignment -name VERILOG_FILE rtl/wd1793_mem.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mz_fdc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mz_qdisk.sv
 set_global_assignment -name SDC_FILE sharpmz.sdc
 
 set_global_assignment -name VHDL_FILE rtl/config_pkg.vhd

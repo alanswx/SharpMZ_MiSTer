@@ -88,9 +88,10 @@ localparam CONF_STR =
 	"S0,MZTMZF,Tape Image;",
 	"S1,DSKD88D77,Floppy Drive A;",
 	"S2,DSKD88D77,Floppy Drive B;",
+	"S3,QDFMZQ,Quick Disk;",
 	"-;",
 	"P1,Machine;",
-	"P1O[3:1],Model,MZ80A,MZ80K,MZ80C,MZ1200,MZ700,MZ80B,MZ2000,MZ800;",
+	"P1O[38:35],Model,MZ80A,MZ80K,MZ80C,MZ1200,MZ700,MZ80B,MZ2000,MZ800,MZ1500;",
 	"P1O[6:4],CPU Speed,Default,+1,+2,+3,+4,+5,+6,+7;",
 	"P1O[30],Boot Reset,Off,On;",
 	"P1O[32],MZ-800 Mode,MZ-700,MZ-800;",
@@ -159,21 +160,21 @@ wire  [7:0] hps_ioctl_din;
 wire [31:0] hps_ioctl_file_ext;
 
 // Image slots: S0 tape image, S1/S2 floppy drives A/B.
-wire  [2:0] img_mounted;
+wire  [3:0] img_mounted;
 wire        img_readonly;
 wire [63:0] img_size;
-wire [31:0] sd_lba[3];
-wire  [2:0] sd_rd;
-wire  [2:0] sd_wr;
-wire  [2:0] sd_ack;
+wire [31:0] sd_lba[4];
+wire  [3:0] sd_rd;
+wire  [3:0] sd_wr;
+wire  [3:0] sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din[3];
+wire  [7:0] sd_buff_din[4];
 wire        sd_buff_wr;
 
 wire        tape_active;
 
-hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -210,7 +211,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.img_readonly(img_readonly),
 	.img_size(img_size),
 	.sd_lba(sd_lba),
-	.sd_blk_cnt('{6'd0, 6'd0, 6'd0}),
+	.sd_blk_cnt('{6'd0, 6'd0, 6'd0, 6'd0}),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
@@ -225,16 +226,17 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 
 /////////////////  CONFIG ADAPTER  ////////////////
 
-function automatic [2:0] mz_model_code(input [2:0] menu_sel);
+function automatic [2:0] mz_model_code(input [3:0] menu_sel);
 	begin
 		case(menu_sel)
-			3'd0: mz_model_code = 3'd3; // MZ80A
-			3'd1: mz_model_code = 3'd0; // MZ80K
-			3'd2: mz_model_code = 3'd1; // MZ80C
-			3'd3: mz_model_code = 3'd2; // MZ1200
-			3'd4: mz_model_code = 3'd4; // MZ700
-			3'd5: mz_model_code = 3'd6; // MZ80B
-			3'd6: mz_model_code = 3'd7; // MZ2000
+			4'd0: mz_model_code = 3'd3; // MZ80A
+			4'd1: mz_model_code = 3'd0; // MZ80K
+			4'd2: mz_model_code = 3'd1; // MZ80C
+			4'd3: mz_model_code = 3'd2; // MZ1200
+			4'd4: mz_model_code = 3'd4; // MZ700
+			4'd5: mz_model_code = 3'd6; // MZ80B
+			4'd6: mz_model_code = 3'd7; // MZ2000
+			4'd8: mz_model_code = 3'd4; // MZ1500: an MZ-700 plus cfg_mz1500
 			default: mz_model_code = 3'd5; // MZ800
 		endcase
 	end
@@ -285,18 +287,19 @@ function automatic [2:0] mz_fast_tape(input [2:0] menu_sel);
 	end
 endfunction
 
-wire [2:0] cfg_model = mz_model_code(status[3:1]);
+wire [2:0] cfg_model = mz_model_code(status[38:35]);
+wire       cfg_mz1500 = (status[38:35] == 4'd8);
 wire [2:0] cfg_display = mz_display_type(status[8:7], cfg_model);
 wire [1:0] cfg_tape_buttons = mz_tape_buttons(status[25:24]);
 wire [2:0] cfg_fast_tape = mz_fast_tape(status[23:21]);
-wire [7:0] cfg_userrom = status[28] ? (8'd1 << cfg_model) : 8'd0;
+wire [7:0] cfg_userrom = (status[28] | cfg_mz1500) ? (8'd1 << cfg_model) : 8'd0;  // MZ-1500: E800-EFFF is always ROM
 wire       fdc_present;
-wire [7:0] cfg_fdcrom  = (status[29] | (fdc_present & cfg_model == 3'b100)) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700: the MZ-1E05 ROM comes with the interface
+wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & cfg_model == 3'b100)) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700: the MZ-1E05 ROM comes with the interface (the MZ-1500 has its own F000 ROM)
 
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, status[18], status[17], status[16], 1'b0, cfg_display};  // PCG is software controlled (E010-E012).
 wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
-wire [7:0] cfg_reg3_display = {5'd0, status[32], 2'b00};   // 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
+wire [7:0] cfg_reg3_display = {4'd0, cfg_mz1500, status[32], 2'b00};   // 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
 wire [7:0] cfg_reg4_cpu     = {status[30], 4'd0, status[6:4]};
 wire [7:0] cfg_reg5_audio   = {7'd0, status[20]};
 wire [7:0] cfg_reg6_cmt     = {1'b0, status[27], status[26], cfg_tape_buttons, cfg_fast_tape};
@@ -432,9 +435,10 @@ wire audio_l_emu;
 wire audio_r_emu;
 // 1-bit sound (8253 or tape signal, per the Audio Source option) at half scale; the framework's
 // DC blocker centres it. Full scale was harsh and sat at a large DC offset.
-wire [13:0] audio_psg;                              // MZ-800 PSG mix (0 on other models).
+wire [13:0] audio_psg;                              // MZ-800 PSG mix; MZ-1500 left PSG (0 on other models).
+wire [13:0] audio_psg_r;                            // MZ-1500 right PSG; the MZ-800 PSG otherwise.
 assign AUDIO_L = {1'b0, audio_l_emu, 14'd0} + {2'b00, audio_psg};
-assign AUDIO_R = {1'b0, audio_r_emu, 14'd0} + {2'b00, audio_psg};
+assign AUDIO_R = {1'b0, audio_r_emu, 14'd0} + {2'b00, audio_psg_r};
 assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
@@ -467,8 +471,8 @@ mz_fdc mz_fdc
 	.io_rd(ext_io_rd),
 	.io_wr(ext_io_wr),
 	.io_dout(ext_io_dout),
-	.io_din(ext_io_din),
-	.io_oe(ext_io_oe),
+	.io_din(fdc_io_din),
+	.io_oe(fdc_io_oe),
 	.int_n(ext_int_n),
 
 	.img_mounted(img_mounted[2:1]),
@@ -486,6 +490,41 @@ mz_fdc mz_fdc
 	.busy(fdd_busy),
 	.present(fdc_present)
 );
+// Quick Disk (MZ-1500 built in; MZ-800 MZ-1F11 when an image is mounted) on image slot S3.
+wire [7:0] fdc_io_din, qd_io_din;
+wire       fdc_io_oe, qd_io_oe, qd_busy;
+reg        qd_mounted = 0;
+always @(posedge clk_sys) if (img_mounted[3]) qd_mounted <= |img_size;
+assign ext_io_oe  = fdc_io_oe | qd_io_oe;
+assign ext_io_din = fdc_io_oe ? fdc_io_din : qd_io_din;
+
+mz_qdisk mz_qdisk
+(
+	.clk_sys(clk_sys),
+	.reset(reset),
+	.enable(cfg_mz1500 | (cfg_model == 3'b101 & qd_mounted)),
+
+	.io_addr(ext_io_addr),
+	.io_rd(ext_io_rd),
+	.io_wr(ext_io_wr),
+	.io_dout(ext_io_dout),
+	.io_din(qd_io_din),
+	.io_oe(qd_io_oe),
+
+	.img_mounted(img_mounted[3]),
+	.img_size(img_size),
+	.sd_lba(sd_lba[3]),
+	.sd_rd(sd_rd[3]),
+	.sd_wr(sd_wr[3]),
+	.sd_ack(sd_ack[3]),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din[3]),
+	.sd_buff_wr(sd_buff_wr),
+
+	.busy(qd_busy)
+);
+
 assign sd_lba[1] = fdc_lba[0];
 assign sd_lba[2] = fdc_lba[1];
 assign sd_buff_din[1] = fdc_buff_din[0];
@@ -517,6 +556,7 @@ sharpmz sharp_mz
 	.AUDIO_L_O(audio_l_emu),
 	.AUDIO_R_O(audio_r_emu),
 	.AUDIO_PSG_O(audio_psg),
+	.AUDIO_PSG_R_O(audio_psg_r),
 
 	.CMT_STATUS(cmt_status),
 	.EXT_IO_ADDR(ext_io_addr),
@@ -551,7 +591,7 @@ sharpmz sharp_mz
 );
 
 assign LED_USER = hps_ioctl_download;
-assign LED_DISK = {1'b0, tape_active | cmt_status[4] | fdd_busy};    // Tape image, CMT or floppy activity.
+assign LED_DISK = {1'b0, tape_active | cmt_status[4] | fdd_busy | qd_busy};    // Tape image, CMT, floppy or Quick Disk activity.
 
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL  = clk_video_in;

@@ -68,6 +68,7 @@ struct Options {
     bool     verbose = false;
     std::string tape_image;
     std::string fdd;
+    std::string qd;
     bool        fdd_readonly = false;
     int         fdc_mode = 0;
     bool     tape_readonly = false;
@@ -94,6 +95,7 @@ static void usage()
 "  --mzf-direct-frame N   frame to do the direct load at (default 0)\n"
 "Tape image (the OSD Tape Image slot):\n"
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
+"  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), read only\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
@@ -182,6 +184,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         }
         else if (a == "--tape-image") o.tape_image = next();
         else if (a == "--fdd") o.fdd = next();
+        else if (a == "--qd") o.qd = next();
         else if (a == "--fdd-readonly") o.fdd_readonly = true;
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
         else if (a == "--tape-readonly") o.tape_readonly = true;
@@ -199,10 +202,11 @@ static bool parse_args(int argc, char **argv, Options &o)
 // ---------------------------------------------------------------------------
 // Machine configuration, as sharpmz.sv derives it from the OSD status bits.
 // ---------------------------------------------------------------------------
-struct ModelInfo { const char *name; uint8_t code; uint8_t display; };
+struct ModelInfo { const char *name; uint8_t code; uint8_t display; uint8_t mz1500; };
 static const ModelInfo MODELS[] = {
-    {"mz80k", 0, 0}, {"mz80c", 1, 0}, {"mz1200", 2, 0}, {"mz80a", 3, 0},
-    {"mz700", 4, 2}, {"mz800", 5, 2}, {"mz80b", 6, 1}, {"mz2000", 7, 1},
+    {"mz80k", 0, 0, 0}, {"mz80c", 1, 0, 0}, {"mz1200", 2, 0, 0}, {"mz80a", 3, 0, 0},
+    {"mz700", 4, 2, 0}, {"mz800", 5, 2, 0}, {"mz80b", 6, 1, 0}, {"mz2000", 7, 1, 0},
+    {"mz1500", 4, 2, 1},                                    // an MZ-700 plus the MZ-1500 flag (display3 bit 3)
 };
 
 // sharpmz.sv mz_fast_tape(): menu step -> register value.
@@ -257,6 +261,9 @@ private:
     uint64_t img_size = 0;
     FILE    *fdd = nullptr;
     uint64_t fdd_size = 0;
+    FILE    *qd = nullptr;
+    uint64_t qd_size = 0;
+    void mount_qd();
     int      sd_slot = 0;
     void mount_fdd();
     enum { SD_IDLE, SD_READ, SD_READ_END, SD_WRITE } sd_state = SD_IDLE;
@@ -283,17 +290,18 @@ private:
 void Sim::sd_step()
 {
     // Slot accessors: the tape (S0) and floppy drive A (S1) share sd_buff_*.
-    auto req_rd = [&](int k) -> bool { return k ? top->fdd_rd : top->sd_rd; };
-    auto req_wr = [&](int k) -> bool { return k ? top->fdd_wr : top->sd_wr; };
-    auto lba    = [&](int k) -> uint32_t { return k ? top->fdd_lba : top->sd_lba; };
-    auto ack    = [&](int k, int v) { if (k) top->fdd_ack = v; else top->sd_ack = v; };
-    auto file   = [&](int k) -> FILE * { return k ? fdd : img; };
-    auto size   = [&](int k) -> uint64_t { return k ? fdd_size : img_size; };
+    // Slot 2 is the Quick Disk (S3), read only.
+    auto req_rd = [&](int k) -> bool { return k == 2 ? top->qd_rd : k ? top->fdd_rd : top->sd_rd; };
+    auto req_wr = [&](int k) -> bool { return k == 2 ? false : k ? top->fdd_wr : top->sd_wr; };
+    auto lba    = [&](int k) -> uint32_t { return k == 2 ? top->qd_lba : k ? top->fdd_lba : top->sd_lba; };
+    auto ack    = [&](int k, int v) { if (k == 2) top->qd_ack = v; else if (k) top->fdd_ack = v; else top->sd_ack = v; };
+    auto file   = [&](int k) -> FILE * { return k == 2 ? qd : k ? fdd : img; };
+    auto size   = [&](int k) -> uint64_t { return k == 2 ? qd_size : k ? fdd_size : img_size; };
 
     top->sd_buff_wr = 0;
     switch (sd_state) {
     case SD_IDLE:
-        for (int k = 0; k < 2; k++) {
+        for (int k = 0; k < 3; k++) {
             if (!file(k) || !(req_rd(k) || req_wr(k))) continue;
             sd_slot = k;
             sd_cur_lba = lba(k);
@@ -341,6 +349,19 @@ void Sim::sd_step()
         }
         break;
     }
+}
+
+void Sim::mount_qd()
+{
+    qd = fopen(opt.qd.c_str(), "rb");
+    if (!qd) { fprintf(stderr, "cannot open Quick Disk image %s\n", opt.qd.c_str()); exit_code = 2; return; }
+    fseeko(qd, 0, SEEK_END);
+    qd_size = (uint64_t)ftello(qd);
+    top->qd_size = qd_size;
+    top->qd_mounted = 1;
+    clock();
+    top->qd_mounted = 0;
+    if (!opt.quiet) fprintf(stderr, "[sim] Quick Disk image '%s' mounted, %llu bytes\n", opt.qd.c_str(), (unsigned long long)qd_size);
 }
 
 void Sim::mount_fdd()
@@ -542,7 +563,7 @@ void Sim::write_config()
     top->cfg_model    = m->code;
     top->cfg_display  = m->display;                            // video/graphics/VRAM wait/PCG bits off
     top->cfg_display2 = opt.vmode == "native" ? 3 : 1;         // sharpmz.sv: 2'b11 native, 2'b01 640x480@60
-    top->cfg_display3 = opt.mz800_700 ? 0 : 4;                   // bit 2: MZ-800 mode switch
+    top->cfg_display3 = (opt.mz800_700 ? 0 : 4) | (m->mz1500 ? 8 : 0);   // bit 2: MZ-800 mode switch, bit 3: MZ-1500
     top->fdc_mode     = opt.fdc_mode;
     top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
     top->cfg_audio    = 0;
@@ -721,6 +742,7 @@ int Sim::run()
         if (!load_mzf(opt.mzf_direct)) return exit_code;
     if (!opt.tape_image.empty()) { mount_tape(); if (exit_code) return exit_code; }
     if (!opt.fdd.empty()) { mount_fdd(); if (exit_code) return exit_code; }
+    if (!opt.qd.empty()) { mount_qd(); if (exit_code) return exit_code; }
 
     uint32_t last = opt.stop_set ? opt.stop_frame : 150;
     while (frame <= last && !Verilated::gotFinish()) clock();

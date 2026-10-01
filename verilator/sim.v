@@ -85,6 +85,12 @@ module top(
    input         fdd_ack,
    output [7:0]  fdd_buff_din,
    input  [1:0]  fdc_mode,
+   // Quick Disk (hps_io S3); shares sd_buff_*.
+   input         qd_mounted,
+   input  [63:0] qd_size,
+   output [31:0] qd_lba,
+   output        qd_rd,
+   input         qd_ack,
    output        fdd_busy /*verilator public_flat*/,
    output        tape_active /*verilator public_flat*/,
    output        tape_full /*verilator public_flat*/,
@@ -132,12 +138,29 @@ module top(
    wire [1:0]  fdc_rd, fdc_wr;
    wire [7:0]  fdc_buff_din[2];
    wire        fdc_present;
+   wire [7:0]  fdc_io_din, qd_io_din;
+   wire        fdc_io_oe, qd_io_oe, qd_busy;
+   assign ext_io_oe  = fdc_io_oe | qd_io_oe;
+   assign ext_io_din = fdc_io_oe ? fdc_io_din : qd_io_din;
+
+   mz_qdisk qd(
+      .clk_sys(clk_sys), .reset(reset | warm_reset),
+      .enable(cfg_display3[3] | (cfg_model[2:0] == 3'b101 & qd_mounted_l)),       // MZ-1500; MZ-800 with an image
+      .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),
+      .io_din(qd_io_din), .io_oe(qd_io_oe),
+      .img_mounted(qd_mounted), .img_size(qd_size),
+      .sd_lba(qd_lba), .sd_rd(qd_rd), .sd_wr(), .sd_ack(qd_ack),
+      .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(), .sd_buff_wr(sd_buff_wr),
+      .busy(qd_busy)
+   );
+   reg qd_mounted_l = 0;
+   always @(posedge clk_sys) if (qd_mounted) qd_mounted_l <= |qd_size;
 
    mz_fdc fdc(
       .clk_sys(clk_sys), .reset(reset | warm_reset), .ce_cpu(ext_ce_cpu),
       .model_ok(cfg_model[2] == 1'b1), .mode(fdc_mode),                          // MZ-700, MZ-800, MZ-80B, MZ-2000
       .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),
-      .io_din(ext_io_din), .io_oe(ext_io_oe), .int_n(ext_int_n),
+      .io_din(fdc_io_din), .io_oe(fdc_io_oe), .int_n(ext_int_n),
       .img_mounted({1'b0, fdd_mounted}), .img_readonly(fdd_readonly), .img_size(fdd_size),
       .sd_lba(fdc_lba), .sd_rd(fdc_rd), .sd_wr(fdc_wr), .sd_ack({1'b0, fdd_ack}),
       .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(fdc_buff_din), .sd_buff_wr(sd_buff_wr),
@@ -160,8 +183,8 @@ module top(
       .CFG_CPU        (cfg_cpu),
       .CFG_AUDIO      (cfg_audio),
       .CFG_CMT        (cfg_cmt),
-      .CFG_USERROM    (8'd0),
-      .CFG_FDCROM     ((fdc_present & cfg_model[2:0] == 3'b100) ? 8'h10 : 8'h00),   // MZ-700 FD ROM with the interface
+      .CFG_USERROM    (cfg_display3[3] ? 8'h10 : 8'h00),                               // MZ-1500: E800-EFFF is always ROM
+      .CFG_FDCROM     (((fdc_present & cfg_model[2:0] == 3'b100) | cfg_display3[3]) ? 8'h10 : 8'h00),   // MZ-700 FD ROM with the interface; MZ-1500 F000 ROM
       .IOCTL_DOWNLOAD (ioctl_download),
       .IOCTL_UPLOAD   (1'b0),
       .IOCTL_CLK      (clk_sys),
@@ -183,6 +206,7 @@ module top(
       .AUDIO_L_O      (AUDIO_L),
       .AUDIO_R_O      (AUDIO_R),
       .AUDIO_PSG_O    (AUDIO_PSG),
+      .AUDIO_PSG_R_O  (),
       .CMT_STATUS     (cmt_status),
       .CMT_CTRL       (dbg_cmt_ctrl),
       .CMT_DEBUG      (dbg_cmt_debug),

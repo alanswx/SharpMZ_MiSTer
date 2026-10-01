@@ -102,7 +102,8 @@ entity sharpmz is
         --------------------                        AUDIO                       ------------------------------
         AUDIO_L_O             : out    std_logic;
         AUDIO_R_O             : out    std_logic;
-        AUDIO_PSG_O           : out    std_logic_vector(13 downto 0);   -- MZ-800 PSG mix, unsigned.
+        AUDIO_PSG_O           : out    std_logic_vector(13 downto 0);   -- MZ-800 PSG mix, unsigned (MZ-1500: left).
+        AUDIO_PSG_R_O         : out    std_logic_vector(13 downto 0);   -- MZ-1500 right PSG; the MZ-800 PSG otherwise.
         --------------------          External I/O (floppy controller)              ------------------------------
         EXT_IO_ADDR           : out    std_logic_vector(7 downto 0);            -- Z80 I/O port address.
         EXT_IO_RD             : out    std_logic;                               -- Z80 I/O read cycle (IORQ, RD, not M1).
@@ -232,6 +233,12 @@ signal MZ80C_CS_IO_GFB_n     :     std_logic;
 signal MZ80C_AUDIO_L         :     std_logic;
 signal MZ80C_AUDIO_R         :     std_logic;
 signal MZ80C_AUDIO_PSG       :     std_logic_vector(13 downto 0);
+signal MZ80C_AUDIO_PSG_R     :     std_logic_vector(13 downto 0);
+signal M15_PCG_CS            :     std_logic;
+signal M15_PCG_PLANE         :     std_logic_vector(1 downto 0);
+signal M15_PCG_DO            :     std_logic_vector(7 downto 0);
+signal M15_DMD               :     std_logic_vector(1 downto 0);
+signal M15_PAL               :     std_logic_vector(23 downto 0);
 --
 -- Video signals for MZ80C
 --
@@ -556,6 +563,12 @@ component mz80c
           AUDIO_L            : out std_logic;
           AUDIO_R            : out std_logic;
           AUDIO_PSG          : out std_logic_vector(13 downto 0);
+          AUDIO_PSG_R        : out std_logic_vector(13 downto 0);
+          M15_PCG_CS         : out std_logic;
+          M15_PCG_PLANE      : out std_logic_vector(1 downto 0);
+          M15_PCG_DI         : in  std_logic_vector(7 downto 0);
+          M15_DMD            : out std_logic_vector(1 downto 0);
+          M15_PAL            : out std_logic_vector(23 downto 0);
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -859,6 +872,11 @@ begin
             GOUT             => MZ_G,                                    -- Green Output
             BOUT             => MZ_B,                                    -- Blue Output
             CE_PIXEL         => MZ_CE_PIXEL,                             -- Pixel clock enable.
+            M15_PCG_CS       => M15_PCG_CS,                              -- MZ-1500 PCG.
+            M15_PCG_PLANE    => M15_PCG_PLANE,
+            M15_PCG_DO       => M15_PCG_DO,
+            M15_DMD          => M15_DMD,
+            M15_PAL          => M15_PAL,
 
             -- HPS Interface
             IOCTL_DOWNLOAD   => MZ_IOCTL_DOWNLOAD,
@@ -968,6 +986,12 @@ begin
             AUDIO_L          => MZ80C_AUDIO_L,
             AUDIO_R          => MZ80C_AUDIO_R,
             AUDIO_PSG        => MZ80C_AUDIO_PSG,
+            AUDIO_PSG_R      => MZ80C_AUDIO_PSG_R,
+            M15_PCG_CS       => M15_PCG_CS,
+            M15_PCG_PLANE    => M15_PCG_PLANE,
+            M15_PCG_DI       => M15_PCG_DO,
+            M15_DMD          => M15_DMD,
+            M15_PAL          => M15_PAL,
 
             -- Different operations modes.
             CONFIG           => CONFIG,
@@ -1114,6 +1138,7 @@ begin
     audio_l_o                <= MZ80C_AUDIO_L     when CONFIG(MZ_80C) = '1'   else MZ80B_AUDIO_L;
     audio_r_o                <= MZ80C_AUDIO_R     when CONFIG(MZ_80C) = '1'   else MZ80B_AUDIO_R;
     AUDIO_PSG_O              <= MZ80C_AUDIO_PSG   when CONFIG(MZ_80C) = '1'   else (others => '0');
+    AUDIO_PSG_R_O            <= MZ80C_AUDIO_PSG_R when CONFIG(MZ_80C) = '1'   else (others => '0');
     MZ_VGATE_n               <= MZ80C_VGATE_n     when CONFIG(MZ_80C) = '1'   else MZ80B_VGATE_n;
     MZ_CMT_BUS_IN            <= MZ80C_CMT_BUS_IN  when CONFIG(MZ_80C) = '1'   else MZ80B_CMT_BUS_IN;
 
@@ -1233,6 +1258,17 @@ begin
     --
     -- MZ-800: one 16KB ROM at 0x1C000 (1Z-013B, CG, IPL/9Z-504M), addressed by A13..A0 (E000 -> 2000).
     MROM_BANK                <= "111" & T80_A16(13 downto 11) when CONFIG(MZ800)          = '1'
+                                else
+                                -- MZ-1500 (also flagged MZ700): its 9Z-502M monitor and E800-FFFF ROM in the old MZ-800 banks.
+                                "100111"                  when CONFIG(IS_MZ1500)             = '1' and T80_A16(15 downto 11) = "11101"
+                                else
+                                "101000"                  when CONFIG(IS_MZ1500)             = '1' and T80_A16(15 downto 11) = "11110"
+                                else
+                                "101001"                  when CONFIG(IS_MZ1500)             = '1' and T80_A16(15 downto 11) = "11111"
+                                else
+                                "100011"                  when CONFIG(IS_MZ1500)             = '1' and T80_A16(11) = '0'
+                                else
+                                "100100"                  when CONFIG(IS_MZ1500)             = '1' and T80_A16(11) = '1'
                                 else
                                 "000100"                  when CONFIG(MZ80K)                 = '1' and T80_A16(15 downto 11) = "11101"
                                 else

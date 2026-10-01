@@ -34,6 +34,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use pkgs.clkgen_pkg.all;
 use pkgs.mctrl_pkg.all;
+use work.vc_rams_pkg.all;
 
 entity video_vc is
     Port (
@@ -66,6 +67,12 @@ entity video_vc is
         GOUT                     : out std_logic_vector(7 downto 0);
         BOUT                     : out std_logic_vector(7 downto 0);
         CE_PIXEL                 : out std_logic;
+        -- MZ-1500 PCG (from mz80c.vhd).
+        M15_PCG_CS               : in  std_logic := '0';
+        M15_PCG_PLANE            : in  std_logic_vector(1 downto 0) := "00";
+        M15_PCG_DO               : out std_logic_vector(7 downto 0);
+        M15_DMD                  : in  std_logic_vector(1 downto 0) := "00";
+        M15_PAL                  : in  std_logic_vector(23 downto 0) := (others => '0');
         IOCTL_DOWNLOAD           : in  std_logic;
         IOCTL_UPLOAD             : in  std_logic;
         IOCTL_CLK                : in  std_logic;
@@ -103,6 +110,15 @@ architecture rtl of video_vc is
     constant V2_GRAMDISABLE  : natural := 70;
 
     signal V2_CONFIG         : std_logic_vector(V2_WIDTH-1 downto 0);
+
+    -- MZ-1500 PCG: three 8 KB planes (mz800emu g_memory.PCG). The CPU sees one plane at D000-EFFF (OUT E5 1-3);
+    -- the renderer reads all three for a character row.
+    signal PCG_CPU_ADDR      : std_logic_vector(12 downto 0);
+    signal PCG_WE            : std_logic_vector(2 downto 0);
+    signal PCG_CPU_Q0, PCG_CPU_Q1, PCG_CPU_Q2 : std_logic_vector(7 downto 0);
+    signal PCG_RD_ADDR       : std_logic_vector(12 downto 0);
+    signal PCG_RD_DATA       : std_logic_vector(23 downto 0);
+    signal M15_PCGON         : std_logic;
     signal VIDEO_MREQ_n      : std_logic;
     signal VIDEO_DATA_OUT    : std_logic_vector(31 downto 0);
     signal VGA_R, VGA_G, VGA_B : std_logic_vector(3 downto 0);
@@ -119,6 +135,27 @@ architecture rtl of video_vc is
     signal R_COMP, G_COMP, B_COMP, WAIT_CSYNC : std_logic;
 
 begin
+
+    -- MZ-1500 PCG planes. D000-EFFF -> plane offset 0000-1FFF (A12 inverted).
+    PCG_CPU_ADDR <= (not T80_A(12)) & T80_A(11 downto 0);
+    PCG_WE(0)    <= '1' when M15_PCG_CS = '1' and T80_WR_n = '0' and M15_PCG_PLANE = "00" else '0';
+    PCG_WE(1)    <= '1' when M15_PCG_CS = '1' and T80_WR_n = '0' and M15_PCG_PLANE = "01" else '0';
+    PCG_WE(2)    <= '1' when M15_PCG_CS = '1' and T80_WR_n = '0' and M15_PCG_PLANE = "10" else '0';
+
+    PCGP0 : dpram
+        generic map (init_file => "", widthad_a => 13, width_a => 8, widthad_b => 13, width_b => 8)
+        port map (clock_a => CLKBUS(CKMASTER), address_a => PCG_CPU_ADDR, data_a => T80_DI, wren_a => PCG_WE(0), q_a => PCG_CPU_Q0,
+                  clock_b => CLKBUS(CKMASTER), address_b => PCG_RD_ADDR, data_b => (others => '0'), wren_b => '0', q_b => PCG_RD_DATA(7 downto 0));
+    PCGP1 : dpram
+        generic map (init_file => "", widthad_a => 13, width_a => 8, widthad_b => 13, width_b => 8)
+        port map (clock_a => CLKBUS(CKMASTER), address_a => PCG_CPU_ADDR, data_a => T80_DI, wren_a => PCG_WE(1), q_a => PCG_CPU_Q1,
+                  clock_b => CLKBUS(CKMASTER), address_b => PCG_RD_ADDR, data_b => (others => '0'), wren_b => '0', q_b => PCG_RD_DATA(15 downto 8));
+    PCGP2 : dpram
+        generic map (init_file => "", widthad_a => 13, width_a => 8, widthad_b => 13, width_b => 8)
+        port map (clock_a => CLKBUS(CKMASTER), address_a => PCG_CPU_ADDR, data_a => T80_DI, wren_a => PCG_WE(2), q_a => PCG_CPU_Q2,
+                  clock_b => CLKBUS(CKMASTER), address_b => PCG_RD_ADDR, data_b => (others => '0'), wren_b => '0', q_b => PCG_RD_DATA(23 downto 16));
+    M15_PCGON  <= CONFIG(IS_MZ1500) and M15_DMD(0);
+    M15_PCG_DO <= PCG_CPU_Q0 when M15_PCG_PLANE = "00" else PCG_CPU_Q1 when M15_PCG_PLANE = "01" else PCG_CPU_Q2;
 
     -- Configuration translation.
     process( CONFIG )
@@ -156,12 +193,13 @@ begin
                "0001" when CONFIG(MZ80C)  = '1' else
                "0010" when CONFIG(MZ1200) = '1' else
                "0011" when CONFIG(MZ80A)  = '1' else
+               "1010" when CONFIG(IS_MZ1500) = '1' else           -- before MZ700: the MZ-1500 also sets it
                "0100" when CONFIG(MZ700)  = '1' else
                "0110" when CONFIG(MZ800)  = '1' else
                "1000" when CONFIG(MZ80B)  = '1' else
                "1001" when CONFIG(MZ2000) = '1' else
                "1111";
-    CG_4K   <= CONFIG(MZ700) or CONFIG(MZ800);
+    CG_4K   <= CONFIG(MZ700) or CONFIG(MZ800);                  -- MZ-1500 included (CONFIG(MZ700))
     CG_IOCTL_WR <= '1' when IOCTL_WR = '1' and IOCTL_ADDR(24 downto 20) = "00101" else '0';
 
     VC: entity work.VideoController
@@ -169,6 +207,11 @@ begin
             CLOCK_50         => '0',
             SYS_CLK          => CLKBUS(CKMASTER),
             VRESETn          => RST_n,
+            M15_PCGON        => M15_PCGON,
+            M15_PRIO         => M15_DMD(1),
+            M15_PAL          => M15_PAL,
+            PCG_RD_ADDR      => PCG_RD_ADDR,
+            PCG_RD_DATA      => PCG_RD_DATA,
             VIDEO_ADDR       => X"00" & T80_A,
             VIDEO_DATA_IN    => X"000000" & T80_DI,
             VIDEO_DATA_OUT   => VIDEO_DATA_OUT,
