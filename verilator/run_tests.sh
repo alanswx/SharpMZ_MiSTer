@@ -21,6 +21,9 @@
 #   tape_mz80b    MZ-80B: the IPL loads SB-5520 BASIC from a tape image (../software/mz80b) to "Ready"; frame hash.
 #   tape_mz2000   MZ-2000: the MZ-2200 IPL loads Gang Man (../software/mz2200) to its title; frame hash.
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
+#   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
+#   qd_mz1500     MZ-1500: Q loads Lode Runner from a Quick Disk dump (../software/mz1500); PCG title, frame hash at 600
+#                 (pixel-identical to mz1500emu). Skipped without the image and with QUICK=1.
 #   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
 #   tape_image    load ramtest from an MZT through the tape image slot (fast tape)
@@ -64,6 +67,17 @@ done
 ( $BIN --model mz2000 --stop-at-frame 301 --frame-log "$OUT/ipl_mz2000.csv" --quiet > /dev/null 2> "$OUT/ipl_mz2000.log"
   awk -F, '$1==300 {print $2}' "$OUT/ipl_mz2000.csv" > "$OUT/ipl_mz2000.txt" ) &
 pids+=($!); names+=("ipl_mz2000")
+( $BIN --model mz1500 --stop-at-frame 151 --frame-log "$OUT/ipl_mz1500.csv" --quiet > /dev/null 2> "$OUT/ipl_mz1500.log"
+  awk -F, '$1==150 {print $2}' "$OUT/ipl_mz1500.csv" > "$OUT/ipl_mz1500.txt" ) &
+pids+=($!); names+=("ipl_mz1500")
+QDF="../software/mz1500/Lode Runner (1985)(Broderbund Software)(Universe) Side A.qdf"
+if [ -z "${QUICK:-}" ] && [ -f "$QDF" ]; then
+    cp "$QDF" "$OUT/qd_mz1500.qdf"
+    ( $BIN --model mz1500 --qd "$OUT/qd_mz1500.qdf" --type '150:Q' --stop-at-frame 601 \
+          --frame-log "$OUT/qd_mz1500.csv" --quiet > /dev/null 2> "$OUT/qd_mz1500.log"
+      awk -F, '$1==600 {print $2}' "$OUT/qd_mz1500.csv" > "$OUT/qd_mz1500.txt" ) &
+    pids+=($!); names+=("qd_mz1500")
+fi
 python3 ../tools/make_boot_disk.py ../rtl/software/mzf/ramtest.mzf "$OUT/fdd_mz700.dsk" > /dev/null
 ( $BIN --model mz700 --fdd "$OUT/fdd_mz700.dsk" --fdd-readonly --type '120:JF000\n' --stop-at-frame 500 \
       --ascii-end --quiet > "$OUT/fdd_mz700.txt" 2> "$OUT/fdd_mz700.log" ) &
@@ -136,7 +150,7 @@ for p in "${pids[@]}"; do wait $p; done
 fail=0
 for n in "${names[@]}"; do
     case $n in
-        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*|ipl_*|tape_mz80b|tape_mz2000)
+        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*|ipl_*|qd_*|tape_mz80b|tape_mz2000)
             if diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
                 echo "PASS $n"
             else

@@ -91,6 +91,9 @@ test('T23', 'MZ2000', 'MZ-2000 floppy: TF-DOS boot disk (fukui brave.d88)', file
      steps=[('wait', 25), ('shot', 'boot')])
 test('T24', 'MZ2000', 'MZ-2000 tape: Zero Fighter (Hudson Soft), colour title screen', files=[('s', 0, f'{SW}/mz2200/Zero Fighter (1983)(Hudosn Soft) [CT].mzt')],
      opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 40), ('shot', 'title')])
+test('T25', 'MZ1500', 'MZ-1500 IPL menu ("Make ready QD", F/Q/C/M)', steps=[('wait', 5), ('shot', 'boot')])
+test('T26', 'MZ1500', 'MZ-1500 Quick Disk: Lode Runner (Q), PCG title screen', files=[('s', 3, f'{SW}/mz1500/Lode Runner (1985)(Broderbund Software)(Universe) Side A.qdf')],
+     reset=True, steps=[('wait', 4), ('type', 'Q'), ('wait', 25), ('shot', 'title')])
 
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, "'": 40, ',': 51, '.': 52, '/': 53, ':': -39, '*': -9}

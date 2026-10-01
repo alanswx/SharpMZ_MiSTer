@@ -14,6 +14,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | Tape | Done. MZF to CMT, direct to RAM, and a Tape Image slot (`rtl/tape_image.sv`) that loads multi-program MZTs, saves into a blank image and does MZ-80B APSS. |
 | MZ-80K/80C/1200/80A/700 | Working in simulation. On hardware: all boot; MZ-700 tape and floppy (`J F000`) work. |
 | MZ-800 | Working in simulation against mz800emu: IPL, 9Z-504M monitor, memory map, MZ-700/800 modes, all graphics modes, PSG, Z80 PIO, tape, floppy and CP/M. 12 native games and 84 of 94 disk images match mz800emu. On hardware: graphics tests, games from tape images (Cauldron II, Cybernoid), CP/M games from disk. |
+| MZ-1500 | New (from mz800emu's MZ-1500): 9Z-502M ROMs, PCG (3 planes, palette, priority), 2 PSGs in stereo, Z80 PIO, Quick Disk (`rtl/mz_qdisk.sv`, .qdf/.mzq, read only). Boots to the IPL and loads Lode Runner from Quick Disk with its PCG title screen pixel-identical to mz1500emu, in the sim and on hardware. |
 | Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. MZ-80B: the IPL boots SB-6511 Disk BASIC and CP/M 2.2 from the idealine.info images. |
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
@@ -36,6 +37,12 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] 1.44 MB disk images (`_Vzor144`, `_Vzor_Nova`): `wd1793.sv` addresses 1 MB.
 - [ ] Turbo-loader tapes (header types 00/08/76, exec below the load address).
 
+### MZ-1500
+- [ ] More software: the ~60 tape titles and the other QD images in `software/mz1500` (many are tape + QD, e.g. Galaga).
+- [ ] CG ROM read through OUT E5 0 (reads FF now).
+- [ ] Quick Disk writes (save), and the PIO/joystick inputs.
+- [ ] MZ-1500 ROMs are mz800emu's copies; check against MAME's mz1500 set.
+
 ### Other models
 - [ ] MZ-700 floppy on hardware; MZ-2Z009 Disk BASIC (loads from tape) on a blank disk.
 - [ ] MZ-2000: MZ-80B CP/M (DISK01) on the MZ-2000 stays black; recheck now that NST resets the CPU.
@@ -57,7 +64,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] Unit testbenches for `cmt.vhd` and the i8254.
 - [ ] WAV to MZF converter for the Waveform sets in `software/`.
 - [ ] Release RBF `releases/SharpMZ_YYYYMMDD.rbf` after hardware testing.
-- [ ] Later: MZ-1500 and MZ-2200 models, v2 machine options (RAM size, GRAM, MZ-1R25), and removing `support/sharpmz/` from Main_MiSTer.
+- [ ] Later: v2 machine options (RAM size, GRAM, MZ-1R25), and removing `support/sharpmz/` from Main_MiSTer.
 
 ## Known issues
 - Changing the model doesn't reset MZ-800 characters redefined through C000; the IPL restores the font on the next boot.
@@ -66,6 +73,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 ## Hardware test log
 - **2026-09-29, MZ-700:** Galactic Invaders loads from tape and plays (SHIFT fires, SPACE pauses as the game intends). This found the keymap bugs fixed in `cbb1c04`.
 - **2026-09-30, all models (`tools/mister_test.py`):** T01-T06 boot screens correct on every model (MZ-2000 on the MZ-2200 IPL). T07 MZ-700 tape, T08 MZ-700 floppy, T09/T10 MZ-800 graphics tests pass. T11/T12 MZ-800 games load from tape images (Cauldron II, Cybernoid) after the tape image fix. The user played MZ-800 CP/M games from disk (sound fixed in `11f2d8b`). T13-T18 on b4004ff: MZ-800 CP/M 4.1 (DIR), CP/M 1.3 and the Hry file manager boot from floppy; MZ-80B boots SB-6511 Disk BASIC and CP/M 2.2; the MZ-2000 loads MZ-80B CP/M and stays blank, as in the sim. T19/T20 play the BELL and 440 Hz tone (by ear).
+- **2026-10-01, MZ-1500 (build 5eda577):** T25 IPL menu, T26 Lode Runner from Quick Disk with the PCG title screen; MZ-700 unchanged (T03).
 - **2026-10-01, MZ-80B/2000 (clean build 9b9001e):** T21 MZ-80B SB-5520 BASIC from tape, T22 Gang Man, T23 TF-DOS D88 with katakana, T24 Zero Fighter in colour. All match the sim.
 
 ## Bugs found and fixed
