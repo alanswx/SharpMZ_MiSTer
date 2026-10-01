@@ -17,7 +17,7 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 * MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, all 320x200/640x200 graphics modes with hardware scroll, the SN76489 sound chip and the Z80 PIO.
 * Floppy disk (MZ-700/MZ-800 interface): two drives from Extended DSK (`.dsk`) images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks.
 * 8253 sound or the tape signal on the audio output.
-* Cassette: MZF loading onto the virtual tape or straight into RAM, and a **Tape Image** slot that loads multi-program tapes and **saves** programs written with SAVE. MZ-80B/2000 APSS (automatic program search) works against the tape image. Fast tape up to 32x.
+* Cassette: MZF loading onto the virtual tape or straight into RAM, and a **Tape Image** slot that loads multi-program tapes and **saves** programs written with SAVE. MZ-80B/2000 load from the tape image under IPL control (deck commands and APSS seek). Fast tape up to 32x.
 * Monitor ROMs, character generator ROMs and keymaps for every model are built in, and can be replaced from the OSD.
 
 ## Installation

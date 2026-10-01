@@ -15,8 +15,8 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | MZ-80K/80C/1200/80A/700 | Working in simulation. On hardware: all boot; MZ-700 tape and floppy (`J F000`) work. |
 | MZ-800 | Working in simulation against mz800emu: IPL, 9Z-504M monitor, memory map, MZ-700/800 modes, all graphics modes, PSG, Z80 PIO, tape, floppy and CP/M. 12 native games and 84 of 94 disk images match mz800emu. On hardware: graphics tests, games from tape images (Cauldron II, Cybernoid), CP/M games from disk. |
 | Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. MZ-80B: the IPL boots SB-6511 Disk BASIC and CP/M 2.2 from the idealine.info images. |
-| MZ-80B | Boots to the IPL; little software tested. |
-| MZ-2000 | Boots the MZ-2200 IPL (no MZ-2000 dump is known) to "IPL is looking for a program"; it reads floppy boot records. Tape and software untested. |
+| MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
+| MZ-2000 | Boots the MZ-2200 IPL (we have no MZ-2000 IPL; MAME's mz20ipl.bin, CRC d7ccf37f, is one). Loads Gang Man from tape and boots a TF-DOS D88 disk (sim and hardware). No colour graphics RAM yet, and Japanese text needs the MZ-2000 character ROM. |
 | FPGA | Latest build (b4004ff) meets timing (core clock +2.2 ns): about 17,600 ALMs (42%), 434/553 RAM blocks. Built on cottageubuntu (Quartus 17.0.2). |
 | Regression | `make test`: 23 tests plus 2 disk tests (see `verilator/README.md`). All pass. |
 
@@ -38,7 +38,9 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ### Other models
 - [ ] MZ-700 floppy on hardware; MZ-2Z009 Disk BASIC (loads from tape) on a blank disk.
-- [ ] MZ-2000: MZ-80B CP/M 2.2 (DISK01) boots and runs its BIOS but the screen stays black, and Disk BASIC (DISK23) stops after loading. Could be MZ-80B software using ports F4-F7 with MZ-80B meanings; needs MZ-2000 software or a reference emulator.
+- [ ] MZ-2000: colour graphics RAM (C000-FFFF) in the memory decode. Zero Fighter loads but shows nothing; MZ-80B CP/M on the MZ-2000 stays black.
+- [ ] MZ-2000 character ROM: Japanese text (kana) shows MZ-80B glyphs (brave.d88). MAME's font.bin (CRC 6ae6ce8e) is marked a bad dump.
+- [ ] More MZ-2000 tapes from `software/mz2200` (Super Doors, Itasandrias, Project A, ...); Ice Block's MZT is malformed.
 - [ ] MZ-80B SB-7010 (DISK29) loads and stops at its monitor's `*` prompt; find out how FDOS is started from there.
 - [ ] wd1793: EDSK sector error flags (ST1/ST2) are ignored, so a sector dumped with a CRC error reads as good data. DISK37/38 are bad dumps: the IPL loads corrupt code and hangs instead of reporting a loading error.
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
@@ -68,6 +70,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ## Bugs found and fixed
 Each has a commit; this list is for context.
+- **MZ-80B/2000 tape never played:** GHDL lost the CMT state process's writes to CMT_BUS_OUTi (the vector was split between the process and concurrent assignments), so the APSS deck never left reset; and the deck needed PLAY high with STOP low, which the MZ-2200 IPL never does. Now registered bits and edge-triggered commands, as MAME.
 - **Tape image hang (hardware):** mounting a tape image froze Main (F12 dead, reboot needed). `ioctl_wait` was tied to the tape engine and holds the whole HPS link, so Main could not serve the engine's sector reads. The engine now yields to downloads instead.
 - **OSD/MGL:** MGL files can only load F/S entries on the first OSD page; ours were on sub-pages, so every MGL with a tape or disk was dropped.
 - **MZ-700/800 sound:** the beeper played an octave low (a divide-by-2 meant for the MZ-80K's 2 MHz clock), and on the MZ-800 counter 0's gate was forced on in 800 mode, so games that switch modes (Astro Marine Corps) clicked.

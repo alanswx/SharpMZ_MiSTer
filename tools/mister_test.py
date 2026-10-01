@@ -83,6 +83,12 @@ test('T19', 'MZ700', 'MZ-700 sound: BELL (880 Hz) then a steady 440 Hz A (listen
      steps=[('wait', 2), ('type', 'J2000\n'), ('wait', 3), ('shot', 'beep')])
 test('T20', 'MZ800', 'MZ-800 sound: the same BELL and 440 Hz A through the 8253 (listen)', files=[('f', 2, f'{ROOT}/verilator/tests/sound/beep700.mzf')],
      steps=[('wait', 2), ('type', 'M'), ('wait', 2), ('type', 'J2000\n'), ('wait', 3), ('shot', 'beep')])
+test('T21', 'MZ80B', 'MZ-80B tape: the IPL loads SB-5520 BASIC from a tape image', files=[('s', 0, f'{SW}/mz80b/SB-5520.mzt')],
+     opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 40), ('shot', 'basic')])
+test('T22', 'MZ2000', 'MZ-2000 tape: the MZ-2200 IPL loads Gang Man (Hudson Soft)', files=[('s', 0, f'{SW}/mz2200/Gang Man (1983)(Hudson Soft)(Fumihiko Itagaki) [CT].mzt')],
+     opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 40), ('shot', 'title')])
+test('T23', 'MZ2000', 'MZ-2000 floppy: TF-DOS boot disk (fukui brave.d88)', files=[('s', 1, f'{SW}/fukui-mz2000/brave.d88')], reset=True,
+     steps=[('wait', 25), ('shot', 'boot')])
 
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, "'": 40, ',': 51, '.': 52, '/': 53, ':': -39, '*': -9}
