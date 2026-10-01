@@ -6,8 +6,8 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 | ------ | ------ | ------ | ------ |
 | MZ-80K | Working | MZ-80C | Working |
 | MZ-1200 | Working | MZ-80A | Working |
-| MZ-700 | Working | MZ-80B | Boots to IPL; limited testing |
-| MZ-2000 | Not working (needs a real MZ-2000 IPL ROM) | MZ-800 | Working in simulation (IPL, graphics, PSG, tape, floppy, CP/M); hardware testing |
+| MZ-700 | Working | MZ-80B | Working: IPL boots tape and floppy (BASIC, CP/M) |
+| MZ-2000 | Working: IPL, tape and floppy, colour graphics, katakana | MZ-800 | Working (IPL, graphics, PSG, tape, floppy, CP/M), tested on hardware |
 
 ## Features
 
@@ -15,7 +15,7 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 * Native video timing (MZ-700/800 are 50 Hz PAL, the others 60 Hz), scaled by the MiSTer framework: HDMI, analog, scandoubler, scanlines and aspect ratio work as in other cores.
 * 40x25 and 80x25, mono and colour character modes; programmable character generator (PCG); MZ-80B/2000 graphics RAM.
 * MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, all 320x200/640x200 graphics modes with hardware scroll, the SN76489 sound chip and the Z80 PIO.
-* Floppy disk (MZ-700/MZ-800 interface): two drives from Extended DSK (`.dsk`) images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks.
+* Floppy disk (MB8876 interface on the MZ-700, MZ-800, MZ-80B and MZ-2000): two drives from Extended DSK (`.dsk`) or D88/D77 images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks; the MZ-80B/2000 IPL boots Disk BASIC, CP/M and TF-DOS.
 * 8253 sound or the tape signal on the audio output.
 * Cassette: MZF loading onto the virtual tape or straight into RAM, and a **Tape Image** slot that loads multi-program tapes and **saves** programs written with SAVE. MZ-80B/2000 load from the tape image under IPL control (deck commands and APSS seek). Fast tape up to 32x.
 * Monitor ROMs, character generator ROMs and keymaps for every model are built in, and can be replaced from the OSD.
@@ -60,7 +60,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 
 | Option | Description |
 | ------ | ----------- |
-| Floppy Drive A / B | Mount an Extended DSK image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
+| Floppy Drive A / B | Mount an Extended DSK or D88/D77 image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
 | Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
 
 Writes go back to the image; mount a copy if you want to keep the original.
@@ -83,11 +83,11 @@ Writes go back to the image; mount a copy if you want to keep the original.
 
 ## Known Issues
 
-* MZ-2000: the ROM slot holds the MZ-80B IPL, which doesn't boot the MZ-2000; a real MZ-2000 IPL dump is needed. Its colour graphics RAM isn't in the memory decode yet.
+* MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
 * MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour isn't shown (only the 320x200/640x200 area is output), and joysticks, the printer port and the RAM disk board aren't implemented.
 * Floppy: 1.44 MB images aren't supported, the MZ-700 needs its floppy ROM added before it can boot from disk, and writing to disk is untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
-* The MZ-80B has had little testing beyond the IPL screen.
+* The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * No Quick Disk support.
 
 ## Design Summary

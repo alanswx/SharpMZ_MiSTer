@@ -17,8 +17,8 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. MZ-80B: the IPL boots SB-6511 Disk BASIC and CP/M 2.2 from the idealine.info images. |
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
-| FPGA | Latest build (b4004ff) meets timing (core clock +2.2 ns): about 17,600 ALMs (42%), 434/553 RAM blocks. Built on cottageubuntu (Quartus 17.0.2). |
-| Regression | `make test`: 23 tests plus 2 disk tests (see `verilator/README.md`). All pass. |
+| FPGA | Latest build (9b9001e, clean) meets timing (core clock +1.3 ns): about 17,600 ALMs (42%), 434/553 RAM blocks. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
+| Regression | `make test`: 34 tests, including disk and MZ-80B/2000 tape tests that need `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py` (24 MGL tests). |
 
 ## Open work
 
@@ -44,7 +44,6 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] MZ-80B SB-7010 (DISK29) loads and stops at its monitor's `*` prompt; find out how FDOS is started from there.
 - [ ] wd1793: EDSK sector error flags (ST1/ST2) are ignored, so a sector dumped with a CRC error reads as good data. DISK37/38 are bad dumps: the IPL loads corrupt code and hangs instead of reporting a loading error.
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
-- [ ] MZ-2000: its colour GRAM (C000-FFFF) in the memory decode; a real MZ-2000 IPL dump if one turns up.
 - [ ] MZ-80B: GRAM and 40/80 column switching with real software; SAVE and APSS.
 - [ ] MZ-80A (probably 80K/1200 too): the cursor keys type 4/6/8/2 and Backspace types `/`. It needs the MZ-80A key matrix.
 - [ ] MZ-80K: 3-D MAZE loads and runs but the screen looks garbled; check whether that's the program.
