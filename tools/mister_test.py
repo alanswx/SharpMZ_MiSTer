@@ -64,9 +64,9 @@ test('T09', 'MZ800', 'MZ-800 graphics 640x200 test program (direct load, M, J200
 test('T10', 'MZ800', 'MZ-800 graphics 320x200 16 colours (direct load, M, J2000)', files=[('f', 2, f'{TESTS}/gfx320h.mzf')],
      steps=[('wait', 2), ('type', 'M'), ('wait', 2), ('type', 'J2000\n'), ('wait', 6), ('shot', 'gfx320h')])
 test('T11', 'MZ800', 'MZ-800 IPL loads Cauldron II from a tape image (C)', files=[('s', 0, f'{GAMES800}/Cauldron.mzf')],
-     opts=[FAST_TAPE(5)], steps=[('wait', 3), ('type', 'C'), ('wait', 45), ('shot', '45s'), ('wait', 30), ('shot', '75s')])
+     opts=[FAST_TAPE(5)], steps=[('wait', 10), ('type', 'C'), ('wait', 45), ('shot', '45s'), ('wait', 30), ('shot', '75s')])
 test('T12', 'MZ800', 'MZ-800 IPL loads Cybernoid from a tape image (C)', files=[('s', 0, f'{GAMES800}/Cyberno.mzf')],
-     opts=[FAST_TAPE(5)], steps=[('wait', 3), ('type', 'C'), ('wait', 45), ('shot', '45s'), ('wait', 30), ('shot', '75s')])
+     opts=[FAST_TAPE(5)], steps=[('wait', 10), ('type', 'C'), ('wait', 45), ('shot', '45s'), ('wait', 30), ('shot', '75s')])
 test('T13', 'MZ800', 'MZ-800 CP/M 4.1 boots from floppy; DIR', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], reset=True,
      steps=[('wait', 15), ('shot', 'boot'), ('type', 'DIR\n'), ('wait', 4), ('shot', 'dir')])
 test('T14', 'MZ800', 'MZ-800 CP/M 1.3 boots from floppy', files=[('s', 1, f'{DSK}/CPMv13A System.dsk')], reset=True,
@@ -79,6 +79,10 @@ test('T17', 'MZ80B', 'MZ-80B floppy: CP/M 2.2 (DISK01)', files=[('s', 1, f'{RB}/
      steps=[('wait', 25), ('shot', 'boot')])
 test('T18', 'MZ2000', 'MZ-2000 floppy: MZ-80B CP/M 2.2 (black screen in the sim)', files=[('s', 1, f'{RB}/DISK01.DSK')], reset=True,
      steps=[('wait', 25), ('shot', 'boot')])
+test('T19', 'MZ700', 'MZ-700 sound: BELL (880 Hz) then a steady 440 Hz A (listen)', files=[('f', 2, f'{ROOT}/verilator/tests/sound/beep700.mzf')],
+     steps=[('wait', 2), ('type', 'J2000\n'), ('wait', 3), ('shot', 'beep')])
+test('T20', 'MZ800', 'MZ-800 sound: the same BELL and 440 Hz A through the 8253 (listen)', files=[('f', 2, f'{ROOT}/verilator/tests/sound/beep700.mzf')],
+     steps=[('wait', 2), ('type', 'M'), ('wait', 2), ('type', 'J2000\n'), ('wait', 3), ('shot', 'beep')])
 
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, "'": 40, ',': 51, '.': 52, '/': 53, ':': -39, '*': -9}

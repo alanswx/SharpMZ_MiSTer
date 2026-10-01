@@ -9,6 +9,8 @@
 #   pcg_mz800     MZ-800: tests/mz800/pcg700.mzf redefines a character in the 700 mode CG-RAM (C000); frame hash
 #   m800_<test>   MZ-800 graphics modes, write/read modes and hardware scroll (tests/mz800/make_gfx_modes.py);
 #                 frame hash. The pictures match mz800emu (tests/mz800/compare_emu.sh).
+#   beep_mz700    MZ-700: tests/sound/beep700.mzf rings the monitor BELL, then counter 0 plays 440 Hz (measured);
+#   beep_mz800    the same program on the MZ-800 in 700 mode with PC0 set (the 8253 sound path and E008 gate)
 #   psg_mz800     MZ-800: tests/mz800/psg440.mzf plays 439.8 Hz on the PSG; the frequency is measured from --wav
 #   fdd_cpm       MZ-800: CP/M 4.1 boots from ../software/dsk/CPMv41 System.dsk, DIR; frame hash (matches
 #                 mz800emu pixel for pixel). fdd_hry: CPMv41 Hry COM A autostarts its file manager.
@@ -82,6 +84,14 @@ fi
       --stop-at-frame 400 --wav "$OUT/psg_mz800.wav" --quiet > /dev/null 2> "$OUT/psg_mz800.log"
   python3 tests/wav_freq.py "$OUT/psg_mz800.wav" 7.0 1.0 > "$OUT/psg_mz800.txt" ) &
 pids+=($!); names+=("psg_mz800")
+( $BIN --model mz700 --mzf tests/sound/beep700.mzf --mzf-direct --mzf-direct-frame 20 --type '150:J2000\n' \
+      --stop-at-frame 450 --wav "$OUT/beep_mz700.wav" --quiet > /dev/null 2> "$OUT/beep_mz700.log"
+  python3 tests/wav_freq.py "$OUT/beep_mz700.wav" 6.0 2.0 > "$OUT/beep_mz700.txt" ) &
+pids+=($!); names+=("beep_mz700")
+( $BIN --model mz800 --mzf tests/sound/beep700.mzf --mzf-direct --mzf-direct-frame 20 --type 200:M --type '280:J2000\n' \
+      --stop-at-frame 500 --wav "$OUT/beep_mz800.wav" --quiet > /dev/null 2> "$OUT/beep_mz800.log"
+  python3 tests/wav_freq.py "$OUT/beep_mz800.wav" 8.0 1.5 > "$OUT/beep_mz800.txt" ) &
+pids+=($!); names+=("beep_mz800")
 
 if [ -z "$QUICK" ]; then
     cat ../rtl/software/mzf/ramtest.mzf ../rtl/software/mzf/tapecheck.mzf > "$OUT/two.mzt"
@@ -116,11 +126,11 @@ for n in "${names[@]}"; do
             else
                 echo "FAIL $n"; diff "tests/expected/$n.txt" "$OUT/$n.txt" | head -5; fail=1
             fi ;;
-        psg_mz800)
-            if awk '{exit !($1 > 435 && $1 < 445)}' "$OUT/psg_mz800.txt"; then
-                echo "PASS $n ($(cat "$OUT/psg_mz800.txt") Hz)"
+        psg_mz800|beep_mz700|beep_mz800)
+            if awk '{exit !($1 > 435 && $1 < 445)}' "$OUT/$n.txt"; then
+                echo "PASS $n ($(cat "$OUT/$n.txt") Hz)"
             else
-                echo "FAIL $n"; cat "$OUT/psg_mz800.txt"; fail=1
+                echo "FAIL $n"; cat "$OUT/$n.txt"; fail=1
             fi ;;
         tape_image|tape_mz800)
             if grep -q "RAM TESTER" "$OUT/tape_image.txt"; then
