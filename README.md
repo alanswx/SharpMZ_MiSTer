@@ -85,7 +85,7 @@ Writes go back to the image; mount a copy if you want to keep the original.
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
 * MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour isn't shown (only the 320x200/640x200 area is output), and joysticks, the printer port and the RAM disk board aren't implemented.
-* Floppy: 1.44 MB images aren't supported, the MZ-700 needs its floppy ROM added before it can boot from disk, and writing to disk is untested.
+* Floppy: 1.44 MB images aren't supported, writing to disk is untested, and the MZ-80K/80A floppy interface isn't implemented.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * No Quick Disk support.
