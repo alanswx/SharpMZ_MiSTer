@@ -319,6 +319,8 @@ signal SYSRAM_DO             :     std_logic_vector(7 downto 0);
 signal MZ_CS_RAM_n           :     std_logic;
 signal MZ_SYSMEM_A16         :     std_logic_vector(15 downto 0);
 signal MZ_SWP_MEM_BANK_n     :     std_logic;
+signal MZ80B_CPU_RESET       :     std_logic;
+signal T80_CPU_RST_n         :     std_logic;
 --
 -- Graphics RAM control signals.
 --
@@ -625,6 +627,7 @@ component mz80b
           CS_IO_GFB_n        : out std_logic;                            -- Graphics FB IO Select range
           CS_IO_G_n          : out std_logic;                            -- Graphics Options IO Select range
           CS_SWP_MEMBANK_n   : out std_logic;                            -- Move lower 32K into upper block.
+          CPU_RESET          : out std_logic;                            -- Reset the CPU only: PC1 (NST) 0->1, the IPL's jump into RAM.
 
           -- Audio.
           AUDIO_L            : out std_logic;
@@ -691,7 +694,7 @@ begin
             IOWait           => 1                                        -- 0 => Single cycle I/O, 1 => Std I/O cycle
         )
         port map (
-            RESET_n          => T80_RST_n,                               -- Reset signal.
+            RESET_n          => T80_CPU_RST_n,                           -- Reset signal (system reset, or the MZ-80B/2000 NST).
             CLK_n            => CLKBUS(CKMASTER),                        -- T80se uses positive level clock.
             CLKEN            => CLKBUS(CKENCPU),                         -- Pulse the master clock at the required CPU frequency.
             WAIT_n           => T80_WAIT_n,                              -- WAIT_n signal into the CPU to prolong a memory cycle.
@@ -1035,6 +1038,7 @@ begin
             CS_IO_GFB_n      => MZ80B_CS_IO_GFB_n,                       -- Graphics FB IO Select range
             CS_IO_G_n        => MZ80B_CS_IO_G_n,                         -- Graphics Options IO Select range
             CS_SWP_MEMBANK_n => MZ_SWP_MEM_BANK_n,                       -- Swap lower 32K memory bank into upper 32k block.
+            CPU_RESET        => MZ80B_CPU_RESET,                         -- NST: restart the CPU in RAM.
 
             -- Audio.
             AUDIO_L          => MZ80B_AUDIO_L,
@@ -1168,6 +1172,7 @@ begin
     -- Control Signals
     --
     T80_RST_n                <= not MZ_SYSTEM_RESET;
+    T80_CPU_RST_n            <= T80_RST_n and not (MZ80B_CPU_RESET and CONFIG(MZ_80B));
     --
     MZ_MEMWR                 <= not T80_WR_n;
     WENSYSRAM                <= MZ_MEMWR when MZ_CS_RAM_n = '0'                                          -- Write enable to System RAM

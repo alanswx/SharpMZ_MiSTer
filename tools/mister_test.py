@@ -54,7 +54,7 @@ test('T02', 'MZ80A', 'MZ-80A boots to the SA-1510 monitor', steps=[('wait', 4), 
 test('T03', 'MZ700', 'MZ-700 boots to the 1Z-013A monitor', steps=[('wait', 4), ('shot', 'boot')])
 test('T04', 'MZ800', 'MZ-800 IPL menu', steps=[('wait', 4), ('shot', 'boot')])
 test('T05', 'MZ80B', 'MZ-80B IPL (no disk: asks for the tape)', steps=[('wait', 6), ('shot', 'boot')])
-test('T06', 'MZ2000', 'MZ-2000 with the MZ-2200 IPL: "IPL is looking for a program"', steps=[('wait', 6), ('shot', 'boot')])
+test('T06', 'MZ2000', 'MZ-2000 IPL: "IPL is looking for a program"', steps=[('wait', 6), ('shot', 'boot')])
 test('T07', 'MZ700', 'MZ-700 tape: L loads ramtest from the CMT', files=[('f', 1, f'{MZF}/ramtest.mzf')],
      steps=[('wait', 2), ('type', 'L\n'), ('wait', 20), ('shot', 'loaded')])
 test('T08', 'MZ700', 'MZ-700 floppy: J F000 boots a disk (MZ-1E05 ROM)', files=[('s', 1, 'gen:fd700')], reset=True,
@@ -85,10 +85,12 @@ test('T20', 'MZ800', 'MZ-800 sound: the same BELL and 440 Hz A through the 8253 
      steps=[('wait', 2), ('type', 'M'), ('wait', 2), ('type', 'J2000\n'), ('wait', 3), ('shot', 'beep')])
 test('T21', 'MZ80B', 'MZ-80B tape: the IPL loads SB-5520 BASIC from a tape image', files=[('s', 0, f'{SW}/mz80b/SB-5520.mzt')],
      opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 40), ('shot', 'basic')])
-test('T22', 'MZ2000', 'MZ-2000 tape: the MZ-2200 IPL loads Gang Man (Hudson Soft)', files=[('s', 0, f'{SW}/mz2200/Gang Man (1983)(Hudson Soft)(Fumihiko Itagaki) [CT].mzt')],
+test('T22', 'MZ2000', 'MZ-2000 tape: the IPL loads Gang Man (Hudson Soft)', files=[('s', 0, f'{SW}/mz2200/Gang Man (1983)(Hudson Soft)(Fumihiko Itagaki) [CT].mzt')],
      opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 40), ('shot', 'title')])
 test('T23', 'MZ2000', 'MZ-2000 floppy: TF-DOS boot disk (fukui brave.d88)', files=[('s', 1, f'{SW}/fukui-mz2000/brave.d88')], reset=True,
      steps=[('wait', 25), ('shot', 'boot')])
+test('T24', 'MZ2000', 'MZ-2000 tape: Zero Fighter (Hudson Soft), colour title screen', files=[('s', 0, f'{SW}/mz2200/Zero Fighter (1983)(Hudosn Soft) [CT].mzt')],
+     opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 40), ('shot', 'title')])
 
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, "'": 40, ',': 51, '.': 52, '/': 53, ':': -39, '*': -9}
