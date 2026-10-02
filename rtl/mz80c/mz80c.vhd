@@ -67,6 +67,7 @@ use ieee.numeric_std.all;
 use pkgs.config_pkg.all;
 use pkgs.clkgen_pkg.all;
 use pkgs.mctrl_pkg.all;
+use work.vc_rams_pkg.all;
 
 entity mz80c is
     PORT (
@@ -112,9 +113,16 @@ entity mz80c is
           -- MZ-1500 PCG and display registers.
           M15_PCG_CS         : out std_logic;                            -- CPU access to a PCG plane (OUT E5 1-3: D000-EFFF).
           M15_PCG_PLANE      : out std_logic_vector(1 downto 0);         -- Plane 0-2.
+          M15_CG_CS          : out std_logic;                            -- CPU read of the CG ROM (OUT E5 0: D000-EFFF).
           M15_PCG_DI         : in  std_logic_vector(7 downto 0);         -- PCG read data.
           M15_DMD            : out std_logic_vector(1 downto 0);         -- Port F0: 0 PCG on, 1 priority (0 = BPF, 1 = BFP).
           M15_PAL            : out std_logic_vector(23 downto 0);        -- Port F1: colour of PCG index i in bits 3i+2..3i.
+
+          -- Joysticks, MiSTer order: 5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right (1 = active).
+          JOY0               : in  std_logic_vector(5 downto 0);
+          JOY1               : in  std_logic_vector(5 downto 0);
+          JOY_1X03           : in  std_logic;                            -- MZ-700/1500: MZ-1X03 joysticks connected.
+          RAMDISK_EN         : in  std_logic;                            -- MZ-800: 64 KB RAM disk board at E9-EB, F8-FA.
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -189,6 +197,17 @@ signal CS_E2_n               :     std_logic;
 signal CS_ESWP_n             :     std_logic;
 signal CS_GRAM_ni            :     std_logic;
 signal DO367                 :     std_logic_vector(7 downto 0);
+signal JOY_CNT               :     unsigned(13 downto 0);                -- CPU T-states since the start of vertical blank.
+signal JOY_VB_LAST           :     std_logic;
+signal JOY_E008              :     std_logic_vector(4 downto 1);         -- MZ-1X03 bits of E008.
+signal M8_JOY_DO             :     std_logic_vector(7 downto 0);         -- MZ-800 joystick ports F0/F1.
+signal RD_SEL                :     std_logic;                            -- RAM disk data port (EA, F9 read; EA, FA write).
+signal RD_SEL_LAST           :     std_logic;
+signal RD_OFF                :     unsigned(15 downto 0);
+signal RD_WE                 :     std_logic;
+signal RD_DO                 :     std_logic_vector(7 downto 0);
+signal RD_Q                  :     std_logic_vector(7 downto 0);
+signal RD_DI                 :     std_logic_vector(7 downto 0);
 signal CS_BANKSWITCH_n       :     std_logic;
 signal CS_MZ700BS_n          :     std_logic;
 signal CS_IO_E0_n            :     std_logic;
@@ -518,9 +537,11 @@ begin
     --
     T80_DI                   <= M8_PIO_DO when (M8 = '1' or M15 = '1') and (M8_PIO_VOE = '1' or (M8_PIO_CS = '1' and T80_RD_n = '0'))   -- MZ-800/1500 Z80 PIO, and its vector
                                 else
-                                M15_PCG_DI when M15_WIN = '1' and M15_SPEC /= "001" and T80_RD_n = '0'                -- MZ-1500 PCG plane
+                                M15_PCG_DI when M15_WIN = '1' and T80_RD_n = '0'                                     -- MZ-1500 PCG plane or CG ROM
                                 else
-                                X"FF"     when M15_WIN = '1' and T80_RD_n = '0'                                      -- MZ-1500 CG ROM window (not readable yet)
+                                M8_JOY_DO when M8 = '1' and T80_RD_n = '0' and M8_IO(7 downto 1) = "1111000"             -- MZ-800 joysticks F0/F1
+                                else
+                                RD_DO     when RD_SEL = '1' and T80_RD_n = '0'                                          -- MZ-800 RAM disk
                                 else
                                 X"1A"     when M8 = '1' and T80_MREQ_n = '0' and T80_RD_n = '0' and T80_A16(15 downto 13) = "111" and M8_PROH = '1'
                                 else
@@ -762,6 +783,7 @@ begin
     M15_SPEC_ON         <= '1' when M15 = '1' and M15_SPEC /= "000" and MZ_HIGH_RAM_ENABLE = '0' else '0';
     M15_WIN             <= '1' when M15_SPEC_ON = '1' and T80_MREQ_n = '0' and (T80_A16(15 downto 12) = "1101" or T80_A16(15 downto 12) = "1110") else '0';
     M15_PCG_CS          <= '1' when M15_WIN = '1' and M15_SPEC(2 downto 1) /= "00" else '0';
+    M15_CG_CS           <= '1' when M15_WIN = '1' and M15_SPEC = "001" else '0';
     M15_PCG_PLANE       <= std_logic_vector(unsigned(M15_SPEC(1 downto 0)) - 2) when M15_SPEC(2) = '0' else "10";
     M15_DMD             <= M15_DMD_R;
     M15_PAL             <= M15_PAL_R;
@@ -1032,7 +1054,9 @@ begin
 
         elsif CLKBUS(CKMASTER)'event and CLKBUS(CKMASTER) = '1' then
 
-            if CLKBUS(CKENPERIPH) = '1' and T80_WR_n = '0' and CS_E2_n = '0' then
+            -- Any clock of the write: a CPU write is shorter than the gap between CKENPERIPH pulses at some
+            -- phases, and then E008 writes were lost (no beeper) depending on when the program started.
+            if T80_WR_n = '0' and CS_E2_n = '0' then
                 SOUND_ENABLE <= T80_DO(0);
             end if;
         end if;
@@ -1101,7 +1125,80 @@ begin
                          else
                          '1'         when CONFIG(MZ_A)  = '1' and (BLNK_n = '0' and VGATE_ni = '0')
                          else '1';
-    DO367(6 downto 1) <= (others=>'1');
+    DO367(6 downto 5) <= (others=>'1');
+    DO367(4 downto 1) <= JOY_E008 when JOY_1X03 = '1' and CONFIG(MZ700) = '1' and M8 = '0' else (others => '1');
+
+    -- MZ-1X03 joysticks (MZ-700, MZ-1500), as mz800emu's joymz-1x03.c: E008 bits 1-4 are JA1, JA2, JB1, JB2. While the
+    -- picture is displayed they are the fire buttons (low = pressed); from the start of vertical blank each is low for
+    -- 68 + 28 x position T-states (the stick's X or Y, 0-255), which the ROM measures with a counting loop. A MiSTer
+    -- joystick is digital: left/up 0, centre 128, right/down 255.
+    process(CLKBUS(CKMASTER)) begin
+        if rising_edge(CLKBUS(CKMASTER)) then
+            if CLKBUS(CKENCPU) = '1' then
+                JOY_VB_LAST <= VBLANK;
+                if VBLANK = '1' and JOY_VB_LAST = '0' then
+                    JOY_CNT <= (others => '0');
+                elsif JOY_CNT /= to_unsigned(16383, JOY_CNT'length) then
+                    JOY_CNT <= JOY_CNT + 1;
+                end if;
+            end if;
+        end if;
+    end process;
+    process(VBLANK, JOY0, JOY1, JOY_CNT)
+        function pulse(cnt : unsigned; neg : std_logic; pos : std_logic) return std_logic is
+            variable t : natural;
+        begin
+            if neg = '1' and pos = '0' then t := 68; elsif pos = '1' and neg = '0' then t := 68 + 255 * 28; else t := 68 + 128 * 28; end if;
+            if cnt < t then return '0'; else return '1'; end if;
+        end function;
+    begin
+        if VBLANK = '0' then
+            JOY_E008 <= not JOY1(5) & not JOY1(4) & not JOY0(5) & not JOY0(4);
+        else
+            JOY_E008 <= pulse(JOY_CNT, JOY1(3), JOY1(2)) & pulse(JOY_CNT, JOY1(1), JOY1(0)) &
+                        pulse(JOY_CNT, JOY0(3), JOY0(2)) & pulse(JOY_CNT, JOY0(1), JOY0(0));
+        end if;
+    end process;
+
+    -- MZ-800 RAM disk board, the "standard" 64 KB one of mz800emu (hw-generic/ramdisk): OUT EB sets the offset (high
+    -- byte from the address bus, OUT (C),A), EA reads or writes the byte there and moves on, F9 reads and FA writes the
+    -- same way, IN F8 resets the offset. E9 selects a 64 KB bank, which a 64 KB board ignores.
+    -- The data is stored inverted so that the board starts out reading FF, as mz800emu's: the IPL boots a "RAM file"
+    -- whose 9th byte equals the number of 1 bits in the first eight, which an all-zero board passes.
+    RD_DI  <= not T80_DO;
+    RD_DO  <= not RD_Q;
+    RD_SEL <= '1' when M8 = '1' and RAMDISK_EN = '1' and
+                       (M8_IO = X"EA" or (M8_IO = X"F9" and T80_RD_n = '0') or (M8_IO = X"FA" and T80_WR_n = '0')) else '0';
+    process(CLKBUS(CKMASTER)) begin
+        if rising_edge(CLKBUS(CKMASTER)) then
+            RD_SEL_LAST <= RD_SEL;
+            RD_WE       <= '0';
+            if RD_SEL = '1' and RD_SEL_LAST = '0' and T80_WR_n = '0' then
+                RD_WE <= '1';                                                   -- Write at the start of the cycle,
+            end if;
+            if RD_SEL = '0' and RD_SEL_LAST = '1' then
+                RD_OFF <= RD_OFF + 1;                                           -- next byte at its end.
+            end if;
+            if M8 = '1' and RAMDISK_EN = '1' and T80_WR_n = '0' and M8_IO = X"EB" then
+                RD_OFF <= unsigned(T80_A16(15 downto 8) & T80_DO);
+            end if;
+            if M8 = '1' and RAMDISK_EN = '1' and T80_RD_n = '0' and M8_IO = X"F8" then
+                RD_OFF <= (others => '0');
+            end if;
+        end if;
+    end process;
+    RAMDISK : dpram
+        generic map (init_file => "", widthad_a => 16, width_a => 8, widthad_b => 16, width_b => 8)
+        port map (clock_a => CLKBUS(CKMASTER), address_a => std_logic_vector(RD_OFF), data_a => RD_DI, wren_a => RD_WE, q_a => RD_Q,
+                  clock_b => CLKBUS(CKMASTER), address_b => (others => '0'), data_b => (others => '0'), wren_b => '0', q_b => open);
+
+    -- MZ-800 joysticks: port F0 (F1) reads joystick 1 (2) while 8255 PA5 (PA6) is low, as mz800emu: bits 0 up, 1 down,
+    -- 2 left, 3 right, 4 fire 1, 5 fire 2, low = active.
+    M8_JOY_DO <= "11" & not JOY0(5) & not JOY0(4) & not JOY0(0) & not JOY0(1) & not JOY0(2) & not JOY0(3)
+                     when M8_IO(0) = '0' and i8255_PA_O(5) = '0' else
+                 "11" & not JOY1(5) & not JOY1(4) & not JOY1(0) & not JOY1(1) & not JOY1(2) & not JOY1(3)
+                     when M8_IO(0) = '1' and i8255_PA_O(6) = '0' else
+                 X"FF";
 
     -- Video Output.
     --

@@ -70,6 +70,7 @@ struct Options {
     std::string fdd;
     std::string qd;
     bool        qd_readonly = false;
+    bool        ramdisk = false;
     std::set<uint32_t> warm_resets;
     bool        fdd_readonly = false;
     int         fdc_mode = 0;
@@ -98,6 +99,7 @@ static void usage()
 "Tape image (the OSD Tape Image slot):\n"
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
 "  --warm-reset N        OSD Reset (warm reset) at frame N (repeatable)\n"
+"  --ramdisk              MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
@@ -189,6 +191,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fdd") o.fdd = next();
         else if (a == "--qd") o.qd = next();
         else if (a == "--qd-readonly") o.qd_readonly = true;
+        else if (a == "--ramdisk") o.ramdisk = true;
         else if (a == "--warm-reset") o.warm_resets.insert((uint32_t)std::stoul(next()));
         else if (a == "--fdd-readonly") o.fdd_readonly = true;
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
@@ -438,11 +441,31 @@ void Sim::clock()
         prev_io_wr = w;
     }
 
+    if (opt.verbose) {
+        static int last_mw = 0;
+        if (top->dbg_memwr && !last_mw && (top->dbg_addr & 0xFFF0) == 0xE000)
+            fprintf(stderr, "[mw] frame %u pc %04X addr %04X data %02X cs_e_n %d cs_e2_n %d\n", frame, top->cpu_pc,
+                    top->dbg_addr, top->dbg_wdata, (top->dbg_cse >> 1) & 1, top->dbg_cse & 1);
+        last_mw = top->dbg_memwr;
+    }
+    if (opt.verbose) {
+        static int last_en = -1, toggles = 0, last_snd = 0;
+        static uint32_t last_frame = 0;
+        if (top->dbg_snd != last_snd) { toggles++; last_snd = top->dbg_snd; }
+        if (top->dbg_snd_en != last_en || frame != last_frame) {
+            if (top->dbg_snd_en != last_en || toggles || frame % 10 == 0)
+                fprintf(stderr, "[snd] frame %u gate %d out0 toggles %d map %d\n", frame, top->dbg_snd_en, toggles, top->dbg_map);
+            last_en = top->dbg_snd_en; last_frame = frame; toggles = 0;
+        }
+    }
+
     if (fwav) {
         wav_acc += 48000;
         if (wav_acc >= (uint64_t)CLK_HZ) {
             wav_acc -= (uint64_t)CLK_HZ;
-            int v = (top->AUDIO_L ? 0x4000 : 0) + top->AUDIO_PSG - 0x4000;
+            // As sharpmz.sv: the beeper is one PSG channel's level on the MZ-800/1500, full range elsewhere.
+            int beep = ((top->cfg_model & 7) == 5 || (top->cfg_display3 & 8)) ? 0x1000 : 0x4000;
+            int v = (top->AUDIO_L ? beep : 0) + top->AUDIO_PSG - 0x4000;
             int16_t smp = (int16_t)v;
             fwrite(&smp, 2, 1, fwav);
             wav_samples++;
@@ -574,6 +597,7 @@ void Sim::write_config()
     top->fdc_mode     = opt.fdc_mode;
     top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
     top->cfg_audio    = 0;
+    top->ramdisk_en   = opt.ramdisk;
     top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape
 }
 

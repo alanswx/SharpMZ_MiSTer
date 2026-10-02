@@ -96,6 +96,15 @@ signal SCAN13                : std_logic_vector(7 downto 0);
 signal SCAN14                : std_logic_vector(7 downto 0);
 signal SCANLL                : std_logic_vector(7 downto 0);
 --
+-- Minimum key press: every key pressed stays in the matrix until HOLD_CLKS after the latest press, so a
+-- short tap (a remote or scripted keypress gives make and break back to back) is still seen by software
+-- that scans the keyboard only now and then (the MZ-1500 IPL while it probes the Quick Disk).
+--
+signal HOLD                  : std_logic_vector(119 downto 0);       -- Row r, column c at bit 8r+c.
+signal HOLD_CNT              : std_logic_vector(22 downto 0);
+constant HOLD_CLKS           : natural := 5675008;                   -- 80 ms of the 70.9376 MHz clock.
+signal K00, K01, K02, K03, K04, K05, K06, K07, K08, K09, K10, K11, K12, K13, K14 : std_logic_vector(7 downto 0);
+--
 -- Key code exchange table
 --
 signal MTEN                  : std_logic_vector(3 downto 0);
@@ -269,35 +278,65 @@ begin
                         when "1110" => SCAN14(conv_integer(MAP_DATA(2 downto 0))) <= not FLGF0;
                         when others => SCAN14(conv_integer(MAP_DATA(2 downto 0))) <= not FLGF0; FLGF0 <= '0';
                     end case;
+                    -- MZ-80A bank: bit 3 also presses SHIFT (F0 bit 0) for its shifted keys (DOWN, LEFT, INST, CLR).
+                    if KEY_BANK = "011" and MAP_DATA(3) = '1' and MAP_DATA /= X"FF" then
+                        SCAN00(0) <= not FLGF0;
+                    end if;
                 end if;
             end if;
         end if;
     end process;
 
+    process( RST_n, CLKBUS(CKMASTER) ) begin
+        if RST_n = '0' then
+            HOLD     <= (others => '0');
+            HOLD_CNT <= (others => '0');
+        elsif rising_edge(CLKBUS(CKMASTER)) then
+            if CLKBUS(CKENCPU) = '1' and MTEN(3) = '1' and FLGF0 = '0' then
+                if MAP_DATA(7 downto 4) /= "1111" then                         -- FF: not a Sharp key
+                    HOLD(conv_integer(MAP_DATA(7 downto 4)) * 8 + conv_integer(MAP_DATA(2 downto 0))) <= '1';
+                    if KEY_BANK = "011" and MAP_DATA(3) = '1' then
+                        HOLD(0)      <= '1';                                     -- MZ-80A SHIFT, as above.
+                    end if;
+                end if;
+                HOLD_CNT <= conv_std_logic_vector(HOLD_CLKS, HOLD_CNT'length);
+            elsif HOLD_CNT /= 0 then
+                HOLD_CNT <= HOLD_CNT - 1;
+            else
+                HOLD     <= (others => '0');
+            end if;
+        end if;
+    end process;
+
+    K00 <= SCAN00 or HOLD(7 downto 0);  K01 <= SCAN01 or HOLD(15 downto 8);  K02 <= SCAN02 or HOLD(23 downto 16);  K03 <= SCAN03 or HOLD(31 downto 24);
+    K04 <= SCAN04 or HOLD(39 downto 32);  K05 <= SCAN05 or HOLD(47 downto 40);  K06 <= SCAN06 or HOLD(55 downto 48);  K07 <= SCAN07 or HOLD(63 downto 56);
+    K08 <= SCAN08 or HOLD(71 downto 64);  K09 <= SCAN09 or HOLD(79 downto 72);  K10 <= SCAN10 or HOLD(87 downto 80); K11 <= SCAN11 or HOLD(95 downto 88);
+    K12 <= SCAN12 or HOLD(103 downto 96); K13 <= SCAN13 or HOLD(111 downto 104); K14 <= SCAN14 or HOLD(119 downto 112);
+
     PA_L : for I in 0 to 7 generate
-        SCANLL(I) <= SCAN00(I) or SCAN01(I) or SCAN02(I) or SCAN03(I) or SCAN04(I) or
-                     SCAN05(I) or SCAN06(I) or SCAN07(I) or SCAN08(I) or SCAN09(I) or
-                     SCAN10(I) or SCAN11(I) or SCAN12(I) or SCAN13(I) or SCAN14(I);
+        SCANLL(I) <= K00(I) or K01(I) or K02(I) or K03(I) or K04(I) or
+                     K05(I) or K06(I) or K07(I) or K08(I) or K09(I) or
+                     K10(I) or K11(I) or K12(I) or K13(I) or K14(I);
     end generate PA_L;
 
     --
     -- response from key access
     --
     PB <= (not SCANLL) when STALL='0' and CONFIG(MZ_B)='1'  else
-          (not SCAN00) when PA="0000"                       else
-          (not SCAN01) when PA="0001"                       else
-          (not SCAN02) when PA="0010"                       else
-          (not SCAN03) when PA="0011"                       else
-          (not SCAN04) when PA="0100"                       else
-          (not SCAN05) when PA="0101"                       else
-          (not SCAN06) when PA="0110"                       else
-          (not SCAN07) when PA="0111"                       else
-          (not SCAN08) when PA="1000"                       else
-          (not SCAN09) when PA="1001"                       else
-          (not SCAN10) when PA="1010"                       else
-          (not SCAN11) when PA="1011"                       else
-          (not SCAN12) when PA="1100"                       else
-          (not SCAN13) when PA="1101"                       else (others=>'1');
+          (not K00) when PA="0000"                       else
+          (not K01) when PA="0001"                       else
+          (not K02) when PA="0010"                       else
+          (not K03) when PA="0011"                       else
+          (not K04) when PA="0100"                       else
+          (not K05) when PA="0101"                       else
+          (not K06) when PA="0110"                       else
+          (not K07) when PA="0111"                       else
+          (not K08) when PA="1000"                       else
+          (not K09) when PA="1001"                       else
+          (not K10) when PA="1010"                       else
+          (not K11) when PA="1011"                       else
+          (not K12) when PA="1100"                       else
+          (not K13) when PA="1101"                       else (others=>'1');
 
     -- Setup key extension signals to use in mapping.
     --
@@ -308,7 +347,7 @@ begin
 
     -- Break detect is connected to SCAN line 3, bit 7. When the strobe is set to 03H and the break key is pressed
     -- this signal will go low and detected in the IPL.
-    BREAKDETECT      <= not SCAN03(7);
+    BREAKDETECT      <= not K03(7);
 
     --
     -- HPS access to reload keymap.

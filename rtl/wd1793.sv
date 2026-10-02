@@ -1153,8 +1153,8 @@ reg        scan_wr;
 
 wire [1:0] edsk_sizecode;          // sector size: 0=128K, 1=256K, 2=512K, 3=1024K
 // LOCAL ADDITION (FM-7_MiSTer): {ID CRC error, data CRC error} for this sector,
-// from the .d77 per-sector status byte. Always 0 for EDSK, which has no
-// equivalent field.
+// from the .d77 per-sector status byte, or for EDSK from the FDC status bytes
+// of the sector information block (ST1 bit 5 DE, ST2 bit 5 DD).
 wire [1:0] edsk_crc;
 wire       edsk_side;              // Side number (0 or 1)
 wire [6:0] edsk_track;             // Track number
@@ -1289,6 +1289,8 @@ generate
 			reg [15:0] track_size, track_pos;
 			reg [19:0] offset, offset1;
 			reg  [7:0] size_lo;
+			reg        st1_de;           // EDSK sector info: FDC status 1 bit 5 (data error)
+			reg        st2_dd;           //                   FDC status 2 bit 5 (data error in the data field)
 			reg [10:0] secpos;
 			reg  [7:0] trackf, sidef;
 
@@ -1669,12 +1671,16 @@ generate
 										1: sidef   <= scan_data;
 										2: sector  <= scan_data;
 										3: sizecode<= scan_data[1:0];
+										4: st1_de  <= scan_data[5];
+										5: st2_dd  <= scan_data[5];
 										6: size_lo <= scan_data;
 										7: begin
 												if({scan_data, size_lo}) begin
 													edsk_wren   <= 1;
 													edsk_wraddr <= secpos;
-													edsk_wrdata <= {track,side,trackf,sidef,sector,sizecode,2'b00,offset1};
+													// The FDC status the sector was dumped with: a CRC error in the
+													// data field (ST2 DD) or, without it, in the ID field (ST1 DE).
+													edsk_wrdata <= {track,side,trackf,sidef,sector,sizecode,st1_de & ~st2_dd,st2_dd,offset1};
 													edsk_size <= edsk_size + 1'd1;
 													offset <= offset + {scan_data, size_lo};
 												end

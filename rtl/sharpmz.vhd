@@ -91,6 +91,11 @@ entity sharpmz is
         MAIN_LEDS             : out    std_logic_vector(7 downto 0);            -- main_leds Green[7:0]
         --------------------                        PS2                         ----------------------------
         PS2_KEY               : in     std_logic_vector(10 downto 0);           -- PS2 Key data.
+        --------------------                        Joysticks                   ----------------------------
+        JOY0                  : in     std_logic_vector(5 downto 0) := (others => '0');  -- MiSTer order: 5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right.
+        JOY1                  : in     std_logic_vector(5 downto 0) := (others => '0');
+        JOY_1X03              : in     std_logic := '0';                        -- MZ-700/1500: MZ-1X03 joysticks connected.
+        RAMDISK_EN            : in     std_logic := '0';                        -- MZ-800: 64 KB RAM disk board.
         --------------------                        VGA                         ----------------------------
         VGA_HB_O              : out    std_logic;                               -- VGA Horizontal Blank
         VGA_VB_O              : out    std_logic;                               -- VGA Vertical Blank
@@ -235,6 +240,7 @@ signal MZ80C_AUDIO_R         :     std_logic;
 signal MZ80C_AUDIO_PSG       :     std_logic_vector(13 downto 0);
 signal MZ80C_AUDIO_PSG_R     :     std_logic_vector(13 downto 0);
 signal M15_PCG_CS            :     std_logic;
+signal M15_CG_CS             :     std_logic;
 signal M15_PCG_PLANE         :     std_logic_vector(1 downto 0);
 signal M15_PCG_DO            :     std_logic_vector(7 downto 0);
 signal M15_DMD               :     std_logic_vector(1 downto 0);
@@ -566,9 +572,14 @@ component mz80c
           AUDIO_PSG_R        : out std_logic_vector(13 downto 0);
           M15_PCG_CS         : out std_logic;
           M15_PCG_PLANE      : out std_logic_vector(1 downto 0);
+          M15_CG_CS          : out std_logic;
           M15_PCG_DI         : in  std_logic_vector(7 downto 0);
           M15_DMD            : out std_logic_vector(1 downto 0);
           M15_PAL            : out std_logic_vector(23 downto 0);
+          JOY0               : in  std_logic_vector(5 downto 0);
+          JOY1               : in  std_logic_vector(5 downto 0);
+          JOY_1X03           : in  std_logic;
+          RAMDISK_EN         : in  std_logic;
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -874,6 +885,7 @@ begin
             CE_PIXEL         => MZ_CE_PIXEL,                             -- Pixel clock enable.
             M15_PCG_CS       => M15_PCG_CS,                              -- MZ-1500 PCG.
             M15_PCG_PLANE    => M15_PCG_PLANE,
+            M15_CG_CS        => M15_CG_CS,
             M15_PCG_DO       => M15_PCG_DO,
             M15_DMD          => M15_DMD,
             M15_PAL          => M15_PAL,
@@ -989,9 +1001,14 @@ begin
             AUDIO_PSG_R      => MZ80C_AUDIO_PSG_R,
             M15_PCG_CS       => M15_PCG_CS,
             M15_PCG_PLANE    => M15_PCG_PLANE,
+            M15_CG_CS        => M15_CG_CS,
             M15_PCG_DI       => M15_PCG_DO,
             M15_DMD          => M15_DMD,
             M15_PAL          => M15_PAL,
+            JOY0             => JOY0,
+            JOY1             => JOY1,
+            JOY_1X03         => JOY_1X03,
+            RAMDISK_EN       => RAMDISK_EN,
 
             -- Different operations modes.
             CONFIG           => CONFIG,

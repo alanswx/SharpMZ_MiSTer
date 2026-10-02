@@ -49,12 +49,12 @@ VHD_SRC = \
 	$(RTL)/keymatrix.vhd \
 	$(RTL)/cmt.vhd \
 	$(RTL)/sn76489_audio.vhd \
+	$(RTL)/vc/vc_rams.vhd \
 	$(RTL)/mz80c/mz800_pio.vhd \
 	$(RTL)/mz80c/mz80c.vhd \
 	$(RTL)/mz80b/mz80b.vhd \
 	$(RTL)/vc/vc_mctrl_pkg.vhd \
 	$(RTL)/vc/VideoController_pkg.vhd \
-	$(RTL)/vc/vc_rams.vhd \
 	$(RTL)/vc/VideoController.vhd \
 	$(RTL)/vc/video_vc.vhd \
 	$(RTL)/sharpmz.vhd

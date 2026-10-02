@@ -70,6 +70,7 @@ entity video_vc is
         -- MZ-1500 PCG (from mz80c.vhd).
         M15_PCG_CS               : in  std_logic := '0';
         M15_PCG_PLANE            : in  std_logic_vector(1 downto 0) := "00";
+        M15_CG_CS                : in  std_logic := '0';                 -- CPU read of the CG ROM (OUT E5 0).
         M15_PCG_DO               : out std_logic_vector(7 downto 0);
         M15_DMD                  : in  std_logic_vector(1 downto 0) := "00";
         M15_PAL                  : in  std_logic_vector(23 downto 0) := (others => '0');
@@ -127,6 +128,7 @@ architecture rtl of video_vc is
     signal CG_4K             : std_logic;
     signal CG_IOCTL_WR       : std_logic;
     signal CG_IOCTL_DIN      : std_logic_vector(7 downto 0);
+    signal CG_PORT_ADDR      : std_logic_vector(14 downto 0);
     signal T80_MREQ_LAST_n   : std_logic := '1';
     signal VRAM_WAIT         : std_logic := '1';
     signal WAITi_n           : std_logic;
@@ -155,7 +157,11 @@ begin
         port map (clock_a => CLKBUS(CKMASTER), address_a => PCG_CPU_ADDR, data_a => T80_DI, wren_a => PCG_WE(2), q_a => PCG_CPU_Q2,
                   clock_b => CLKBUS(CKMASTER), address_b => PCG_RD_ADDR, data_b => (others => '0'), wren_b => '0', q_b => PCG_RD_DATA(23 downto 16));
     M15_PCGON  <= CONFIG(IS_MZ1500) and M15_DMD(0);
-    M15_PCG_DO <= PCG_CPU_Q0 when M15_PCG_PLANE = "00" else PCG_CPU_Q1 when M15_PCG_PLANE = "01" else PCG_CPU_Q2;
+    -- The CG ROM read (OUT E5 0) goes through the CG ROM's ioctl port; the core keeps the font bit-reversed for
+    -- the renderer, the CPU sees the ROM's own bit order.
+    M15_PCG_DO <= CG_IOCTL_DIN(0) & CG_IOCTL_DIN(1) & CG_IOCTL_DIN(2) & CG_IOCTL_DIN(3) &
+                  CG_IOCTL_DIN(4) & CG_IOCTL_DIN(5) & CG_IOCTL_DIN(6) & CG_IOCTL_DIN(7) when M15_CG_CS = '1' else
+                  PCG_CPU_Q0 when M15_PCG_PLANE = "00" else PCG_CPU_Q1 when M15_PCG_PLANE = "01" else PCG_CPU_Q2;
 
     -- Configuration translation.
     process( CONFIG )
@@ -201,6 +207,8 @@ begin
                "1111";
     CG_4K   <= CONFIG(MZ700) or CONFIG(MZ800);                  -- MZ-1500 included (CONFIG(MZ700))
     CG_IOCTL_WR <= '1' when IOCTL_WR = '1' and IOCTL_ADDR(24 downto 20) = "00101" else '0';
+    -- MZ-1500 CG ROM bank (cg 5000-5FFF) for OUT E5 0 reads, otherwise the ioctl address.
+    CG_PORT_ADDR <= "101" & T80_A(11 downto 0) when M15_CG_CS = '1' and IOCTL_DOWNLOAD = '0' else IOCTL_ADDR(14 downto 0);
 
     VC: entity work.VideoController
         port map (
@@ -250,7 +258,7 @@ begin
             VIDEO_50HZ       => CONFIG(MZ700) or CONFIG(MZ800),               -- European MZ-700/800 are PAL 50Hz machines.
             CG_BANK          => CG_BANK,
             CG_4K            => CG_4K,
-            CG_IOCTL_ADDR    => IOCTL_ADDR(14 downto 0),
+            CG_IOCTL_ADDR    => CG_PORT_ADDR,
             CG_IOCTL_WR      => CG_IOCTL_WR,
             CG_IOCTL_DOUT    => IOCTL_DOUT(7 downto 0),
             CG_IOCTL_DIN     => CG_IOCTL_DIN

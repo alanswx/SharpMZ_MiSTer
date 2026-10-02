@@ -22,6 +22,9 @@
 #   tape_mz2000   MZ-2000: the MZ-2200 IPL loads Gang Man (../software/mz2200) to its title; frame hash.
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
 #   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
+#   rd_mz800      MZ-800: tests/mz800/ramdisk.mzf writes 5A C3 to the RAM disk board (--ramdisk) and reads them back
+#   cg_mz1500     MZ-1500: tests/mz1500/cgread.mzf reads the CG ROM through OUT E5 0 and prints the 8 bytes of 'A' in
+#                 hex (MAME's mz700fon.jpn: 1824427E42424200)
 #   qd_mz1500     MZ-1500: Q loads Lode Runner from a Quick Disk dump (../software/mz1500); PCG title, frame hash at 600
 #                 (pixel-identical to mz1500emu). Skipped without the image and with QUICK=1.
 #   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
@@ -70,6 +73,14 @@ pids+=($!); names+=("ipl_mz2000")
 ( $BIN --model mz1500 --stop-at-frame 151 --frame-log "$OUT/ipl_mz1500.csv" --quiet > /dev/null 2> "$OUT/ipl_mz1500.log"
   awk -F, '$1==150 {print $2}' "$OUT/ipl_mz1500.csv" > "$OUT/ipl_mz1500.txt" ) &
 pids+=($!); names+=("ipl_mz1500")
+cp tests/mz800/ramdisk.mzf "$OUT/rd_mz800.mzt"
+( $BIN --model mz800 --ramdisk --fast-tape 4 --tape-image "$OUT/rd_mz800.mzt" --type '160:C' --stop-at-frame 700 \
+      --ascii-end --quiet 2> "$OUT/rd_mz800.log" | head -1 | cut -c1-4 > "$OUT/rd_mz800.txt" ) &
+pids+=($!); names+=("rd_mz800")
+cp tests/mz1500/cgread.mzf "$OUT/cg_mz1500.mzt"
+( $BIN --model mz1500 --fast-tape 6 --tape-image "$OUT/cg_mz1500.mzt" --type '150:C' --stop-at-frame 450 \
+      --ascii-end --quiet 2> "$OUT/cg_mz1500.log" | head -1 | cut -c1-16 > "$OUT/cg_mz1500.txt" ) &
+pids+=($!); names+=("cg_mz1500")
 QDF="../software/mz1500/Lode Runner (1985)(Broderbund Software)(Universe) Side A.qdf"
 if [ -z "${QUICK:-}" ] && [ -f "$QDF" ]; then
     cp "$QDF" "$OUT/qd_mz1500.qdf"
@@ -150,7 +161,7 @@ for p in "${pids[@]}"; do wait $p; done
 fail=0
 for n in "${names[@]}"; do
     case $n in
-        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*|ipl_*|qd_*|tape_mz80b|tape_mz2000)
+        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*|ipl_*|qd_*|cg_*|rd_*|tape_mz80b|tape_mz2000)
             if diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
                 echo "PASS $n"
             else

@@ -36,6 +36,9 @@ module top(
    output [7:0]  ioctl_din,
 
    input  [10:0] ps2_key,
+   input  [5:0]  joy0,           // joystick 1, MiSTer order (5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right)
+   input         joy_1x03,       // MZ-1X03 joysticks connected (MZ-700/1500)
+   input         ramdisk_en,     // MZ-800 64 KB RAM disk
 
    // Machine configuration, as sharpmz.sv derives it from the OSD status bits.
    input  [7:0]  cfg_model,
@@ -105,6 +108,13 @@ module top(
    output [31:0] dbg_rcv_sum /*verilator public_flat*/,
    output        dbg_pc1 /*verilator public_flat*/,
    output        dbg_readbit /*verilator public_flat*/,
+   output        dbg_snd_en /*verilator public_flat*/,
+   output        dbg_snd /*verilator public_flat*/,
+   output [2:0]  dbg_map /*verilator public_flat*/,
+   output        dbg_memwr /*verilator public_flat*/,
+   output [15:0] dbg_addr /*verilator public_flat*/,
+   output [7:0]  dbg_wdata /*verilator public_flat*/,
+   output [1:0]  dbg_cse /*verilator public_flat*/,
 
    // Backdoor reads of internal memories for --ascii-end and --dump-mem.
    input  [11:0] vram_addr,
@@ -179,6 +189,10 @@ module top(
       .COLD_RESET     (reset),
       .WARM_RESET     (warm_reset),
       .PS2_KEY        (ps2_key),
+      .JOY0           (joy0),
+      .JOY1           (6'd0),
+      .JOY_1X03       (joy_1x03),
+      .RAMDISK_EN     (ramdisk_en),
       .CFG_MODEL      (cfg_model),
       .CFG_DISPLAY    (cfg_display),
       .CFG_DISPLAY2   (cfg_display2),
@@ -231,6 +245,13 @@ module top(
    assign cpu_ce = core.clkgen0.ckencpui;
    assign cpu_m1_n = core.cpu0.u0.m1_n;
    assign dbg_io_wr = ~core.t80_iorq_n & ~core.t80_wr_n;
+   assign dbg_snd_en = core.mz80hw.sound_enable;        // 8253 GATE0 (E008 bit 0)
+   assign dbg_snd    = core.mz80hw.sound_pulse_x2;      // 8253 OUT0
+   assign dbg_memwr  = ~core.t80_mreq_n & ~core.t80_wr_n;
+   assign dbg_addr   = core.t80_a16;
+   assign dbg_wdata  = core.t80_do;
+   assign dbg_cse    = {core.mz80hw.cs_e_ni, core.mz80hw.cs_e2_n};
+   assign dbg_map    = {core.mz80hw.mz_gram_enable, core.mz80hw.mz_high_ram_inhibit, core.mz80hw.mz_high_ram_enable};
    assign dbg_io_port = core.t80_a16[7:0];
    assign dbg_io_data = core.t80_do;
    assign dbg_m8_dmd = core.mz80hw.m8_dmd;

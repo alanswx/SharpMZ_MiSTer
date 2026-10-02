@@ -95,6 +95,7 @@ localparam CONF_STR =
 	"P1O[6:4],CPU Speed,Default,+1,+2,+3,+4,+5,+6,+7;",
 	"P1O[30],Boot Reset,Off,On;",
 	"P1O[32],MZ-800 Mode,MZ-700,MZ-800;",
+	"P1O[39],MZ-1X03 Joysticks,Off,On;",
 	"-;",
 	"P2,Tape;",
 	"P2T[31],Rewind Tape Image;",
@@ -112,6 +113,7 @@ localparam CONF_STR =
 	"-;",
 	"P5,Floppy;",
 	"P5O[34:33],Floppy Interface,Auto,On,Off;",
+	"P5O[40],MZ-800 RAM Disk,Off,64 KB;",
 	"-;",
 	"P4,ROM and RAM;",
 	"P4O[28],User ROM,Off,On;",
@@ -121,6 +123,8 @@ localparam CONF_STR =
 	"P4F5,ROMBIN,Load Keymap,0x200000;",
 	"P4F6,ROMBIN,Load CGROM,0x500000;",
 	"-;",
+	"J1,Fire 1,Fire 2;",
+	"jn,A,B;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
 	"v,5;",
@@ -148,6 +152,7 @@ wire forced_scandoubler;
 wire [1:0] buttons;
 wire [127:0] status;
 wire [10:0] ps2_key;
+wire [31:0] joystick_0, joystick_1;
 
 wire        hps_ioctl_download;
 wire        hps_ioctl_upload;
@@ -191,6 +196,8 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 	.new_vmode(1'b0),
 
 	.ps2_key(ps2_key),
+	.joystick_0(joystick_0),
+	.joystick_1(joystick_1),
 	.ps2_kbd_led_status(3'd0),
 	.ps2_kbd_led_use(3'd0),
 
@@ -437,8 +444,13 @@ wire audio_r_emu;
 // DC blocker centres it. Full scale was harsh and sat at a large DC offset.
 wire [13:0] audio_psg;                              // MZ-800 PSG mix; MZ-1500 left PSG (0 on other models).
 wire [13:0] audio_psg_r;                            // MZ-1500 right PSG; the MZ-800 PSG otherwise.
-assign AUDIO_L = {1'b0, audio_l_emu, 14'd0} + {2'b00, audio_psg};
-assign AUDIO_R = {1'b0, audio_r_emu, 14'd0} + {2'b00, audio_psg_r};
+// The beeper (8253 counter 0) is as loud as one PSG channel on the machines with a PSG, as mz800emu mixes them
+// (each source at the same gain); on the others it is the only source and uses the full range.
+wire        has_psg = (cfg_model == 3'b101) | cfg_mz1500;
+wire [15:0] beep_l  = has_psg ? {3'b000, audio_l_emu, 12'd0} : {1'b0, audio_l_emu, 14'd0};
+wire [15:0] beep_r  = has_psg ? {3'b000, audio_r_emu, 12'd0} : {1'b0, audio_r_emu, 14'd0};
+assign AUDIO_L = beep_l + {2'b00, audio_psg};
+assign AUDIO_R = beep_r + {2'b00, audio_psg_r};
 assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
@@ -545,6 +557,10 @@ sharpmz sharp_mz
 	.MAIN_LEDS(main_leds),
 
 	.PS2_KEY(ps2_key),
+	.JOY0(joystick_0[5:0]),         // MZ-800: ports F0/F1; MZ-700/1500: MZ-1X03 on E008 when enabled.
+	.JOY1(joystick_1[5:0]),
+	.JOY_1X03(status[39]),
+	.RAMDISK_EN(status[40]),
 
 	.VGA_HB_O(hblank_emu),
 	.VGA_VB_O(vblank_emu),

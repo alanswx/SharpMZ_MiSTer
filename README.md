@@ -20,6 +20,7 @@ How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and 
 * MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, all 320x200/640x200 graphics modes with hardware scroll, the SN76489 sound chip and the Z80 PIO.
 * Floppy disk (MB8876 interface on the MZ-700, MZ-800, MZ-80B and MZ-2000): two drives from Extended DSK (`.dsk`) or D88/D77 images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks; the MZ-80B/2000 IPL boots Disk BASIC, CP/M and TF-DOS.
 * 8253 sound or the tape signal on the audio output.
+* Joysticks: the MZ-800's ports and the MZ-1X03 joysticks of the MZ-700/1500.
 * Cassette: MZF loading onto the virtual tape or straight into RAM, and a **Tape Image** slot that loads multi-program tapes and **saves** programs written with SAVE. MZ-80B/2000 load from the tape image under IPL control (deck commands and APSS seek). Fast tape up to 32x.
 * Monitor ROMs, character generator ROMs and keymaps for every model are built in, and can be replaced from the OSD.
 
@@ -40,6 +41,7 @@ The tape loads, the tape image and the two floppy drives are on the OSD's first 
 | Model | MZ-80A, MZ-80K, MZ-80C, MZ-1200, MZ-700, MZ-80B, MZ-2000, MZ-800 or MZ-1500. Changing model resets the machine. |
 | CPU Speed | Default is the original speed. Each step doubles it up to the core's limit of about 32–35 MHz (MZ-700: +4; MZ-80K/A/B: +4 or +5); higher steps fall back to the original speed. |
 | Boot Reset | MZ-80B/2000: reset back into the IPL. |
+| MZ-1X03 Joysticks | MZ-700/MZ-1500: connect two Sharp MZ-1X03 joysticks (MiSTer joysticks 1 and 2, read on E008). The MZ-800's own joystick ports (F0/F1) are always connected. |
 | MZ-800 Mode | The MZ-800 rear switch. In MZ-800 mode the IPL switches to MZ-800 graphics before starting a program loaded from tape; in MZ-700 mode (default) programs start in MZ-700 mode, which MZ-700 software needs. Reset after changing it. |
 
 ### Tape
@@ -53,7 +55,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Tape Image | Mount an `.mzt`/`.mzf` as the cassette. The first program is ready to play; when the machine stops the tape after reading one program, the next one is loaded, so multi-part programs work. Programs saved with SAVE are appended to the image. |
 | Rewind Tape Image | Go back to the first program on the mounted image. |
 | Tape Buttons | Auto (play or record as the machine needs), Off, Play, Record. |
-| Fast Tape | Run the CPU (and the tape) faster while the tape is moving, 2x to 32x (capped like CPU Speed). Default and Off are real speed. |
+| Fast Tape | Run the CPU (and the tape) faster while the tape is moving, 2x to 32x (capped like CPU Speed: 16x and 32x are both the fastest on the MZ-700/800/1500). Default and Off are real speed. |
 | Sharp ASCII Name | Convert tape file names between Sharp display codes and ASCII on save and/or load. |
 | Audio Source | The 8253 sound, or the tape signal. |
 
@@ -66,6 +68,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Floppy Drive A / B | Mount an Extended DSK or D88/D77 image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
 | Quick Disk | Mount a Quick Disk image: a raw dump (`.qdf`) or mz800emu's `.mzq`. Built into the MZ-1500 (press `Q` at the IPL menu); on the MZ-800 it appears while an image is mounted. Writes (BASIC `INIT "QD:"`, `SAVE`) go back to the image, which must be full size: make a blank one with `tools/make_blank_qd.py`. |
 | Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
+| MZ-800 RAM Disk | A 64 KB RAM disk board (ports EA/EB, F8-FA), for CP/M's RAM drive. Its contents are lost at power off. |
 
 Writes go back to the image; mount a copy if you want to keep the original.
 
@@ -88,11 +91,12 @@ Writes go back to the image; mount a copy if you want to keep the original.
 ## Known Issues
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
-* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour isn't shown (only the 320x200/640x200 area is output), and joysticks, the printer port and the RAM disk board aren't implemented.
+* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour isn't shown (only the 320x200/640x200 area is output), and the printer port isn't implemented. Joysticks and the RAM disk are new and not yet tried with software.
 * Floppy: 1.44 MB images aren't supported, writing to disk is untested, and the MZ-80K/80A floppy interface isn't implemented.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). They don't run from tape; `tools/mzf2qdf.py OUT.qdf SIDE.mzt` makes a Quick Disk of each side (answer `Y` to "SET PROGRAM QD ?" after swapping in side B). `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.
+* Tape recordings (the No-Intro "Waveform" sets, `.wav`/`.flac`) convert to MZF with `tools/wav2mzf.py RECORDING [OUTDIR]` (standard Sharp format only, not turbo loaders).
 
 ## Design Summary
 

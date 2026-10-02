@@ -24,28 +24,32 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 ## Open work
 
 ### Next
-- [ ] Sound tests for the other models: MZ-80K/80A note table (does the MZ-80K need the counter 0 divide-by-2?), MZ-800 PSG channels and noise, beeper vs PSG level (mz800emu mixes them equally; ours is 4x louder), MZ-80B/2000 PC2.
+- [ ] Sound tests for the other models: MZ-80K/80A note table (does the MZ-80K need the counter 0 divide-by-2?), MZ-800 PSG channels and noise, MZ-80B/2000 PC2.
+- [x] Beeper vs PSG level: on the MZ-800/1500 the beeper is now one PSG channel's level, as mz800emu mixes them; full range on the models without a PSG.
 - [ ] Tape saves into a growing image instead of a pre-made blank tape: needs a Main change, proposed in `docs/main-growable-images.md` (with an RTL-only alternative through Main's save files).
 - [ ] Astro1: mz800emu rings the monitor bell (6 frames of 880 Hz) when the game restarts the monitor; the sim shows only the PC0 step. beep_mz800 shows the path works, so check the game's timing.
 - [ ] Floppy writes: copy a file on a writable image and check it in mz800emu; drive B; turbo speeds.
 - [ ] 8253: the CP/M 1.x loader waits for counter 2's first clock (the first 1 s pulse of counter 1): about 1 s here, as the 8253 datasheet gives, and 2 s in mz800emu. Only the boot pause differs; confirm on hardware.
 
 ### MZ-800
-- [ ] Border colour (CF register 6): only the 320x200/640x200 area is output.
-- [ ] Joysticks (F0/F1 read FF), printer port.
-- [ ] RAM disk board (ports E8-EF, CP/M drive E:).
+- [ ] Border colour (CF register 6): only the 320x200/640x200 area is output. VideoController can draw a border (display window inside a wider display area), but widening the area moves the canvas within the line and changes every MZ-700/800 frame hash: do it behind an OSD option (mz800emu: 154/134 pixels left/right in 640 mode, 46/42 lines top/bottom).
+- [x] Joysticks: ports F0/F1 read MiSTer joysticks 1/2 while 8255 PA5/PA6 strobe them (mz800emu's bit layout). Not yet tried with software.
+- [ ] Printer port.
+- [x] RAM disk board: the 64 KB "standard" board of mz800emu (EA/EB, F8-FA; OSD MZ-800 RAM Disk). Not yet tried with CP/M; the Pezik boards (E8, EC-EF) and larger sizes aren't implemented.
 - [ ] 1.44 MB disk images (`_Vzor144`, `_Vzor_Nova`): `wd1793.sv` addresses 1 MB.
-- [ ] Turbo-loader tapes (header types 00/08/76, exec below the load address).
+- [ ] Turbo-loader tapes: 66 MZ-800 games have exec 1108, a loader in the MZF header's comment area (loaded at 10F0) that reads the body itself; most other unusual types are later parts of multi-part games. Check a few in the sim against mz800emu, which plays them at standard speed.
 
 ### MZ-1500
 - [x] Quick Disk writes: the SIO transmitter (break, data, CRC on underrun, sync) as the ROM drives it, written sectors back to the image. BASIC INIT "QD:", SAVE and LOAD work on hardware; images check with `tools/qdinfo.py`. Writing needs a full-size image (`tools/make_blank_qd.py`).
 - [x] The two-tape "DATA" titles (Rally-X, Druaga, Dig Dug, Mappy, Door Door, Knither, Zolvass, Burnin' Rubber, ...) are Quick Disk products dumped to tape, not installers: side A asks for side B ("SET PROGRAM QD ?", answer Y). `tools/mzf2qdf.py` makes a disk of each side.
-- [ ] Fast tape doesn't seem to speed up MZ-1500 tape loads: a 48 KB file took about 5 minutes at the 32x setting on hardware.
+- [x] Fast tape 32x mapped to the normal CPU speed on the MZ-700/800/1500 and MZ-80B/2000; it now selects the fastest rate (capped at about 35 MHz). The 48 KB Druaga file loads in under a minute on hardware.
+- [x] Short keypresses: a remote or scripted key (make and break back to back) was missed by the MZ-1500 IPL while it probes the Quick Disk. Every key now stays in the matrix until 80 ms after the latest press (`keymatrix.vhd`). This exposed an old bug: the E008 sound gate latched only on the 2 MHz peripheral enable, so some CPU writes to it were lost (no beeper).
 - [ ] More `mzf2qdf.py` titles: Dark Storm, Demon Crystal, Devil Land, Feizer-21, Flappy, Holy Knight, Volgurd, Grobda/Battle City tapes, Galaga (two files on one tape).
 - [ ] Tape titles on hardware: the `C` at the IPL menu is sometimes missed (keypress while the IPL still probes the QD); W02 presses it twice, the C tests should too.
-- [ ] CG ROM read through OUT E5 0 (reads FF now).
-- [ ] Joystick inputs (PIO), printer.
-- [ ] MZ-1500 ROMs are mz800emu's copies; check against MAME's mz1500 set.
+- [x] CG ROM read through OUT E5 0: returns the ROM's own bit order (test cg_mz1500: 'A' reads 1824427E42424200 as in MAME's mz700fon.jpn).
+- [x] Joysticks: MZ-1X03 on E008 bits 1-4 (OSD MZ-1X03 Joysticks, also for the MZ-700): buttons during the picture, axis pulses of 68 + 28 x position T-states from the start of vertical blank, as mz800emu's joymz-1x03.c. Not yet tried with software.
+- [ ] Printer.
+- [x] MZ-1500 ROMs: identical to MAME's mz1500 set (9z-502m.rom, mz700fon.jpn).
 
 ### Other models
 - [ ] MZ-700 floppy on hardware; MZ-2Z009 Disk BASIC (loads from tape) on a blank disk.
@@ -53,20 +57,21 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] MZ-2000 character ROM is MAME's hand-made font.bin; a real dump of the IX0286PA (also the Japanese MZ-80B font) would replace it.
 - [ ] More MZ-2000 tapes from `software/mz2200` (Super Doors, Itasandrias, Project A, ...); Ice Block's MZT is malformed.
 - [ ] MZ-80B SB-7010 (DISK29) loads and stops at its monitor's `*` prompt; find out how FDOS is started from there.
-- [ ] wd1793: EDSK sector error flags (ST1/ST2) are ignored, so a sector dumped with a CRC error reads as good data. DISK37/38 are bad dumps: the IPL loads corrupt code and hangs instead of reporting a loading error.
+- [x] wd1793: EDSK sectors dumped with a CRC error (ST2 bit 5 data field, ST1 bit 5 ID field) now report CRC ERROR. Recheck DISK37/38 (bad dumps) on the MZ-80B: the IPL should report a loading error instead of hanging.
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
 - [ ] MZ-80B: GRAM and 40/80 column switching with real software; SAVE and APSS.
-- [ ] MZ-80A (probably 80K/1200 too): the cursor keys type 4/6/8/2 and Backspace types `/`. It needs the MZ-80A key matrix.
+- [x] MZ-80A keys: cursor keys, Backspace/Delete/Insert and Home/End go to the MZ-80A's UP/DOWN, RIGHT/LEFT, INST/DEL and CLR/HOME keys (with SHIFT where needed), the keypad to its keypad (`tools/fix_keymap.py`). Not yet tried on hardware.
+- [ ] MZ-80K/1200 keys: check the same keys against their matrices.
 - [ ] MZ-80K: 3-D MAZE loads and runs but the screen looks garbled; check whether that's the program.
 
 ### Core and polish
 - [ ] Audio mixing: sound and tape together, volume.
-- [ ] Joystick mapping in the OSD.
+- [x] Joystick mapping in the OSD (Fire 1, Fire 2).
 - [ ] Show tape status (record number, tape full) in the OSD.
 - [ ] Tape PLAY_READY "one second" counter is hard-coded to 32,000,000 cycles.
 - [ ] Optional 64 MHz clock for the MZ-80K/80A/80B family, so their clock enables are exact (±1 clk_sys jitter now).
 - [ ] Unit testbenches for `cmt.vhd` and the i8254.
-- [ ] WAV to MZF converter for the Waveform sets in `software/`.
+- [x] WAV to MZF converter: `tools/wav2mzf.py` (WAV, or FLAC etc. through ffmpeg; either polarity; header and body copies). Decodes the No-Intro MZ-700 "BASIC" and "Applications" recordings.
 - [ ] Release RBF `releases/SharpMZ_YYYYMMDD.rbf` after hardware testing.
 - [ ] Later: v2 machine options (RAM size, GRAM, MZ-1R25), and removing `support/sharpmz/` from Main_MiSTer.
 
