@@ -18,8 +18,8 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. MZ-80B: the IPL boots SB-6511 Disk BASIC and CP/M 2.2 from the idealine.info images. |
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
-| FPGA | Latest build (fdb8de9, clean) meets timing (core clock +1.7 ns): about 18,300 ALMs (44%), 65% of block memory bits. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
-| Regression | `make test`: 36 tests (34 plus ipl_mz1500 and qd_mz1500), including disk and tape tests that need `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 57 MGL tests (T01-T26, Q01-Q05, B01-B04, C01-C12, W01-W02, G01-G08). |
+| FPGA | Latest build (6e70d0e, clean) meets timing (core clock +2.1 ns): about 18,750 ALMs (45%), 74% of block memory bits (the RAM disk adds 64 KB). Built on cottageubuntu or locally in the Quartus container. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
+| Regression | `make test`: 38 tests (including ipl/qd/cg_mz1500 and rd_mz800), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 65 MGL tests (T01-T26, Q01-Q05, B01-B04, C01-C12, W01-W02, G01-G16). |
 
 ## Open work
 
