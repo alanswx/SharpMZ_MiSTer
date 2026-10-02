@@ -148,6 +148,8 @@ test('W02', 'MZ1500', 'MZ-1500 tape installer onto a blank Quick Disk: Druaga no
             ('wait', 60), ('shot', 'prompt'), ('type', '\n'), ('wait', 20),
             ('shot', 'a'), ('wait', 30), ('shot', 'b'), ('fetch', 1)])
 
+HOLY = next((f for f in os.listdir(M15) if f.startswith('Holy Knight') and 'Side A' in f), 'Holy Knight') if os.path.isdir(M15) else ''
+
 # Quick Disk titles sold or archived as tapes (side A: a DATA loader that asks for side B; side B: the game):
 # tools/mzf2qdf.py turns each side into a Quick Disk, then they run like B01-B04. The Dempa/Game Roman loaders ask
 # "SET PROGRAM QD ?" and want Y; the others take Return.
@@ -160,10 +162,18 @@ for n, (title, fa, fb, key) in enumerate([
         ('Knither', 'Knither - Demon Crystal 2 (1986)(YMCAT)(Dempa Shimbunsha)(Masami Nakamura)(Side A).MZT', None, '\n'),
         ('Zolvass', 'Zolvass (1986)(Takeshi Maruyama)(Side A).mzt', None, '\n'),
         ('Burnin\' Rubber', 'Burnin\' Rubber (1985)(Dempa Shimbunsha)(Data East)(Masami Nakamura) Side A.mzt',
-         'Burnin\' Rubber (1985)(Dempa Shimbunshha)(Data East)(Masami Nakamura) Side B.mzt', 'Y')]):
-    fb = fb or fa.replace('Side A', 'Side B')
+         'Burnin\' Rubber (1985)(Dempa Shimbunshha)(Data East)(Masami Nakamura) Side B.mzt', 'Y'),
+        ('Galaga', 'Galaga (1985)(Dempa Shimbunsha)(Namco).MZT', '-', '\n'),
+        ('Dark Storm', 'Dark Storm - Demon Crystal 3 (1987)(YMCAT)(Dempa Shimbunsha)(Masami Nakamura)(Yasunobu Matsui) Side A.mzt', None, 'Y'),
+        ('Demon Crystal', 'Demon Crystal (1984)(Dempa Shimbunsha)(Game Roman)(Yasunobu Matsui) Side A.mzt', None, 'Y'),
+        ('Devil Land', 'Devil Land (1985)(YMCAT)(Game Roman)(Y. Morinaka)(T. Aochi) Side A.mzt', None, 'Y'),
+        ('Feizer-21', 'Feizer-21 (1984)(Game Roman)(Side A).mzt', None, 'Y'),
+        ('Flappy', 'Flappy (1984)(DB-Soft)(Akira Obata) Side A.mzt', None, '\n'),
+        ('Holy Knight', HOLY, None, 'Y'),
+        ('Volgurd', 'Volgurd (1984)(db-Soft)(Side A).mzt', None, 'Y')]):
+    fb = fb or fa.replace('Side A', 'Side B').replace('(Side A)', '(Side B)')
     test(f'G{n + 1:02d}', 'MZ1500', f'MZ-1500 Quick Disk made from tapes: {title}',
-         files=[('s', 3, f'qd:{M15}/{fa}')], late=[('s', 3, f'qd:{M15}/{fb}', 35)], reset=True,
+         files=[('s', 3, f'qd:{M15}/{fa}')], late=[] if fb == '-' else [('s', 3, f'qd:{M15}/{fb}', 35)], reset=True,
          steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('type', key), ('wait', 30), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
 
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).

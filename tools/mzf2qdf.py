@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Put MZF files on a Quick Disk image (.qdf) for the MZ-1500 (and MZ-800 with a QD drive).
 
-Usage: mzf2qdf.py OUT.qdf FILE.mzf [FILE.mzf ...]
+Usage: mzf2qdf.py OUT.qdf FILE.mzf|FILE.mzt [...]     (every record of an .mzt goes on the disk)
 
 The layout copies the commercial dumps: 16-byte "-QD format-" header, then
     00 x4826, 16 x9, A5 <block count> CRC, 16 x5, 00 x2795,
@@ -38,10 +38,13 @@ def main():
     files = []
     for name in sys.argv[2:]:
         d = open(name, 'rb').read()
-        size = d[18] | d[19] << 8
-        hdr = bytes(d[0:18]) + b'\x00\x00' + bytes(d[18:24])
-        hdr += bytes(64 - len(hdr))
-        files.append((hdr, d[128:128 + size]))
+        i = 0
+        while i + 128 <= len(d) and d[i]:              # an MZT holds several MZF records; type 0 ends it
+            size = d[i + 18] | d[i + 19] << 8
+            hdr = bytes(d[i:i + 18]) + b'\x00\x00' + bytes(d[i + 18:i + 24])
+            hdr += bytes(64 - len(hdr))
+            files.append((hdr, d[i + 128:i + 128 + size]))
+            i += 128 + size
 
     m = bytes(4826) + b'\x16' * 9 + block(bytes([2 * len(files)])) + b'\x16' * 5 + bytes(2795)
     for hdr, body in files:
