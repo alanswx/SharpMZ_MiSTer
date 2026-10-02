@@ -140,6 +140,32 @@ test('W01', 'MZ1500', 'MZ-1500 Quick Disk write: BASIC INIT, SAVE, LOAD', files=
             ('shot', 'saved'), ('type', 'NEW\n'), ('type', 'LOAD "TEST"\n'), ('wait', 12), ('type', 'LIST\n'), ('type', 'RUN\n'),
             ('wait', 3), ('shot', 'loaded'), ('fetch', 0)])
 
+# A tape installer: Druaga no Tou loads its DATA file from tape and copies the game onto a blank Quick Disk.
+test('W02', 'MZ1500', 'MZ-1500 tape installer onto a blank Quick Disk: Druaga no Tou',
+     files=[('s', 0, f'{M15}/Druaga no Tou (1984)(Dempa Shimbunsha)(Namco)(Masami Nakamura) Side A.mzt'), ('s', 3, 'gen:qd_blank')],
+     opts=[FAST_TAPE(6)], reset=True,
+     steps=[('wait', 8), ('shot', 'menu'), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 10), ('shot', 'loading'),
+            ('wait', 360), ('shot', 'prompt'), ('type', '\n'), ('wait', 20),
+            ('shot', 'a'), ('wait', 30), ('shot', 'b'), ('fetch', 1)])
+
+# Quick Disk titles sold or archived as tapes (side A: a DATA loader that asks for side B; side B: the game):
+# tools/mzf2qdf.py turns each side into a Quick Disk, then they run like B01-B04. The Dempa/Game Roman loaders ask
+# "SET PROGRAM QD ?" and want Y; the others take Return.
+for n, (title, fa, fb, key) in enumerate([
+        ('Druaga no Tou', 'Druaga no Tou (1984)(Dempa Shimbunsha)(Namco)(Masami Nakamura) Side A.mzt', None, '\n'),
+        ('Rally-X', 'Rally-X (1985)(Dempa Shimbunsha)(Namco)(Game Roman)(Masami Nakamura) Side A.mzt', None, 'Y'),
+        ('Dig Dug', 'Dig Dug (1984)(Dempa Shimbunsha)(Game Roman)(Masami Nakamura) Side A.mzt', None, 'Y'),
+        ('Mappy', 'Mappy (1984)(Dempa Shimbunsha)(Namco)(Game Roman)(Masami Nakamura) Side A.mzt', None, 'Y'),
+        ('Door Door MkII', 'Door Door MkII (1984)(Enix)(Koichi Nakamura)(Side A).MZT', None, '\n'),
+        ('Knither', 'Knither - Demon Crystal 2 (1986)(YMCAT)(Dempa Shimbunsha)(Masami Nakamura)(Side A).MZT', None, '\n'),
+        ('Zolvass', 'Zolvass (1986)(Takeshi Maruyama)(Side A).mzt', None, '\n'),
+        ('Burnin\' Rubber', 'Burnin\' Rubber (1985)(Dempa Shimbunsha)(Data East)(Masami Nakamura) Side A.mzt',
+         'Burnin\' Rubber (1985)(Dempa Shimbunshha)(Data East)(Masami Nakamura) Side B.mzt', 'Y')]):
+    fb = fb or fa.replace('Side A', 'Side B')
+    test(f'G{n + 1:02d}', 'MZ1500', f'MZ-1500 Quick Disk made from tapes: {title}',
+         files=[('s', 3, f'qd:{M15}/{fa}')], late=[('s', 3, f'qd:{M15}/{fb}', 35)], reset=True,
+         steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('type', key), ('wait', 30), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
+
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, ',': 51, '.': 52, '/': 53, ':': 40, '*': -40, '"': -3}   # Sharp layout by position: PC ' is the : key (shift *), shift+2 is "
 KEYS.update({c: k for c, k in zip('1234567890', range(2, 12))})
@@ -215,6 +241,13 @@ def main():
             if src == 'gen:fd700':        # MZ-700 boot disk made from ramtest
                 src = os.path.join(stage, 'fd700_ramtest.dsk')
                 sh(f'python3 "{ROOT}/tools/make_boot_disk.py" "{MZF}/ramtest.mzf" "{src}" > /dev/null')
+            if src.startswith('qd:'):     # tape image -> Quick Disk
+                mzt = src[3:]
+                src = os.path.join(stage, f'{t["name"]}_{len(remote)}.qdf')
+                sh(f'python3 "{ROOT}/tools/mzf2qdf.py" "{src}" "{mzt}" > /dev/null')
+            if src == 'gen:qd_blank':     # unformatted Quick Disk
+                src = os.path.join(stage, 'qd_blank.qdf')
+                sh(f'python3 "{ROOT}/tools/make_blank_qd.py" "{src}" > /dev/null')
             if src == 'gen:qd_basic':     # MZ-1500 BASIC on a Quick Disk
                 src = os.path.join(stage, 'qd_basic.qdf')
                 sh(f'python3 "{ROOT}/tools/mzf2qdf.py" "{src}" "{SW}/mz1500/5Z001.mzt" > /dev/null')

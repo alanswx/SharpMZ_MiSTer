@@ -43,7 +43,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--tape-image FILE` | Mount a tape image (S0). Also `--tape-readonly`, `--tape-rewind`. |
 | `--fast-tape STEP` | The OSD Fast Tape step (0–7), not a multiplier. 4 is about 8x; 5 is the fastest (capped at clk_sys/2). |
 | `--fdd FILE` | Extended DSK image in floppy drive A. Also `--fdd-readonly`, and `--fdc-mode auto\|on\|off`. |
-| `--qd FILE` | Quick Disk image (`.qdf` or `.mzq`) in slot S3 (MZ-1500, MZ-800), read only. |
+| `--qd FILE` | Quick Disk image (`.qdf` or `.mzq`) in slot S3 (MZ-1500, MZ-800); writes go back to the file. `--qd-readonly` mounts it write protected. |
 | `--warm-reset N` | Press the OSD Reset at frame N (repeatable). |
 | `--mz800-mode 700\|800` | The MZ-800 rear switch (default 700, as mz800emu). |
 | `--turbo N`, `--vmode` | CPU speed step; video mode. |

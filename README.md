@@ -8,7 +8,7 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 | MZ-1200 | Working | MZ-80A | Working |
 | MZ-700 | Working | MZ-80B | Working: IPL boots tape and floppy (BASIC, CP/M) |
 | MZ-2000 | Working: IPL, tape and floppy, colour graphics, katakana | MZ-800 | Working (IPL, graphics, PSG, tape, floppy, CP/M), tested on hardware |
-| MZ-1500 | New: IPL, PCG graphics, stereo PSG, Quick Disk (read only) | | |
+| MZ-1500 | New: IPL, PCG graphics, stereo PSG, Quick Disk (read and write) | | |
 
 How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and MAME: [docs/comparison.md](docs/comparison.md).
 
@@ -64,7 +64,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Option | Description |
 | ------ | ----------- |
 | Floppy Drive A / B | Mount an Extended DSK or D88/D77 image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
-| Quick Disk | Mount a Quick Disk image: a raw dump (`.qdf`) or mz800emu's `.mzq`. Built into the MZ-1500 (press `Q` at the IPL menu); on the MZ-800 it appears while an image is mounted. Read only. |
+| Quick Disk | Mount a Quick Disk image: a raw dump (`.qdf`) or mz800emu's `.mzq`. Built into the MZ-1500 (press `Q` at the IPL menu); on the MZ-800 it appears while an image is mounted. Writes (BASIC `INIT "QD:"`, `SAVE`) go back to the image, which must be full size: make a blank one with `tools/make_blank_qd.py`. |
 | Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
 
 Writes go back to the image; mount a copy if you want to keep the original.
@@ -92,7 +92,7 @@ Writes go back to the image; mount a copy if you want to keep the original.
 * Floppy: 1.44 MB images aren't supported, writing to disk is untested, and the MZ-80K/80A floppy interface isn't implemented.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
-* Quick Disk (MZ-1500, MZ-800): read only.
+* Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). They don't run from tape; `tools/mzf2qdf.py OUT.qdf SIDE.mzt` makes a Quick Disk of each side (answer `Y` to "SET PROGRAM QD ?" after swapping in side B). `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.
 
 ## Design Summary
 

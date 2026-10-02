@@ -2,7 +2,8 @@
 """List the blocks of a Quick Disk image (.qdf dump or .mzq) and check their CRCs.
 
 A QD side is a byte stream. Each block is preceded by sync characters (16 16) and is
-    A5, then either one byte (the first block: the number of blocks that follow)
+    A5, then either one byte (the first block: the number of blocks that follow; a formatted
+    disk also has a one-byte A5 00 mark)
     or a flag byte, a 16-bit length (little endian) and that many data bytes,
 and ends with a CRC-16 (polynomial 0xA001 reflected, init 0, over A5 and the block)
 sent low byte first. Flag 00 is a file's 64-byte header (type, 17-byte name, 2 bytes,
@@ -23,7 +24,11 @@ def crc16(data):
 
 
 def blocks(img):
-    """Yield (offset, kind, payload, crc_ok) for each block found after a sync pair."""
+    """Yield (offset, kind, payload, crc_ok) for each block found after a sync pair.
+
+    A one-byte block (A5 n CRC) is the block count when it comes first, otherwise a mark
+    (a freshly formatted disk has A5 00 after the count); which form a block has is decided
+    by its CRC."""
     i = 0
     first = True
     while True:
@@ -31,18 +36,16 @@ def blocks(img):
         if j < 0:
             return
         a = j + 2
-        if first:
-            payload = img[a + 1:a + 2]
+        crc_at = lambda e: img[e] | img[e + 1] << 8 if e + 1 < len(img) else -1
+        if crc16(img[a:a + 2]) == crc_at(a + 2):
+            yield a, 'count' if first else 'mark', img[a + 1:a + 2], True
             end = a + 2
-            kind = 'count'
         else:
             flag = img[a + 1]
             n = img[a + 2] | img[a + 3] << 8
-            payload = img[a + 4:a + 4 + n]
             end = a + 4 + n
             kind = {0: 'header', 5: 'body'}.get(flag, 'flag %02x' % flag)
-        stored = img[end] | img[end + 1] << 8 if end + 1 < len(img) else -1
-        yield a, kind, payload, crc16(img[a:end]) == stored
+            yield a, kind, img[a + 4:end], crc16(img[a:end]) == crc_at(end)
         first = False
         i = end + 2
 
@@ -60,6 +63,8 @@ def main():
         info = ''
         if kind == 'count':
             info = 'blocks %d' % payload[0]
+        elif kind == 'mark':
+            info = '%02x' % payload[0]
         elif kind == 'header' and len(payload) >= 26:
             name = payload[1:18].split(b'\r')[0].decode('ascii', 'replace')
             size = payload[20] | payload[21] << 8
