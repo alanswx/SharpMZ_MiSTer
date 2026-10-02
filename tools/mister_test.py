@@ -120,7 +120,7 @@ for n, (title, f) in enumerate([
         ('Druaga no Tou', 'Druaga no Tou (1984)(Dempa Shimbunsha)(Namco)(Masami Nakamura) Side A.mzt'),
         ('Galaga', 'Galaga (1985)(Dempa Shimbunsha)(Namco).MZT')]):
     test(f'C{n + 1:02d}', 'MZ1500', f'MZ-1500 tape: {title}', files=[('s', 0, f'{M15}/{f}')], opts=[FAST_TAPE(6)], reset=True,
-         steps=[('wait', 6), ('type', 'C'), ('wait', 40), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
+         steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 35), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
 
 # Two-sided Quick Disks: side A loads, the game asks for side B; the MGL swaps the image, the test presses Return.
 for n, (title, fa) in enumerate([
@@ -145,7 +145,7 @@ test('W02', 'MZ1500', 'MZ-1500 tape installer onto a blank Quick Disk: Druaga no
      files=[('s', 0, f'{M15}/Druaga no Tou (1984)(Dempa Shimbunsha)(Namco)(Masami Nakamura) Side A.mzt'), ('s', 3, 'gen:qd_blank')],
      opts=[FAST_TAPE(6)], reset=True,
      steps=[('wait', 8), ('shot', 'menu'), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 10), ('shot', 'loading'),
-            ('wait', 360), ('shot', 'prompt'), ('type', '\n'), ('wait', 20),
+            ('wait', 60), ('shot', 'prompt'), ('type', '\n'), ('wait', 20),
             ('shot', 'a'), ('wait', 30), ('shot', 'b'), ('fetch', 1)])
 
 # Quick Disk titles sold or archived as tapes (side A: a DATA loader that asks for side B; side B: the game):

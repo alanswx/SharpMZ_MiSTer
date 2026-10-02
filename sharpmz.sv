@@ -281,7 +281,7 @@ function automatic [2:0] mz_fast_tape(input [2:0] menu_sel);
 			3'd3: mz_fast_tape = 3'b010; // 4x.
 			3'd4: mz_fast_tape = 3'b011; // 8x.
 			3'd5: mz_fast_tape = 3'b100; // 16x.
-			3'd6: mz_fast_tape = 3'b101; // 32x where supported.
+			3'd6: mz_fast_tape = 3'b101; // 32x; every model is capped at clk_sys/2 (about 35 MHz).
 			default: mz_fast_tape = 3'b110; // Core default.
 		endcase
 	end

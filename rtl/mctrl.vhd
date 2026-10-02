@@ -242,7 +242,7 @@ begin
                             when "010" => CONFIG(CPUSPEED) <= "0101";   -- 14MHz
                             when "011" => CONFIG(CPUSPEED) <= "0111";   -- 28MHz
                             when "100" => CONFIG(CPUSPEED) <= "1001";   -- 56MHz
-                            when "101" => CONFIG(CPUSPEED) <= "0001";   -- 3.5MHz
+                            when "101" => CONFIG(CPUSPEED) <= "1001";   -- 32x: the fastest (clkgen caps the CPU at clk_sys/2)
                             when "110" => CONFIG(CPUSPEED) <= "0001";   -- 3.5MHz
                             when "111" => CONFIG(CPUSPEED) <= "0001";   -- 3.5MHz
                             when others => null;
@@ -254,7 +254,7 @@ begin
                             when "010" => CONFIG(CPUSPEED) <= "0110";   -- 16MHz
                             when "011" => CONFIG(CPUSPEED) <= "1000";   -- 32MHz
                             when "100" => CONFIG(CPUSPEED) <= "1010";   -- 64MHz
-                            when "101" => CONFIG(CPUSPEED) <= "0010";   -- 4MHz
+                            when "101" => CONFIG(CPUSPEED) <= "1010";   -- 32x: the fastest (capped)
                             when "110" => CONFIG(CPUSPEED) <= "0010";   -- 4MHz
                             when "111" => CONFIG(CPUSPEED) <= "0010";   -- 4MHz
                             when others => null;

@@ -51,3 +51,12 @@ verilator/obj_dir*/
 verilator/software/
 verilator/out/
 out/
+
+# mz1500emu run leftovers
+SD-mz1500/
+cdl-export/
+rd-mz1500.dat
+verilator/SD-mz1500/
+verilator/cdl-export/
+verilator/rd-mz1500.dat
+tools/__pycache__/
