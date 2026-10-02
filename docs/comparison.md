@@ -33,7 +33,7 @@ for the MZ-700/800/1500; MAME is 0.264 with its own driver status flags. Sources
 
 ## Where this core is ahead
 
-- The only FPGA core with the MZ-1500 (PCG and Quick Disk), and the only one with Quick Disk at all.
+- The only FPGA core with the MZ-1500 (PCG and Quick Disk), and the only FPGA core with Quick Disk.
 - MZ-800 graphics checked frame by frame against mz800emu; 8 bugs fixed in the VideoController code taken from v2.
 - MZ-80B/2000 tape and floppy work through their IPLs (v2's MZ-80B video was marked untested; MAME's drivers are preliminary).
 - A standard MiSTer core: MGL files can load tapes and disks, and the sim and hardware suites run unattended.
