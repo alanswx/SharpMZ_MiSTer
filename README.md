@@ -10,6 +10,8 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 | MZ-2000 | Working: IPL, tape and floppy, colour graphics, katakana | MZ-800 | Working (IPL, graphics, PSG, tape, floppy, CP/M), tested on hardware |
 | MZ-1500 | New: IPL, PCG graphics, stereo PSG, Quick Disk (read only) | | |
 
+How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and MAME: [docs/comparison.md](docs/comparison.md).
+
 ## Features
 
 * Z80 CPU at the original speed (2 MHz MZ-80K/C/1200/A, 3.547 MHz MZ-700/800, 4 MHz MZ-80B/2000), with turbo steps up to about 32–35 MHz.

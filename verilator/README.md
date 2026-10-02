@@ -33,7 +33,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 
 | Option | |
 |---|---|
-| `--model M` | mz80k, mz80c, mz1200, mz80a, mz700, mz800, mz80b or mz2000 |
+| `--model M` | mz80k, mz80c, mz1200, mz80a, mz700, mz800, mz80b, mz2000 or mz1500 |
 | `--stop-at-frame N` | Run to frame N. |
 | `--screenshot N`, `--dump-every N` | PNGs of frames. |
 | `--ascii-end` | Print the text screen at exit. |
@@ -43,6 +43,8 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--tape-image FILE` | Mount a tape image (S0). Also `--tape-readonly`, `--tape-rewind`. |
 | `--fast-tape STEP` | The OSD Fast Tape step (0–7), not a multiplier. 4 is about 8x; 5 is the fastest (capped at clk_sys/2). |
 | `--fdd FILE` | Extended DSK image in floppy drive A. Also `--fdd-readonly`, and `--fdc-mode auto\|on\|off`. |
+| `--qd FILE` | Quick Disk image (`.qdf` or `.mzq`) in slot S3 (MZ-1500, MZ-800), read only. |
+| `--warm-reset N` | Press the OSD Reset at frame N (repeatable). |
 | `--mz800-mode 700\|800` | The MZ-800 rear switch (default 700, as mz800emu). |
 | `--turbo N`, `--vmode` | CPU speed step; video mode. |
 | `--trace-cpu FILE` | PC of every opcode fetch; `--trace-from`/`--trace-to` limit the frames. |
@@ -62,6 +64,11 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `mon_mz800` | `M` at the MZ-800 IPL starts the 9Z-504M monitor. |
 | `gfx_mz800`, `pcg_mz800`, `m800_*` | MZ-800 graphics modes, write/read modes, scroll and CG-RAM, by frame hash. The pictures match mz800emu; `tests/mz800/compare_emu.sh` redoes the comparison. |
 | `psg_mz800` | The PSG plays 439.8 Hz (measured from `--wav`). |
+| `beep_mz700`, `beep_mz800` | The monitor BELL, then 8253 counter 0 at 440 Hz (measured from `--wav`); the MZ-800 runs it in 700 mode with PC0 set. |
+| `fdd_mz700` | The MZ-700 boots a disk made by `tools/make_boot_disk.py` with `J F000` (MZ-1E05 ROM). |
+| `fdd_mz80b`, `fdd_mz80b_cpm` | The MZ-80B IPL boots SB-6511 Disk BASIC and CP/M 2.2 (images from idealine.info in `../software/idealine/`). |
+| `ipl_mz2000`, `tape_mz80b`, `tape_mz2000` | The MZ-2000 IPL; MZ-80B BASIC (SB-5520) and Gang Man from tape images (`../software/mz80b`, `mz2200`). |
+| `ipl_mz1500`, `qd_mz1500` | The MZ-1500 IPL menu; Lode Runner from a Quick Disk dump with its PCG title screen (pixel-identical to mz1500emu). |
 | `tape_image`, `tape_mz800` | Load from a tape image, on the MZ-700 monitor and the MZ-800 IPL. Slow; skipped with `QUICK=1`. |
 | `fdd_cpm`, `fdd_hry` | CP/M 4.1 boots from disk and runs DIR; a games disk starts its file manager (pixel-identical to mz800emu). They need the images in `../software/dsk/` (not in the repository) and are skipped otherwise. |
 

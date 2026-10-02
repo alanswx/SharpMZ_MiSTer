@@ -14,12 +14,12 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | Tape | Done. MZF to CMT, direct to RAM, and a Tape Image slot (`rtl/tape_image.sv`) that loads multi-program MZTs, saves into a blank image and does MZ-80B APSS. |
 | MZ-80K/80C/1200/80A/700 | Working in simulation. On hardware: all boot; MZ-700 tape and floppy (`J F000`) work. |
 | MZ-800 | Working in simulation against mz800emu: IPL, 9Z-504M monitor, memory map, MZ-700/800 modes, all graphics modes, PSG, Z80 PIO, tape, floppy and CP/M. 12 native games and 84 of 94 disk images match mz800emu. On hardware: graphics tests, games from tape images (Cauldron II, Cybernoid), CP/M games from disk. |
-| MZ-1500 | New (from mz800emu's MZ-1500): 9Z-502M ROMs, PCG (3 planes, palette, priority), 2 PSGs in stereo, Z80 PIO, Quick Disk (`rtl/mz_qdisk.sv`, .qdf/.mzq, read only). Boots to the IPL and loads Lode Runner from Quick Disk with its PCG title screen pixel-identical to mz1500emu, in the sim and on hardware. |
+| MZ-1500 | New (from mz800emu's MZ-1500): 9Z-502M ROMs, PCG (3 planes, palette, priority), 2 PSGs in stereo, Z80 PIO, Quick Disk (`rtl/mz_qdisk.sv`, .qdf/.mzq, read only). Boots to the IPL and loads Lode Runner from Quick Disk with its PCG title screen pixel-identical to mz1500emu. On hardware: Lode Runner, Nintendo Tennis, and two-sided Battle City, Grobda, Milky Way and Batten Tanuki (side B swapped by the MGL) reach their title or demo. |
 | Floppy | MZ-700/800 interface (`rtl/mz_fdc.sv`) with two drives from Extended DSK images. CP/M 1.3, 1.4, 2.3 and 4.1 boot in simulation. MZ-700: the MZ-1E05 ROM at F000 comes with the interface; `J F000` boots a disk made by `tools/make_boot_disk.py`. MZ-80B: the IPL boots SB-6511 Disk BASIC and CP/M 2.2 from the idealine.info images. |
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
-| FPGA | Latest build (9b9001e, clean) meets timing (core clock +1.3 ns): about 17,600 ALMs (42%), 434/553 RAM blocks. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
-| Regression | `make test`: 34 tests, including disk and MZ-80B/2000 tape tests that need `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py` (24 MGL tests). |
+| FPGA | Latest build (aa0e0a7, clean) meets timing (core clock +2.3 ns): 18,216 ALMs (43%), 459/553 RAM blocks. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
+| Regression | `make test`: 36 tests (34 plus ipl_mz1500 and qd_mz1500), including disk and tape tests that need `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 47 MGL tests (T01-T26, Q01-Q05, B01-B04, C01-C12). |
 
 ## Open work
 
@@ -38,9 +38,10 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] Turbo-loader tapes (header types 00/08/76, exec below the load address).
 
 ### MZ-1500
-- [ ] More software: the ~60 tape titles and the other QD images in `software/mz1500` (many are tape + QD, e.g. Galaga).
+- [ ] Quick Disk writes. Many MZ-1500 tapes are installers: Rally-X, Galaga, Druaga and Door Door load a "DATA" file and then ask "SET PROGRAM QD ?" to copy the game onto a Quick Disk. Also needed for game saves.
+- [ ] Tape titles on hardware: the `C` at the IPL menu is sometimes missed (keypress while the IPL still probes the QD); the tests should wait longer and retry.
 - [ ] CG ROM read through OUT E5 0 (reads FF now).
-- [ ] Quick Disk writes (save), and the PIO/joystick inputs.
+- [ ] Joystick inputs (PIO), printer.
 - [ ] MZ-1500 ROMs are mz800emu's copies; check against MAME's mz1500 set.
 
 ### Other models
@@ -73,6 +74,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 ## Hardware test log
 - **2026-09-29, MZ-700:** Galactic Invaders loads from tape and plays (SHIFT fires, SPACE pauses as the game intends). This found the keymap bugs fixed in `cbb1c04`.
 - **2026-09-30, all models (`tools/mister_test.py`):** T01-T06 boot screens correct on every model (MZ-2000 on the MZ-2200 IPL). T07 MZ-700 tape, T08 MZ-700 floppy, T09/T10 MZ-800 graphics tests pass. T11/T12 MZ-800 games load from tape images (Cauldron II, Cybernoid) after the tape image fix. The user played MZ-800 CP/M games from disk (sound fixed in `11f2d8b`). T13-T18 on b4004ff: MZ-800 CP/M 4.1 (DIR), CP/M 1.3 and the Hry file manager boot from floppy; MZ-80B boots SB-6511 Disk BASIC and CP/M 2.2; the MZ-2000 loads MZ-80B CP/M and stays blank, as in the sim. T19/T20 play the BELL and 440 Hz tone (by ear).
+- **2026-10-02, MZ-1500 software (build aa0e0a7):** Quick Disk: Nintendo Tennis runs; Battle City, Grobda, Milky Way and Batten Tanuki load side A, ask for side B and reach their title/demo once the MGL swaps it in. Tapes: Rally-X, Thunder Force, Door Door MkII and Druaga load their DATA files (QD installers, need QD writes); Pac-Man, Mappy, Dig Dug, Mario Bros. Special, Flappy, Star Fighter, Xetter91 and Galaga missed the `C` keypress in the test run.
 - **2026-10-01, MZ-1500 (build 5eda577):** T25 IPL menu, T26 Lode Runner from Quick Disk with the PCG title screen; MZ-700 unchanged (T03).
 - **2026-10-01, MZ-80B/2000 (clean build 9b9001e):** T21 MZ-80B SB-5520 BASIC from tape, T22 Gang Man, T23 TF-DOS D88 with katakana, T24 Zero Fighter in colour. All match the sim.
 
@@ -81,6 +83,7 @@ Each has a commit; this list is for context.
 - **MZ-80B/2000 NST:** PC1 going high must reset the CPU (the IPL's jump into RAM); the core carried on at 0008 inside the loaded program (Zero Fighter crashed).
 - **Stale FPGA ROM contents:** a Quartus incremental build kept the old character ROM after only the MIF changed; builds are now clean (`rm -rf db incremental_db`).
 - **MZ-80B/2000 tape never played:** GHDL lost the CMT state process's writes to CMT_BUS_OUTi (the vector was split between the process and concurrent assignments), so the APSS deck never left reset; and the deck needed PLAY high with STOP low, which the MZ-2200 IPL never does. Now registered bits and edge-triggered commands, as MAME.
+- **Tape image lost on reset:** a machine reset cleared the CMT but the tape engine still thought its record was loaded, so a tape mounted before Reset (or an MGL `<reset>`) never played. It now reloads after a reset.
 - **Tape image hang (hardware):** mounting a tape image froze Main (F12 dead, reboot needed). `ioctl_wait` was tied to the tape engine and holds the whole HPS link, so Main could not serve the engine's sector reads. The engine now yields to downloads instead.
 - **OSD/MGL:** MGL files can only load F/S entries on the first OSD page; ours were on sub-pages, so every MGL with a tape or disk was dropped.
 - **MZ-700/800 sound:** the beeper played an octave low (a divide-by-2 meant for the MZ-80K's 2 MHz clock), and on the MZ-800 counter 0's gate was forced on in 800 mode, so games that switch modes (Astro Marine Corps) clicked.
