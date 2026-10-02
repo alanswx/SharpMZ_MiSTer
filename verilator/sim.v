@@ -90,7 +90,10 @@ module top(
    input  [63:0] qd_size,
    output [31:0] qd_lba,
    output        qd_rd,
+   output        qd_wr,
    input         qd_ack,
+   input         qd_readonly,
+   output [7:0]  qd_buff_din,
    output        fdd_busy /*verilator public_flat*/,
    output        tape_active /*verilator public_flat*/,
    output        tape_full /*verilator public_flat*/,
@@ -148,9 +151,9 @@ module top(
       .enable(cfg_display3[3] | (cfg_model[2:0] == 3'b101 & qd_mounted_l)),       // MZ-1500; MZ-800 with an image
       .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),
       .io_din(qd_io_din), .io_oe(qd_io_oe),
-      .img_mounted(qd_mounted), .img_size(qd_size),
-      .sd_lba(qd_lba), .sd_rd(qd_rd), .sd_wr(), .sd_ack(qd_ack),
-      .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(), .sd_buff_wr(sd_buff_wr),
+      .img_mounted(qd_mounted), .img_readonly(qd_readonly), .img_size(qd_size),
+      .sd_lba(qd_lba), .sd_rd(qd_rd), .sd_wr(qd_wr), .sd_ack(qd_ack),
+      .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(qd_buff_din), .sd_buff_wr(sd_buff_wr),
       .busy(qd_busy)
    );
    reg qd_mounted_l = 0;

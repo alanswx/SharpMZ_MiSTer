@@ -21,7 +21,12 @@
 //  header, skipped), read through two 512-byte sector buffers with prefetch. If a sector is late the
 //  disk waits for it.
 //
-//  Read only for now: CTS reports write protect and data writes are ignored.
+//  Writing follows the Z80 SIO in bisync mode as the MZ-1500 ROM drives it (FD4D-FDD9): WR5 b1 (RTS) is
+//  the write gate. With it and Tx enable (b3) on, every byte time the transmitter puts one byte on the disk:
+//  00 while WR5 b4 (break) is set, else the Tx buffer (F4), else on an underrun the CRC-16 of the bytes
+//  since the last Tx CRC reset (once per WR0 "reset Tx underrun/EOM latch"), else sync characters (WR6,
+//  WR7). This gives the layout of the real dumps: 00 run, 16 x9, A5, data, CRC (0xA001 reflected, low byte
+//  first), 16 ... Written sectors go back to the image when the head leaves them or the motor stops.
 //
 //  Copyright (C) 2026 SharpMZ MiSTer contributors. GPL v2 or later.
 //
@@ -43,10 +48,11 @@ module mz_qdisk
 
 	// MiSTer image slot
 	input         img_mounted,
+	input         img_readonly,
 	input  [63:0] img_size,
 	output reg [31:0] sd_lba,
 	output reg    sd_rd,
-	output        sd_wr,
+	output reg    sd_wr,
 	input         sd_ack,
 	input   [8:0] sd_buff_addr,
 	input   [7:0] sd_buff_dout,
@@ -55,9 +61,6 @@ module mz_qdisk
 
 	output        busy            // motor on (LED)
 );
-
-assign sd_wr       = 0;
-assign sd_buff_din = 8'hFF;
 
 localparam [16:0] QD_MAX    = 17'd89826;         // mz800emu QDISK_IMAGE_MAX_SIZE
 parameter         BYTE_CLKS = 5583;              // clk_sys clocks per byte (70.9 MHz, ~101.6 kbit/s)
@@ -69,20 +72,27 @@ assign io_oe = sel & io_rd;
 // Image
 // ---------------------------------------------------------------------------------------------
 reg        mounted = 0;
+reg        wprot   = 1;                          // image is read only
 reg [19:0] size    = 0;                          // image size (bytes)
 reg  [4:0] base    = 0;                          // 16 for a .qdf
 reg        base_known = 0;
 
-// Two sector buffers, selected by the sector number's bit 0.
-reg  [7:0] buf_ram[1024];
-reg  [7:0] buf_q;
+// Two sector buffers, selected by the sector number's bit 0. Port A is the SD side, port B the head.
+wire [7:0] buf_q;
 reg  [9:0] buf_raddr;
-always @(posedge clk_sys) begin
-	if (sd_ack & sd_buff_wr) buf_ram[{sd_lba[0], sd_buff_addr}] <= sd_buff_dout;
-	buf_q <= buf_ram[buf_raddr];
-end
+reg        hd_we = 0;                            // head writes a byte
+reg  [9:0] hd_addr;
+reg  [7:0] hd_data;
+
+wd1793_mem #(.DATAWIDTH(8), .ADDRWIDTH(10)) qbuf
+(
+	.clock(clk_sys),
+	.address_a({sd_lba[0], sd_buff_addr}), .data_a(sd_buff_dout), .wren_a(sd_ack & sd_buff_wr), .q_a(sd_buff_din),
+	.address_b(hd_we ? hd_addr : buf_raddr), .data_b(hd_data), .wren_b(hd_we), .q_b(buf_q)
+);
 
 reg  [1:0] valid = 0;
+reg  [1:0] dirty = 0;                            // written by the head, not yet back in the image
 reg [10:0] tag[2];                               // sector number held by each buffer
 
 // ---------------------------------------------------------------------------------------------
@@ -120,7 +130,31 @@ reg        overrun  = 0;                         // RR1 b5
 reg        strip    = 0;                         // dropping sync characters after hunt (WR3 b1)
 reg [12:0] tick     = 0;
 
-wire [7:0] rr0_a = {2'b00, 1'b0 /* CTS: write protected */, hunt, mounted, 1'b1, 1'b0, rx_avail};
+// Transmitter
+reg  [7:0] tx_buf;
+reg        tx_full  = 0;                         // RR0 b2 is its inverse
+reg        eom      = 1;                         // Tx underrun/EOM latch: set = an underrun sends sync, not CRC
+reg        crc_hi   = 0;                         // sending the CRC's second byte
+reg        sync_hi  = 0;                         // next sync character is WR7
+reg [15:0] crc      = 0;
+
+function [15:0] crc16(input [15:0] c, input [7:0] d);   // CRC-16, x16+x15+x2+1, LSB first
+	integer i;
+	reg [15:0] x;
+	begin
+		x = c ^ {8'h00, d};
+		for (i = 0; i < 8; i = i + 1) x = x[0] ? ((x >> 1) ^ 16'hA001) : (x >> 1);
+		crc16 = x;
+	end
+endfunction
+
+wire       wgate  = wa[5][3] & wa[5][1] & ~wprot;    // Tx enabled with RTS: the drive writes
+wire [7:0] tx_out = wa[5][4] ? 8'h00 :
+                    tx_full  ? tx_buf :
+                    ~eom     ? (crc_hi ? crc[15:8] : crc[7:0]) :
+                    sync_hi  ? wa[7] : wa[6];
+
+wire [7:0] rr0_a = {1'b0, eom, ~wprot /* CTS */, hunt, mounted, ~tx_full, 1'b0, rx_avail};
 wire [7:0] rr1_a = {1'b0, pos > QD_MAX, overrun, 5'd0};
 
 // ---------------------------------------------------------------------------------------------
@@ -137,6 +171,7 @@ always @(posedge clk_sys) begin
 	rd_last <= io_rd & sel;
 	wr_last <= io_wr & sel;
 	consume <= 0;
+	hd_we   <= 0;
 
 	// --- the disk: one byte every BYTE_CLKS while the motor runs (waits for a late sector) ---
 	if (~spinning) tick <= BYTE_CLKS[12:0];
@@ -144,7 +179,25 @@ always @(posedge clk_sys) begin
 	else if ((head_ok | ~in_img | (pos > QD_MAX)) & ~consume) begin
 		tick    <= BYTE_CLKS[12:0];
 		consume <= 1;
-		if (hunt) begin
+		if (wgate) begin
+			if (in_img & (pos <= QD_MAX)) begin
+				hd_we   <= 1;
+				hd_addr <= {b_sel, abs[8:0]};
+				hd_data <= tx_out;
+				dirty[b_sel] <= 1;
+			end
+			if (wa[5][4]) begin end                              // break
+			else if (tx_full) begin
+				tx_full <= 0;
+				if (wa[5][0]) crc <= crc16(crc, tx_buf);
+			end
+			else if (~eom) begin
+				crc_hi <= ~crc_hi;
+				if (crc_hi) eom <= 1;
+			end
+			else sync_hi <= ~sync_hi;
+		end
+		else if (hunt) begin
 			last_b <= next_byte;
 			if (last_b == wa[6] && next_byte == wa[7]) begin hunt <= 0; strip <= wa[3][1]; end
 		end
@@ -190,8 +243,10 @@ always @(posedge clk_sys) begin
 				wa[pa] <= io_dout;
 				if (pa == 0) begin
 					pa <= io_dout[2:0];
-					if (io_dout[5:3] == 3'd3) begin wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0; hunt <= 0; rx_avail <= 0; end
+					if (io_dout[5:3] == 3'd3) begin wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0; hunt <= 0; rx_avail <= 0; tx_full <= 0; eom <= 1; end
 					if (io_dout[5:3] == 3'd6) overrun <= 0;     // error reset
+					if (io_dout[7:6] == 2'd2) crc <= 0;          // reset Tx CRC generator
+					if (io_dout[7:6] == 2'd3) begin eom <= 0; crc_hi <= 0; end   // reset Tx underrun/EOM latch
 				end
 				else begin
 					if (pa == 3 && io_dout[4] && io_dout[0]) begin hunt <= 1; last_b <= 8'h00; rx_avail <= 0; end
@@ -211,7 +266,7 @@ always @(posedge clk_sys) begin
 				end
 			end
 		end
-		// data writes ignored (write protected)
+		else if (~io_addr[0]) begin tx_buf <= io_dout; tx_full <= 1; end   // data A
 	end
 
 	if (consume) pos <= pos + 1'd1;
@@ -220,8 +275,10 @@ always @(posedge clk_sys) begin
 		wa[0] <= 0; wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0;
 		wb[0] <= 0; wb[1] <= 0; wb[2] <= 0; wb[3] <= 0; wb[4] <= 0; wb[5] <= 0; wb[6] <= 0; wb[7] <= 0;
 		pa <= 0; pb <= 0; hunt <= 0; pos <= 0; head_home <= 1; rx_avail <= 0; overrun <= 0;
+		tx_full <= 0; eom <= 1; crc <= 0;
 	end
-	if (img_mounted) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; end
+	if (img_mounted) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; dirty <= 0; end
+	if (wb_clear) dirty[wb_buf] <= 0;
 end
 
 // ---------------------------------------------------------------------------------------------
@@ -244,10 +301,15 @@ end
 
 // ---------------------------------------------------------------------------------------------
 // Sector loading: keep the current sector and the next one in the buffers while the motor runs.
-// Sector 0 is read at mount to see whether there is a .qdf header.
+// Sector 0 is read at mount to see whether there is a .qdf header. A written buffer goes back to the
+// image first, once the head has left its sector or the motor has stopped.
 // ---------------------------------------------------------------------------------------------
-reg  [1:0] ld_state = 0;
+reg  [2:0] ld_state = 0;
 reg [10:0] ld_sector;
+reg        wb_clear = 0;                         // to the SIO block: the write-back took this buffer
+reg        wb_buf;
+wire       wb0 = dirty[0] & (~motor | tag[0] != sector);
+wire       wb1 = dirty[1] & (~motor | tag[1] != sector);
 
 wire [10:0] want0 = base_known ? sector : 11'd0;
 wire [10:0] want1 = sector + 1'd1;
@@ -258,23 +320,34 @@ reg  [1:0] hdr_cnt;
 reg [23:0] hdr;
 
 always @(posedge clk_sys) begin
+	wb_clear <= 0;
 	case (ld_state)
-		2'd0: if (mounted & (motor | ~base_known)) begin
-			if (need0) begin ld_sector <= want0; ld_state <= 2'd1; end
-			else if (need1 & motor) begin ld_sector <= want1; ld_state <= 2'd1; end
+		3'd0: if (mounted & (wb0 | wb1)) begin              // write back
+			wb_buf   <= ~wb0;
+			wb_clear <= 1;
+			sd_lba   <= {21'd0, wb0 ? tag[0] : tag[1]};
+			sd_wr    <= 1;
+			ld_state <= 3'd4;
 		end
-		2'd1: begin
+		else if (mounted & (motor | ~base_known)) begin
+			if (need0) begin ld_sector <= want0; ld_state <= 3'd1; end
+			else if (need1 & motor) begin ld_sector <= want1; ld_state <= 3'd1; end
+		end
+		3'd1: begin
 			sd_lba <= {21'd0, ld_sector};
 			valid[ld_sector[0]] <= 0;
 			sd_rd <= 1;
-			ld_state <= 2'd2;
+			ld_state <= 3'd2;
 		end
-		2'd2: if (sd_ack) begin sd_rd <= 0; ld_state <= 2'd3; end
-		2'd3: if (~sd_ack) begin
+		3'd2: if (sd_ack) begin sd_rd <= 0; ld_state <= 3'd3; end
+		3'd3: if (~sd_ack) begin
 			valid[ld_sector[0]] <= 1;
 			tag[ld_sector[0]]   <= ld_sector;
-			ld_state <= 2'd0;
+			ld_state <= 3'd0;
 		end
+		3'd4: if (sd_ack) begin sd_wr <= 0; ld_state <= 3'd5; end
+		3'd5: if (~sd_ack) ld_state <= 3'd0;
+		default: ld_state <= 3'd0;
 	endcase
 
 	// Header check on the first bytes of sector 0 as they arrive.
@@ -288,12 +361,14 @@ always @(posedge clk_sys) begin
 
 	if (img_mounted) begin
 		mounted    <= |img_size;
+		wprot      <= img_readonly;
 		size       <= |img_size[63:20] ? 20'hFFFFF : img_size[19:0];
 		valid      <= 0;
 		base_known <= 0;
 		base       <= 0;
 		ld_state   <= 0;
 		sd_rd      <= 0;
+		sd_wr      <= 0;
 	end
 end
 

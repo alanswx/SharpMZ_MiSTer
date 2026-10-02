@@ -69,6 +69,7 @@ struct Options {
     std::string tape_image;
     std::string fdd;
     std::string qd;
+    bool        qd_readonly = false;
     std::set<uint32_t> warm_resets;
     bool        fdd_readonly = false;
     int         fdc_mode = 0;
@@ -97,7 +98,7 @@ static void usage()
 "Tape image (the OSD Tape Image slot):\n"
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
 "  --warm-reset N        OSD Reset (warm reset) at frame N (repeatable)\n"
-"  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), read only\n"
+"  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
@@ -187,6 +188,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--tape-image") o.tape_image = next();
         else if (a == "--fdd") o.fdd = next();
         else if (a == "--qd") o.qd = next();
+        else if (a == "--qd-readonly") o.qd_readonly = true;
         else if (a == "--warm-reset") o.warm_resets.insert((uint32_t)std::stoul(next()));
         else if (a == "--fdd-readonly") o.fdd_readonly = true;
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
@@ -293,9 +295,9 @@ private:
 void Sim::sd_step()
 {
     // Slot accessors: the tape (S0) and floppy drive A (S1) share sd_buff_*.
-    // Slot 2 is the Quick Disk (S3), read only.
+    // Slot 2 is the Quick Disk (S3).
     auto req_rd = [&](int k) -> bool { return k == 2 ? top->qd_rd : k ? top->fdd_rd : top->sd_rd; };
-    auto req_wr = [&](int k) -> bool { return k == 2 ? false : k ? top->fdd_wr : top->sd_wr; };
+    auto req_wr = [&](int k) -> bool { return k == 2 ? top->qd_wr : k ? top->fdd_wr : top->sd_wr; };
     auto lba    = [&](int k) -> uint32_t { return k == 2 ? top->qd_lba : k ? top->fdd_lba : top->sd_lba; };
     auto ack    = [&](int k, int v) { if (k == 2) top->qd_ack = v; else if (k) top->fdd_ack = v; else top->sd_ack = v; };
     auto file   = [&](int k) -> FILE * { return k == 2 ? qd : k ? fdd : img; };
@@ -336,7 +338,7 @@ void Sim::sd_step()
         break;
     case SD_WRITE:
         // sd_buff_din is registered: it holds the byte addressed on the previous clock.
-        if (sd_idx > 0) sd_data[sd_idx - 1] = sd_slot ? top->fdd_buff_din : top->sd_buff_din;
+        if (sd_idx > 0) sd_data[sd_idx - 1] = sd_slot == 2 ? top->qd_buff_din : sd_slot ? top->fdd_buff_din : top->sd_buff_din;
         if (sd_idx < 512) {
             top->sd_buff_addr = sd_idx++;
         } else {
@@ -356,11 +358,12 @@ void Sim::sd_step()
 
 void Sim::mount_qd()
 {
-    qd = fopen(opt.qd.c_str(), "rb");
+    qd = fopen(opt.qd.c_str(), opt.qd_readonly ? "rb" : "r+b");
     if (!qd) { fprintf(stderr, "cannot open Quick Disk image %s\n", opt.qd.c_str()); exit_code = 2; return; }
     fseeko(qd, 0, SEEK_END);
     qd_size = (uint64_t)ftello(qd);
     top->qd_size = qd_size;
+    top->qd_readonly = opt.qd_readonly;
     top->qd_mounted = 1;
     clock();
     top->qd_mounted = 0;

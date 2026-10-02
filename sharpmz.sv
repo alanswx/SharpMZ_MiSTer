@@ -512,6 +512,7 @@ mz_qdisk mz_qdisk
 	.io_oe(qd_io_oe),
 
 	.img_mounted(img_mounted[3]),
+	.img_readonly(img_readonly),
 	.img_size(img_size),
 	.sd_lba(sd_lba[3]),
 	.sd_rd(sd_rd[3]),
