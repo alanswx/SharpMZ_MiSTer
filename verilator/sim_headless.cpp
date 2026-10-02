@@ -69,6 +69,7 @@ struct Options {
     std::string tape_image;
     std::string fdd;
     std::string qd;
+    std::set<uint32_t> warm_resets;
     bool        fdd_readonly = false;
     int         fdc_mode = 0;
     bool     tape_readonly = false;
@@ -95,6 +96,7 @@ static void usage()
 "  --mzf-direct-frame N   frame to do the direct load at (default 0)\n"
 "Tape image (the OSD Tape Image slot):\n"
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
+"  --warm-reset N        OSD Reset (warm reset) at frame N (repeatable)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), read only\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
@@ -185,6 +187,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--tape-image") o.tape_image = next();
         else if (a == "--fdd") o.fdd = next();
         else if (a == "--qd") o.qd = next();
+        else if (a == "--warm-reset") o.warm_resets.insert((uint32_t)std::stoul(next()));
         else if (a == "--fdd-readonly") o.fdd_readonly = true;
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
         else if (a == "--tape-readonly") o.tape_readonly = true;
@@ -543,6 +546,7 @@ void Sim::on_frame_end()
     if (!opt.mzf.empty() && opt.mzf_direct && frame == opt.mzf_direct_frame && frame != 0) load_mzf(true);
 
     top->tape_rewind = opt.tape_rewinds.count(frame) ? 1 : 0;   // Held for one frame.
+    if (opt.warm_resets.count(frame)) { top->warm_reset = 1; for (int i = 0; i < 64; i++) clock(); top->warm_reset = 0; }
 }
 
 void Sim::ioctl_write(uint32_t addr, uint8_t data)

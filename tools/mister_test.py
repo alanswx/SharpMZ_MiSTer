@@ -46,8 +46,9 @@ MZ800_MODE = (32, 1, 1)                    # rear switch in the MZ-800 position
 # mounting, then steps: ('wait', s) / ('type', text) / ('shot', label).
 # kind: 's' = image slot (S0 tape, S1/S2 floppy), 'f' = file load (F1 tape to CMT, F2 direct).
 T = []
-def test(name, model, desc, files=(), opts=(), reset=False, steps=()):
-    T.append(dict(name=name, model=model, desc=desc, files=list(files), opts=list(opts), reset=reset, steps=list(steps)))
+def test(name, model, desc, files=(), opts=(), reset=False, steps=(), late=()):
+    # late: [(kind, index, source, delay)] mounted by the MGL after the reset, e.g. a disk's side B.
+    T.append(dict(name=name, model=model, desc=desc, files=list(files), opts=list(opts), reset=reset, steps=list(steps), late=list(late)))
 
 test('T01', 'MZ80K', 'MZ-80K boots to the SP-1002 monitor', steps=[('wait', 4), ('shot', 'boot')])
 test('T02', 'MZ80A', 'MZ-80A boots to the SA-1510 monitor', steps=[('wait', 4), ('shot', 'boot')])
@@ -95,6 +96,42 @@ test('T25', 'MZ1500', 'MZ-1500 IPL menu ("Make ready QD", F/Q/C/M)', steps=[('wa
 test('T26', 'MZ1500', 'MZ-1500 Quick Disk: Lode Runner (Q), PCG title screen', files=[('s', 3, f'{SW}/mz1500/Lode Runner (1985)(Broderbund Software)(Universe) Side A.qdf')],
      reset=True, steps=[('wait', 4), ('type', 'Q'), ('wait', 25), ('shot', 'title')])
 
+# MZ-1500 software: Quick Disk images (Q) and tapes (tape image + C at the IPL), two screenshots each.
+M15 = f'{SW}/mz1500'
+for n, (title, f) in enumerate([
+        ('Battle City', 'Battle City (1986)(Dempa Shimbunsha)(Namco)(Masami Nakamura)(Manami Kadowaki)(Tamo Matsui)(Sei Kimigaki)(Miku) Side A.qdf'),
+        ('Grobda', 'Grobda (1986)(Dempa Shimbunsha)(Namco)(Masami Nakamura)(Miku)(Manami Kadowaki)(Tamo Matsui)(Tadashi Fujioka) Side A.qdf'),
+        ('Milky Way', 'Milky Way (1984)(Micronet)(Yasuro Koideya) Side A.qdf'),
+        ('Nintendo Tennis', 'Nintendo Tennis (1985)(Hudson Soft)(Nintendo)(Masaaki Kikuta).qdf'),
+        ('Batten Tanuki', 'Batten Tanuki No Daibouken (1986)(Tecno Soft) Side A.qdf')]):
+    test(f'Q{n + 1:02d}', 'MZ1500', f'MZ-1500 Quick Disk: {title}', files=[('s', 3, f'{M15}/{f}')], reset=True,
+         steps=[('wait', 4), ('type', 'Q'), ('wait', 25), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
+for n, (title, f) in enumerate([
+        ('Pac-Man', 'Pac-Man (1984)(Dempa Shimbunsha)(Namco)(Noboru Gankou).mzt'),
+        ('Mappy', 'Mappy (1984)(Dempa Shimbunsha)(Namco)(Game Roman)(Masami Nakamura) Side A.mzt'),
+        ('Dig Dug', 'Dig Dug (1984)(Dempa Shimbunsha)(Game Roman)(Masami Nakamura) Side A.mzt'),
+        ('Rally-X', 'Rally-X (1985)(Dempa Shimbunsha)(Namco)(Game Roman)(Masami Nakamura) Side A.mzt'),
+        ('Mario Bros. Special', 'Mario Bros. Special (1984)(Hudson Soft).MZT'),
+        ('Thunder Force', 'Thunder Force (1984)(Tecno Soft).mzt'),
+        ('Door Door MkII', 'Door Door MkII (1984)(Enix)(Koichi Nakamura)(Side A).MZT'),
+        ('Flappy', 'Flappy (1984)(DB-Soft)(Akira Obata) Side A.mzt'),
+        ('Star Fighter', 'Star Fighter (1986)(Takeshi Maruyama).mzt'),
+        ('Xetter91', 'Xetter91 (1991)(Mushakun).mzt'),
+        ('Druaga no Tou', 'Druaga no Tou (1984)(Dempa Shimbunsha)(Namco)(Masami Nakamura) Side A.mzt'),
+        ('Galaga', 'Galaga (1985)(Dempa Shimbunsha)(Namco).MZT')]):
+    test(f'C{n + 1:02d}', 'MZ1500', f'MZ-1500 tape: {title}', files=[('s', 0, f'{M15}/{f}')], opts=[FAST_TAPE(6)], reset=True,
+         steps=[('wait', 6), ('type', 'C'), ('wait', 40), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
+
+# Two-sided Quick Disks: side A loads, the game asks for side B; the MGL swaps the image, the test presses Return.
+for n, (title, fa) in enumerate([
+        ('Battle City', 'Battle City (1986)(Dempa Shimbunsha)(Namco)(Masami Nakamura)(Manami Kadowaki)(Tamo Matsui)(Sei Kimigaki)(Miku) Side A.qdf'),
+        ('Grobda', 'Grobda (1986)(Dempa Shimbunsha)(Namco)(Masami Nakamura)(Miku)(Manami Kadowaki)(Tamo Matsui)(Tadashi Fujioka) Side A.qdf'),
+        ('Milky Way', 'Milky Way (1984)(Micronet)(Yasuro Koideya) Side A.qdf'),
+        ('Batten Tanuki', 'Batten Tanuki No Daibouken (1986)(Tecno Soft) Side A.qdf')]):
+    test(f'B{n + 1:02d}', 'MZ1500', f'MZ-1500 Quick Disk: {title}, side A then side B',
+         files=[('s', 3, f'{M15}/{fa}')], late=[('s', 3, f'{M15}/{fa.replace("Side A", "Side B")}', 35)], reset=True,
+         steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('type', '\n'), ('wait', 30), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
+
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, "'": 40, ',': 51, '.': 52, '/': 53, ':': -39, '*': -9}
 KEYS.update({c: k for c, k in zip('1234567890', range(2, 12))})
@@ -138,6 +175,8 @@ def mgl(rbf, t, remote_files):
         x.append(f'  <file delay="2" type="{kind}" index="{index}" path="{path}"/>')
     if t['reset']:
         x.append('  <reset delay="1"/>')
+    for (kind, index, _, delay), path in zip(t['late'], remote_files[len(t['files']):]):
+        x.append(f'  <file delay="{delay}" type="{kind}" index="{index}" path="{path}"/>')
     x.append('</mistergamedescription>')
     return '\n'.join(x) + '\n'
 
@@ -164,14 +203,15 @@ def main():
 
     for t in tests:
         remote = []
-        for kind, index, src in t['files']:
+        for kind, index, src in t['files'] + [l[:3] for l in t['late']]:
             if src == 'gen:fd700':        # MZ-700 boot disk made from ramtest
                 src = os.path.join(stage, 'fd700_ramtest.dsk')
                 sh(f'python3 "{ROOT}/tools/make_boot_disk.py" "{MZF}/ramtest.mzf" "{src}" > /dev/null')
             if not os.path.exists(src):
                 sys.exit(f'{t["name"]}: missing {src}')
             ext = os.path.splitext(src)[1].lower()
-            dst = f'{HW}/{"disks" if kind == "s" and index > 0 else "files"}/{t["name"]}_{index}{ext}'
+            side = len(remote)
+            dst = f'{HW}/{"disks" if kind == "s" and index > 0 else "files"}/{t["name"]}_{index}_{side}{ext}'
             m.ssh(f'mkdir -p "{os.path.dirname(dst)}"')
             m.put(src, dst)
             remote.append(dst)

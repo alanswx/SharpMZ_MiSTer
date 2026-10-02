@@ -145,6 +145,7 @@ reg  [7:0] core_byte;
 reg [13:0] cmt_last;
 reg        rewind_last;
 reg        pending_rewind, pending_save, pending_next, pending_prev;
+reg        pending_reload = 0;  // reload the current record into the CMT after a reset
 
 wire [22:0] off_lba = img_off[31:9];
 
@@ -183,7 +184,7 @@ always @(posedge clk) begin
 		record_no   <= 0;
 		hist_n      <= 0;
 		rpos        <= 0;
-		pending_rewind <= 0; pending_save <= 0; pending_next <= 0; pending_prev <= 0;
+		pending_rewind <= 0; pending_save <= 0; pending_next <= 0; pending_prev <= 0; pending_reload <= 0;
 		if (|img_size) begin
 			pos    <= 0;
 			active <= 1;
@@ -208,6 +209,12 @@ always @(posedge clk) begin
 				pending_save <= 0;
 				active <= 1;
 				state  <= S_SAVE;
+			end
+			else if (pending_reload) begin                  // rescan for the end of the tape, then load rpos
+				pending_reload <= 0;
+				pos       <= 0;
+				active    <= 1;
+				state     <= S_SCAN;
 			end
 			else if (pending_rewind) begin
 				pending_rewind <= 0; pending_next <= 0; pending_prev <= 0;
@@ -444,13 +451,16 @@ always @(posedge clk) begin
 	default: state <= S_IDLE;
 	endcase
 
+	// A reset keeps the image (it used to unmount it, so a tape mounted before pressing Reset was lost):
+	// any transfer is dropped and the current record is loaded into the CMT again.
 	if (reset) begin
 		state   <= S_IDLE;
 		active  <= 0;
 		sd_rd   <= 0;
 		sd_wr   <= 0;
-		mounted <= 0;
 		loaded  <= 0;
+		if (~cache_dirty) cache_valid <= 0;
+		pending_reload <= mounted;
 		pending_rewind <= 0; pending_save <= 0; pending_next <= 0; pending_prev <= 0;
 	end
 end

@@ -389,7 +389,7 @@ wire  [7:0] tape_record;
 tape_image tape_image
 (
 	.clk(clk_sys),
-	.reset(reset),
+	.reset(reset | warm_reset),               // a machine reset clears the CMT, so the engine reloads its record
 
 	.img_mounted(img_mounted[0]),
 	.img_readonly(img_readonly),
