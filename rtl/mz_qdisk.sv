@@ -24,8 +24,8 @@
 //  Writing follows the Z80 SIO in bisync mode as the MZ-1500 ROM drives it (FD4D-FDD9): WR5 b1 (RTS) is
 //  the write gate. With it and Tx enable (b3) on, every byte time the transmitter puts one byte on the disk:
 //  00 while WR5 b4 (break) is set, else the Tx buffer (F4), else on an underrun the CRC-16 of the bytes
-//  since the last Tx CRC reset (once per WR0 "reset Tx underrun/EOM latch"), else sync characters (WR6,
-//  WR7). This gives the layout of the real dumps: 00 run, 16 x9, A5, data, CRC (0xA001 reflected, low byte
+//  since the last Tx CRC reset (once per WR0 "reset Tx underrun/EOM latch", and only after a data byte:
+//  the ROM resets the latch just before it writes A5), else sync characters (WR6, WR7). This gives the layout of the real dumps: 00 run, 16 x9, A5, data, CRC (0xA001 reflected, low byte
 //  first), 16 ... Written sectors go back to the image when the head leaves them or the motor stops.
 //
 //  Copyright (C) 2026 SharpMZ MiSTer contributors. GPL v2 or later.
@@ -135,6 +135,7 @@ reg  [7:0] tx_buf;
 reg        tx_full  = 0;                         // RR0 b2 is its inverse
 reg        eom      = 1;                         // Tx underrun/EOM latch: set = an underrun sends sync, not CRC
 reg        crc_hi   = 0;                         // sending the CRC's second byte
+reg        crc_arm  = 0;                         // a data byte went out since the Tx CRC reset
 reg        sync_hi  = 0;                         // next sync character is WR7
 reg [15:0] crc      = 0;
 
@@ -151,7 +152,7 @@ endfunction
 wire       wgate  = wa[5][3] & wa[5][1] & ~wprot;    // Tx enabled with RTS: the drive writes
 wire [7:0] tx_out = wa[5][4] ? 8'h00 :
                     tx_full  ? tx_buf :
-                    ~eom     ? (crc_hi ? crc[15:8] : crc[7:0]) :
+                    (~eom & crc_arm) ? (crc_hi ? crc[15:8] : crc[7:0]) :
                     sync_hi  ? wa[7] : wa[6];
 
 wire [7:0] rr0_a = {1'b0, eom, ~wprot /* CTS */, hunt, mounted, ~tx_full, 1'b0, rx_avail};
@@ -189,11 +190,12 @@ always @(posedge clk_sys) begin
 			if (wa[5][4]) begin end                              // break
 			else if (tx_full) begin
 				tx_full <= 0;
+				crc_arm <= 1;
 				if (wa[5][0]) crc <= crc16(crc, tx_buf);
 			end
-			else if (~eom) begin
+			else if (~eom & crc_arm) begin
 				crc_hi <= ~crc_hi;
-				if (crc_hi) eom <= 1;
+				if (crc_hi) begin eom <= 1; crc_arm <= 0; end
 			end
 			else sync_hi <= ~sync_hi;
 		end
@@ -245,7 +247,7 @@ always @(posedge clk_sys) begin
 					pa <= io_dout[2:0];
 					if (io_dout[5:3] == 3'd3) begin wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0; hunt <= 0; rx_avail <= 0; tx_full <= 0; eom <= 1; end
 					if (io_dout[5:3] == 3'd6) overrun <= 0;     // error reset
-					if (io_dout[7:6] == 2'd2) crc <= 0;          // reset Tx CRC generator
+					if (io_dout[7:6] == 2'd2) begin crc <= 0; crc_arm <= 0; end   // reset Tx CRC generator
 					if (io_dout[7:6] == 2'd3) begin eom <= 0; crc_hi <= 0; end   // reset Tx underrun/EOM latch
 				end
 				else begin

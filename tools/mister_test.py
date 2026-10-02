@@ -132,8 +132,16 @@ for n, (title, fa) in enumerate([
          files=[('s', 3, f'{M15}/{fa}')], late=[('s', 3, f'{M15}/{fa.replace("Side A", "Side B")}', 35)], reset=True,
          steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('type', '\n'), ('wait', 30), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
 
+# Quick Disk writes: MZ-1500 BASIC (MZ-5Z001) on a Quick Disk made by tools/mzf2qdf.py boots with Q, formats the
+# disk (INIT "QD:"), saves a program, loads it back and runs it. The image is fetched and its blocks checked.
+test('W01', 'MZ1500', 'MZ-1500 Quick Disk write: BASIC INIT, SAVE, LOAD', files=[('s', 3, 'gen:qd_basic')], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 20), ('shot', 'ready'), ('type', 'INIT "QD:"\n'), ('wait', 3), ('shot', 'init'),
+            ('type', 'Y'), ('wait', 15), ('shot', 'formatted'), ('type', '10 PRINT 4321\n'), ('type', 'SAVE "TEST"\n'), ('wait', 15),
+            ('shot', 'saved'), ('type', 'NEW\n'), ('type', 'LOAD "TEST"\n'), ('wait', 12), ('type', 'LIST\n'), ('type', 'RUN\n'),
+            ('wait', 3), ('shot', 'loaded'), ('fetch', 0)])
+
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
-KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, "'": 40, ',': 51, '.': 52, '/': 53, ':': -39, '*': -9}
+KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, ',': 51, '.': 52, '/': 53, ':': 40, '*': -40, '"': -3}   # Sharp layout by position: PC ' is the : key (shift *), shift+2 is "
 KEYS.update({c: k for c, k in zip('1234567890', range(2, 12))})
 KEYS.update({c: k for c, k in zip('QWERTYUIOP', range(16, 26))})
 KEYS.update({c: k for c, k in zip('ASDFGHJKL', range(30, 39))})
@@ -207,6 +215,9 @@ def main():
             if src == 'gen:fd700':        # MZ-700 boot disk made from ramtest
                 src = os.path.join(stage, 'fd700_ramtest.dsk')
                 sh(f'python3 "{ROOT}/tools/make_boot_disk.py" "{MZF}/ramtest.mzf" "{src}" > /dev/null')
+            if src == 'gen:qd_basic':     # MZ-1500 BASIC on a Quick Disk
+                src = os.path.join(stage, 'qd_basic.qdf')
+                sh(f'python3 "{ROOT}/tools/mzf2qdf.py" "{src}" "{SW}/mz1500/5Z001.mzt" > /dev/null')
             if not os.path.exists(src):
                 sys.exit(f'{t["name"]}: missing {src}')
             ext = os.path.splitext(src)[1].lower()
@@ -234,6 +245,10 @@ def main():
                 time.sleep(arg)
             elif op == 'type':
                 m.type(arg)
+            elif op == 'fetch':           # copy a mounted image back (after the core wrote to it) and list its blocks
+                local = os.path.join(a.out, f'{t["name"]}_{os.path.basename(remote[arg])}')
+                sh(f'scp -q "root@{a.host}:{remote[arg]}" "{local}"')
+                subprocess.run(['python3', os.path.join(ROOT, 'tools/qdinfo.py'), local])
             elif op == 'shot':
                 m.cmd(f'screenshot {t["name"]}_{arg}.png')
                 time.sleep(1.5)
