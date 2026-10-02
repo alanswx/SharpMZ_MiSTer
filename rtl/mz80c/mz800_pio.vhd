@@ -11,7 +11,10 @@
 --                  Implemented: the control words (mode, I/O mask, interrupt control and mask,
 --                  vector, interrupt enable), bit mode (mode 3) interrupts on the logic condition
 --                  becoming true, the vector on interrupt acknowledge (port A before port B), and
---                  data reads and writes. Not implemented: the handshake modes 0-2 (strobe/ready)
+--                  data reads and writes. As in mz800emu (pioz80.c), the condition becoming true is
+--                  latched while interrupts are disabled and requested once they are enabled
+--                  (MZ-1500 BASIC sets up its music timer that way), and writing the I/O or
+--                  interrupt mask takes the inputs as they are, without a request. Not implemented: the handshake modes 0-2 (strobe/ready)
 --                  and the daisy chain; RETI is not decoded, a request is served by the acknowledge.
 --
 -- Copyright:       (c) 2026 SharpMZ MiSTer contributors
@@ -63,7 +66,9 @@ architecture rtl of mz800_pio is
     signal EXP_INTMASK       : bit2;                                         -- Next control word is the interrupt mask.
     signal COND              : bit2;
     signal COND_LAST         : bit2;
+    signal REQ               : bit2;                                         -- Pending and enabled.
     signal PEND              : bit2;
+    signal SNAP              : bit2;                                         -- Mask written: take COND without a request.
     signal WR_LAST_n         : std_logic;
     signal INTA              : std_logic;
     signal INTA_LAST         : std_logic;
@@ -108,6 +113,7 @@ begin
                     EXP_INTMASK(p)   <= '0';
                     COND_LAST(p)     <= '0';
                     PEND(p)          <= '0';
+                    SNAP(p)          <= '0';
                 end loop;
                 WR_LAST_n            <= '1';
                 INTA_LAST            <= '0';
@@ -116,17 +122,18 @@ begin
                 WR_LAST_n            <= WR_n;
                 INTA_LAST            <= INTA;
 
-                -- Requests: the condition becoming true while interrupts are enabled.
+                -- Requests: the condition becoming true (served once interrupts are enabled).
                 for p in 0 to 1 loop
                     COND_LAST(p)     <= COND(p);
-                    if COND(p) = '1' and COND_LAST(p) = '0' and IE(p) = '1' then
+                    SNAP(p)          <= '0';
+                    if COND(p) = '1' and COND_LAST(p) = '0' and SNAP(p) = '0' and EXP_INTMASK(p) = '0' then
                         PEND(p)      <= '1';
                     end if;
                 end loop;
 
                 -- Acknowledge: port A has priority; the request is served at the end of the cycle.
                 if INTA = '1' and INTA_LAST = '0' then
-                    if PEND(0) = '1' then INTA_PORT <= '0'; else INTA_PORT <= '1'; end if;
+                    if REQ(0) = '1' then INTA_PORT <= '0'; else INTA_PORT <= '1'; end if;
                 end if;
                 if INTA = '0' and INTA_LAST = '1' then
                     if INTA_PORT = '0' then PEND(0) <= '0'; else PEND(1) <= '0'; end if;
@@ -142,9 +149,11 @@ begin
                                 if EXP_IOMASK(p) = '1' then
                                     IOMASK(p)        <= DI;
                                     EXP_IOMASK(p)    <= '0';
+                                    SNAP(p)          <= '1';
                                 elsif EXP_INTMASK(p) = '1' then
                                     INTMASK(p)       <= DI;
                                     EXP_INTMASK(p)   <= '0';
+                                    SNAP(p)          <= '1';
                                 elsif DI(0) = '0' then
                                     VECT(p)          <= DI;
                                 elsif DI(3 downto 0) = "1111" then
@@ -167,9 +176,11 @@ begin
         end if;
     end process;
 
-    INT_n                    <= '0' when PEND(0) = '1' or PEND(1) = '1' else '1';
-    VECTOR_OE                <= '1' when INTA = '1' and (PEND(0) = '1' or PEND(1) = '1') else '0';
-    DO                       <= VECT(0) when INTA = '1' and PEND(0) = '1' else
+    REQ(0)                   <= PEND(0) and IE(0);
+    REQ(1)                   <= PEND(1) and IE(1);
+    INT_n                    <= '0' when REQ(0) = '1' or REQ(1) = '1' else '1';
+    VECTOR_OE                <= '1' when INTA = '1' and (REQ(0) = '1' or REQ(1) = '1') else '0';
+    DO                       <= VECT(0) when INTA = '1' and REQ(0) = '1' else
                                 VECT(1) when INTA = '1' else
                                 (PA_IN and IOMASK(0)) or (OUTREG(0) and not IOMASK(0)) when A = "10" and MODE(0) = "11" else
                                 PA_IN                                                  when A = "10" else
