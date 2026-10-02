@@ -157,10 +157,10 @@ begin
         port map (clock_a => CLKBUS(CKMASTER), address_a => PCG_CPU_ADDR, data_a => T80_DI, wren_a => PCG_WE(2), q_a => PCG_CPU_Q2,
                   clock_b => CLKBUS(CKMASTER), address_b => PCG_RD_ADDR, data_b => (others => '0'), wren_b => '0', q_b => PCG_RD_DATA(23 downto 16));
     M15_PCGON  <= CONFIG(IS_MZ1500) and M15_DMD(0);
-    -- The CG ROM read (OUT E5 0) goes through the CG ROM's ioctl port; the core keeps the font bit-reversed for
-    -- the renderer, the CPU sees the ROM's own bit order.
-    M15_PCG_DO <= CG_IOCTL_DIN(0) & CG_IOCTL_DIN(1) & CG_IOCTL_DIN(2) & CG_IOCTL_DIN(3) &
-                  CG_IOCTL_DIN(4) & CG_IOCTL_DIN(5) & CG_IOCTL_DIN(6) & CG_IOCTL_DIN(7) when M15_CG_CS = '1' else
+    -- The CG ROM read (OUT E5 0) goes through the CG ROM's ioctl port. The CPU sees the font with bit 7 as the
+    -- leftmost pixel, the order the core keeps it in and the PCG's order: software copies CG characters into
+    -- the PCG (Xetter '91's text came out mirrored with the dump's bit 0-left order).
+    M15_PCG_DO <= CG_IOCTL_DIN when M15_CG_CS = '1' else
                   PCG_CPU_Q0 when M15_PCG_PLANE = "00" else PCG_CPU_Q1 when M15_PCG_PLANE = "01" else PCG_CPU_Q2;
 
     -- Configuration translation.

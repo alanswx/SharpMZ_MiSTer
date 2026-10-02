@@ -23,8 +23,8 @@
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
 #   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
 #   rd_mz800      MZ-800: tests/mz800/ramdisk.mzf writes 5A C3 to the RAM disk board (--ramdisk) and reads them back
-#   cg_mz1500     MZ-1500: tests/mz1500/cgread.mzf reads the CG ROM through OUT E5 0 and prints the 8 bytes of 'A' in
-#                 hex (MAME's mz700fon.jpn: 1824427E42424200)
+#   cg_mz1500     MZ-1500: tests/mz1500/cgread.mzf reads the CG ROM through OUT E5 0 and prints the 8 bytes of 'F' in
+#                 hex, bit 7 = left pixel as the PCG (MAME's mz700fon.jpn bit-reversed: 7E40407840404000)
 #   qd_mz1500     MZ-1500: Q loads Lode Runner from a Quick Disk dump (../software/mz1500); PCG title, frame hash at 600
 #                 (pixel-identical to mz1500emu). Skipped without the image and with QUICK=1.
 #   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
