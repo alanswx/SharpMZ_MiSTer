@@ -176,6 +176,13 @@ for n, (title, fa, fb, key) in enumerate([
          files=[('s', 3, f'qd:{M15}/{fa}')], late=[] if fb == '-' else [('s', 3, f'qd:{M15}/{fb}', 35)], reset=True,
          steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('type', key), ('wait', 30), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
 
+# MZ-800 tapes whose header carries a loader (exec 1108, in the MZF comment area loaded at 10F0): it relocates
+# itself and reads the body with the ROM's tape routine.
+for n, f in enumerate(['Jetman-S.mzf', 'Inparadi.mzf', 'Silents2.mzf', 'Boulder.mzf', 'Robo2-De.mzf']):
+    test(f'H{n + 1:02d}', 'MZ800', f'MZ-800 tape with a header loader (exec 1108): {f}', files=[('s', 0, f'{GAMES800}/{f}')],
+         opts=[FAST_TAPE(6)], reset=True,
+         steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 40), ('shot', 'a'), ('wait', 30), ('shot', 'b')])
+
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, ',': 51, '.': 52, '/': 53, ':': 40, '*': -40, '"': -3}   # Sharp layout by position: PC ' is the : key (shift *), shift+2 is "
 KEYS.update({c: k for c, k in zip('1234567890', range(2, 12))})

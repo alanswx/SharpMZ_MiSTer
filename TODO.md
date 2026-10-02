@@ -19,7 +19,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
 | FPGA | Latest build (6e70d0e, clean) meets timing (core clock +2.1 ns): about 18,750 ALMs (45%), 74% of block memory bits (the RAM disk adds 64 KB). Built on cottageubuntu or locally in the Quartus container. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
-| Regression | `make test`: 38 tests (including ipl/qd/cg_mz1500 and rd_mz800), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 65 MGL tests (T01-T26, Q01-Q05, B01-B04, C01-C12, W01-W02, G01-G16). |
+| Regression | `make test`: 38 tests (including ipl/qd/cg_mz1500 and rd_mz800), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 70 MGL tests (T01-T26, Q01-Q05, B01-B04, C01-C12, W01-W02, G01-G16, H01-H05). |
 
 ## Open work
 
@@ -37,7 +37,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] Printer port.
 - [x] RAM disk board: the 64 KB "standard" board of mz800emu (EA/EB, F8-FA; OSD MZ-800 RAM Disk). Not yet tried with CP/M; the Pezik boards (E8, EC-EF) and larger sizes aren't implemented.
 - [ ] 1.44 MB disk images (`_Vzor144`, `_Vzor_Nova`): `wd1793.sv` addresses 1 MB.
-- [ ] Turbo-loader tapes: 66 MZ-800 games have exec 1108, a loader in the MZF header's comment area (loaded at 10F0) that reads the body itself; most other unusual types are later parts of multi-part games. Check a few in the sim against mz800emu, which plays them at standard speed.
+- [x] MZ-800 tapes with exec 1108 (66 games): the header holds a relocating loader that reads the body with the ROM's tape routine, not a turbo format. Lunar Jetman, Three Weeks in Paradise, Silent Service, Boulder Dash III and Robocop 2 load on hardware (H01-H05). The other unusual header types are later parts of multi-part games.
 
 ### MZ-1500
 - [x] Quick Disk writes: the SIO transmitter (break, data, CRC on underrun, sync) as the ROM drives it, written sectors back to the image. BASIC INIT "QD:", SAVE and LOAD work on hardware; images check with `tools/qdinfo.py`. Writing needs a full-size image (`tools/make_blank_qd.py`).
