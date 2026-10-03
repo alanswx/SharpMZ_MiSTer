@@ -28,6 +28,7 @@ module mz_fdc
 	input         ce_cpu,         // CPU clock enable; the controller timing runs at CPU speed
 	input         model_ok,       // Model has the interface (MZ-700/800, MZ-80B/2000)
 	input   [1:0] mode,           // 0 Auto (present while a disk image is mounted), 1 On, 2 Off
+	input         crc_report,     // Report sectors dumped with a CRC error (else read them as good)
 
 	// Z80 I/O
 	input   [7:0] io_addr,
@@ -113,6 +114,7 @@ generate
 			.wr(io_wr),
 			.addr(reg_a),
 			.din(~io_dout),
+			.crc_report(crc_report),
 			.dout(fdc_dout[d]),
 			.drq(fdc_drq[d]),
 			.intrq(),

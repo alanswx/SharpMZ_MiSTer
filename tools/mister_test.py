@@ -170,11 +170,14 @@ for n, (title, fa, fb, key) in enumerate([
         ('Feizer-21', 'Feizer-21 (1984)(Game Roman)(Side A).mzt', None, 'Y'),
         ('Flappy', 'Flappy (1984)(DB-Soft)(Akira Obata) Side A.mzt', None, '\n'),
         ('Holy Knight', HOLY, None, 'Y'),
-        ('Volgurd', 'Volgurd (1984)(db-Soft)(Side A).mzt', None, 'Y')]):
+        ('Volgurd', 'Volgurd (1984)(db-Soft)(Side A).mzt', None, 'Y'),
+        ('Nonbarla Panic', 'Nonbarla Panic (1985)(Compac)(Shinsuke Nakamura).mzt', '-', '\n'),
+        ('Youkai Toubatsu Hidejirou', 'Youkai Toubatsu Hidejirou (1987)(Takeshi Maruyama) Side A.mzt', None, ' ')]):
     fb = fb or fa.replace('Side A', 'Side B').replace('(Side A)', '(Side B)')
     test(f'G{n + 1:02d}', 'MZ1500', f'MZ-1500 Quick Disk made from tapes: {title}',
          files=[('s', 3, f'qd:{M15}/{fa}')], late=[] if fb == '-' else [('s', 3, f'qd:{M15}/{fb}', 35)], reset=True,
-         steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('type', key), ('wait', 30), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
+         steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('type', key), ('wait', 30), ('shot', 'a'), ('type', key), ('wait', 20),
+                ('shot', 'b')])
 
 # MZ-800 tapes whose header carries a loader (exec 1108, in the MZF comment area loaded at 10F0): it relocates
 # itself and reads the body with the ROM's tape routine.
@@ -182,6 +185,36 @@ for n, f in enumerate(['Jetman-S.mzf', 'Inparadi.mzf', 'Silents2.mzf', 'Boulder.
     test(f'H{n + 1:02d}', 'MZ800', f'MZ-800 tape with a header loader (exec 1108): {f}', files=[('s', 0, f'{GAMES800}/{f}')],
          opts=[FAST_TAPE(6)], reset=True,
          steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 40), ('shot', 'a'), ('wait', 30), ('shot', 'b')])
+
+# More MZ-1500 tapes (single programs that start from tape).
+for n, (title, f) in enumerate([
+        ('Diamond Chase', 'Diamond Chase (1984)(Oak Corp)(Mac Tabata)(TMK).mzt'),
+        ('Hashire! Skyline', 'Hashire! Skyline (1985)(Compac).mzt'),
+        ('HP-Oushou', 'HP-Oushou (1984)(SPS).mzt'),
+        ('Ice Block', 'Ice Block (1984)(DB-Soft)(Yuji Yoshida).MZT'),
+        ('Jan-kyou', 'Jan-kyou (1984)(Hudson Soft).mzt'),
+        ('Nonbarla Panic', 'Nonbarla Panic (1985)(Compac)(Shinsuke Nakamura).mzt'),
+        ('Punch Ball Mario Bros.', 'Punch Ball Mario Bros. (1984)(Hudson Soft)(Masaaki Kikuta).mzt'),
+        ('Sonic Birds', 'Sonic Birds (1984)(Compac).mzt'),
+        ('Yakyu-kyou', 'Yakyu-kyou (1984)(Hudson Soft).mzt'),
+        ('Youkai Toubatsu Hidejirou', 'Youkai Toubatsu Hidejirou (1987)(Takeshi Maruyama) Side A.mzt'),
+        ('Excite 4nin Mahjong', 'Excite 4nin Mahjong (1984)(Tecno Soft).mzt'),
+        ('Dezeni Land', 'Dezeni Land (1984)(Hudson)(Tape 1).mzt')]):
+    test(f'C{n + 13:02d}', 'MZ1500', f'MZ-1500 tape: {title}', files=[('s', 0, f'{M15}/{f}')], opts=[FAST_TAPE(6)], reset=True,
+         steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 35), ('shot', 'a'), ('wait', 20), ('shot', 'b')])
+
+# MZ-80B bad dumps: sectors with CRC errors in the EDSK; the IPL should report a loading error, not hang.
+# OSD Floppy CRC Errors: DISK37 with Report (the IPL says "Loading error"), DISK38 with the default Ignore (boots).
+for n, (d, rep) in enumerate([('DISK37.DSK', 1), ('DISK38.DSK', 0)]):
+    test(f'T{n + 27:02d}', 'MZ80B', f'MZ-80B floppy with bad sectors: {d}, CRC errors {"reported" if rep else "ignored"}',
+         files=[('s', 1, f'{RB}/{d}')], opts=[(42, 1, rep)], reset=True,
+         steps=[('wait', 25), ('shot', 'a'), ('wait', 20), ('shot', 'b'), ('wait', 60), ('shot', 'c')])
+
+# Floppy write: CP/M 4.1 saves a file (SAVE 1 TEST.COM) on a copy of its system disk; DIR shows it, and the image
+# fetched back has the directory entry.
+test('W03', 'MZ800', 'MZ-800 floppy write: CP/M 4.1 SAVE 1 TEST.COM', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], reset=True,
+     steps=[('wait', 15), ('type', 'SAVE 1 TEST.COM\n'), ('wait', 6), ('type', 'DIR\n'), ('wait', 4), ('shot', 'dir'),
+            ('fetch', 0)])
 
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, ',': 51, '.': 52, '/': 53, ':': 40, '*': -40, '"': -3}   # Sharp layout by position: PC ' is the : key (shift *), shift+2 is "
@@ -295,10 +328,13 @@ def main():
                 time.sleep(arg)
             elif op == 'type':
                 m.type(arg)
-            elif op == 'fetch':           # copy a mounted image back (after the core wrote to it) and list its blocks
+            elif op == 'fetch':           # copy a mounted image back (after the core wrote to it); list a Quick Disk's blocks
                 local = os.path.join(a.out, f'{t["name"]}_{os.path.basename(remote[arg])}')
                 sh(f'scp -q "root@{a.host}:{remote[arg]}" "{local}"')
-                subprocess.run(['python3', os.path.join(ROOT, 'tools/qdinfo.py'), local])
+                if local.lower().endswith('.qdf'):
+                    subprocess.run(['python3', os.path.join(ROOT, 'tools/qdinfo.py'), local])
+                else:
+                    print(f'   fetched {local}')
             elif op == 'shot':
                 m.cmd(f'screenshot {t["name"]}_{arg}.png')
                 time.sleep(1.5)

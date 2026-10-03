@@ -119,7 +119,8 @@ signal IOCTL_DIN_ASCII       :     std_logic_vector(7 downto 0);
 -- CMT Control signals.
 signal CMT_BUS_OUTi          :     std_logic_vector(CMT_BUS_OUT_WIDTH);      -- CMT bus output.
 signal BUTTONS_LAST          :     std_logic_vector(1 downto 0);             -- Virtual buttons last sample, used to detect changes.
-signal PLAY_READY_SET_CNT    :     integer range 0 to 32000000   := 0;       -- 1 second timer from last cache upload to PLAY_READY being set.
+constant PLAY_READY_CLKS     :     natural := CLK_SYS_HZ / 2;              -- Quiet time after the last tape buffer write before PLAY_READY.
+signal PLAY_READY_SET_CNT    :     integer range 0 to PLAY_READY_CLKS := 0; -- Timer from the last cache upload to PLAY_READY being set.
 signal PLAY_READY_CLR_CNT    :     unsigned(21 downto 0);                    -- 2 second timer from motor being stopped to PLAY_READY being cleared.
 signal PLAY_READY            :     std_logic;                                -- Cache loaded, playback ready to commence.
 signal PLAY_READY_CLR        :     std_logic;                                -- Clear PLAY_READY signal.
@@ -607,8 +608,8 @@ begin
                 PLAY_READY                          <= '0';
                 PLAY_READY_SET_CNT                  <= 1;
 
-            -- 1 second timer, if no new writes have occurred to RAM, then set the ready flag.
-            elsif PLAY_READY_SET_CNT >= 32000000 then
+            -- Half a second without new writes to the buffer: set the ready flag.
+            elsif PLAY_READY_SET_CNT >= PLAY_READY_CLKS then
                 PLAY_READY_SET_CNT                  <= 0;
                 PLAY_READY                          <= '1';
             end if;

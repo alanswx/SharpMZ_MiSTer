@@ -19,7 +19,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
 | FPGA | Latest build (6e70d0e, clean) meets timing (core clock +2.1 ns): about 18,750 ALMs (45%), 74% of block memory bits (the RAM disk adds 64 KB). Built on cottageubuntu or locally in the Quartus container. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
-| Regression | `make test`: 40 tests (including ipl/qd/cg_mz1500, rd_mz800 and kb_mz80k/80a), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 70 MGL tests (T01-T26, Q01-Q05, B01-B04, C01-C12, W01-W02, G01-G16, H01-H05). |
+| Regression | `make test`: 40 tests (including ipl/qd/cg_mz1500, rd_mz800 and kb_mz80k/80a), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 85 MGL tests (T01-T28, Q01-Q05, B01-B04, C01-C24, W01-W03, G01-G18, H01-H05). |
 
 ## Open work
 
@@ -28,7 +28,8 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [x] Beeper vs PSG level: on the MZ-800/1500 the beeper is now one PSG channel's level, as mz800emu mixes them; full range on the models without a PSG.
 - [ ] Tape saves into a growing image instead of a pre-made blank tape: needs a Main change, proposed in `docs/main-growable-images.md` (with an RTL-only alternative through Main's save files).
 - [ ] Astro1: mz800emu rings the monitor bell (6 frames of 880 Hz) when the game restarts the monitor; the sim shows only the PC0 step. beep_mz800 shows the path works, so check the game's timing.
-- [ ] Floppy writes: copy a file on a writable image and check it in mz800emu; drive B; turbo speeds.
+- [x] Floppy writes: CP/M 4.1 SAVE 1 TEST.COM on hardware (W03); DIR lists it and the image fetched back has the directory entry.
+- [ ] Floppy: drive B, writes at turbo speeds.
 - [ ] 8253: the CP/M 1.x loader waits for counter 2's first clock (the first 1 s pulse of counter 1): about 1 s here, as the 8253 datasheet gives, and 2 s in mz800emu. Only the boot pause differs; confirm on hardware.
 
 ### MZ-800
@@ -47,7 +48,10 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] More `mzf2qdf.py` titles: Dark Storm, Demon Crystal, Devil Land, Feizer-21, Flappy, Holy Knight, Volgurd, Grobda/Battle City tapes, Galaga (two files on one tape).
 - [ ] Tape titles on hardware: the `C` at the IPL menu is sometimes missed (keypress while the IPL still probes the QD); W02 presses it twice, the C tests should too.
 - [x] CG ROM read through OUT E5 0, with bit 7 as the left pixel like the PCG (software copies CG characters into the PCG; Xetter '91's text was mirrored with the ROM dump's order). Test cg_mz1500: 'F' reads 7E40407840404000.
-- [ ] Galaga's tape (GALAGA DATA + GALAGA MZ-1500) stops at "QD: Not ready": probably a Quick Disk title too; try `mzf2qdf.py` with both files.
+- [x] Yakyu-kyou's tape ends on blue/green stripes, identical in mz1500emu: the program (or the dump), not the core.
+- [x] Nonbarla Panic (PCG set + main) is a Quick Disk title too and runs from a converted disk (G17).
+- [ ] Youkai Toubatsu Hidejirou (G18): side A from a converted disk runs to "set side B and hit SPACE", but with side B mounted SPACE doesn't continue. Check in mz1500emu (key, or how it reads side B).
+- [x] Galaga's tape (GALAGA DATA + GALAGA MZ-1500) is a Quick Disk title: `mzf2qdf.py` puts both files on one disk and it plays (G09).
 - [x] Joysticks: MZ-1X03 on E008 bits 1-4 (OSD MZ-1X03 Joysticks, also for the MZ-700): buttons during the picture, axis pulses of 68 + 28 x position T-states from the start of vertical blank, as mz800emu's joymz-1x03.c. Not yet tried with software.
 - [ ] Printer.
 - [x] MZ-1500 ROMs: identical to MAME's mz1500 set (9z-502m.rom, mz700fon.jpn).
@@ -58,17 +62,17 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] MZ-2000 character ROM is MAME's hand-made font.bin; a real dump of the IX0286PA (also the Japanese MZ-80B font) would replace it.
 - [ ] More MZ-2000 tapes from `software/mz2200` (Super Doors, Itasandrias, Project A, ...); Ice Block's MZT is malformed.
 - [ ] MZ-80B SB-7010 (DISK29) loads and stops at its monitor's `*` prompt; find out how FDOS is started from there.
-- [x] wd1793: EDSK sectors dumped with a CRC error (ST2 bit 5 data field, ST1 bit 5 ID field) now report CRC ERROR. Recheck DISK37/38 (bad dumps) on the MZ-80B: the IPL should report a loading error instead of hanging.
+- [x] wd1793: EDSK sectors dumped with a CRC error (ST2 bit 5 data field, ST1 bit 5 ID field) report CRC ERROR when the OSD Floppy CRC Errors is Report: at the end of the sector's data, ending a multi-sector read there (a WD179x checks the CRC after the data; flagging it at the ID broke reads force-interrupted before the bad sector). Default Ignore: DISK38 has sector 4 flagged on its boot tracks but good data, and boots; DISK37 gives the IPL's "Loading error" with Report and hung before.
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
 - [ ] MZ-80B: GRAM and 40/80 column switching with real software; SAVE and APSS.
 - [x] MZ-80K/80C/1200/80A keys: cursor keys, Backspace/Delete/Insert and Home/End go to the machine's UP/DOWN, RIGHT/LEFT, INST/DEL and CLR/HOME keys, with SHIFT where the monitor's key table needs it (SA-1510: unshifted UP; SP-1002: unshifted DOWN); MZ-80A/1200 keypad to its keypad (`tools/fix_keymap.py`). Tests kb_mz80k, kb_mz80a. The MZ-80A reads SHIFT late: a tap shorter than about 80 ms gives the unshifted key.
 - [ ] MZ-80K: 3-D MAZE loads and runs but the screen looks garbled; check whether that's the program.
 
 ### Core and polish
-- [ ] Audio mixing: sound and tape together, volume.
+- [x] Audio mixing: OSD Tape Sound mixes the tape signal in quietly while it moves. Not yet heard on hardware.
 - [x] Joystick mapping in the OSD (Fire 1, Fire 2).
 - [ ] Show tape status (record number, tape full) in the OSD.
-- [ ] Tape PLAY_READY "one second" counter is hard-coded to 32,000,000 cycles.
+- [x] Tape PLAY_READY delay: half a second of clk_sys (`CLK_SYS_HZ` in clkgen_pkg), was a bare 32,000,000.
 - [ ] Optional 64 MHz clock for the MZ-80K/80A/80B family, so their clock enables are exact (±1 clk_sys jitter now).
 - [ ] Unit testbenches for `cmt.vhd` and the i8254.
 - [x] WAV to MZF converter: `tools/wav2mzf.py` (WAV, or FLAC etc. through ffmpeg; either polarity; header and body copies). Decodes the No-Intro MZ-700 "BASIC" and "Applications" recordings.

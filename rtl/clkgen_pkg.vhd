@@ -12,6 +12,8 @@
 ---------------------------------------------------------------------------------------------------------
 
 package clkgen_pkg is
+    constant CLK_SYS_HZ      : natural := 70937600;                      -- clk_sys (4 x 17.7344 MHz), as clkgen's CLK_HZ.
+
 
     -- Clock bus, various clocks on a single bus construct.
     --

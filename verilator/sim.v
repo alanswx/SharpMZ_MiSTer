@@ -171,7 +171,7 @@ module top(
 
    mz_fdc fdc(
       .clk_sys(clk_sys), .reset(reset | warm_reset), .ce_cpu(ext_ce_cpu),
-      .model_ok(cfg_model[2] == 1'b1), .mode(fdc_mode),                          // MZ-700, MZ-800, MZ-80B, MZ-2000
+      .model_ok(cfg_model[2] == 1'b1), .mode(fdc_mode), .crc_report(1'b0),                          // MZ-700, MZ-800, MZ-80B, MZ-2000
       .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),
       .io_din(fdc_io_din), .io_oe(fdc_io_oe), .int_n(ext_int_n),
       .img_mounted({1'b0, fdd_mounted}), .img_readonly(fdd_readonly), .img_size(fdd_size),

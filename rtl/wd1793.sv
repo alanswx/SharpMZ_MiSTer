@@ -38,6 +38,7 @@ module wd1793 #(parameter RWMODE=0, EDSK=1)
 	output       busy,
 
 	input        wp,          // write protect
+	input        crc_report,  // LOCAL ADDITION (SharpMZ): report sectors dumped with a CRC error (.d77 status, EDSK ST1/ST2)
 
 	// LOCAL ADDITION (FM-7_MiSTer): write-protect flag carried inside the image
 	// itself. .d77 has one at header offset $1a; valid only once the mount-time
@@ -428,6 +429,7 @@ always @(posedge clk_sys) begin
 	reg [9:0] seektimer;
 	reg [7:0] ra_sector;
 	reg       multisector;
+	reg       sec_crc;              // the sector being read was dumped with a CRC error
 	reg       write;
 	reg [5:0] ack;
 	reg       sd_busy;
@@ -612,11 +614,13 @@ always @(posedge clk_sys) begin
 						// protection need this to be true. Not on a write: that
 						// replaces the data, and not while formatting.
 						//
-						// Sticky, so a multi-sector read that crosses a bad
-						// sector still reports the error when it ends. A real
-						// WD179x would also abort the run there; this one reads
-						// on to the end of the track.
-						if(~write & ~format) s_crcerr <= s_crcerr | (|edsk_crc);
+						// Reported when the sector's data has been read (the FDC
+						// checks the CRC after the data field), and like a real
+						// WD179x a multi-sector read stops there. Flagging it at
+						// the ID instead poisoned reads that are force-interrupted
+						// before the bad sector: the MZ-80B IPL reads 16 sectors and
+						// stops, and DISK37 has a bad 17th sector on every track.
+						sec_crc <= crc_report & ~write & ~format & (|edsk_crc);
 `ifdef DEBUG_FDC_SCAN
 						$display("WDMATCH want trk=%0d side=%0d sec=%0d -> entry trk=%0d side=%0d sec=%0d off=%0d",
 									disk_track, side, wdreg_sector, edsk_track, edsk_side, edsk_sector, edsk_offset);
@@ -737,7 +741,10 @@ always @(posedge clk_sys) begin
 
 						if(next_length == 0) begin
 							// either read the next sector, or stop if this is track end
-							if(multisector) begin
+							if(sec_crc) begin
+								s_crcerr <= 1;
+								state <= STATE_ENDCOMMAND;
+							end else if(multisector) begin
 								wdreg_sector <= wdreg_sector + 1'b1;
 								state <= STATE_SEARCH;
 							end else begin

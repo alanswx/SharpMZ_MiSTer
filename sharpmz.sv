@@ -103,6 +103,7 @@ localparam CONF_STR =
 	"P2O[23:21],Fast Tape,Default,Off,2x,4x,8x,16x,32x,Default;",
 	"P2O[27:26],Sharp ASCII Name,Off,On Save,On Load,Both;",
 	"P2O[20],Audio Source,Sound,Tape;",
+	"P2O[41],Tape Sound,Off,On;",
 	"-;",
 	"P3,Display;",
 	"P3O[8:7],Display Type,Default,Mono 80x25,Colour 40x25,Colour 80x25;",
@@ -114,6 +115,7 @@ localparam CONF_STR =
 	"P5,Floppy;",
 	"P5O[34:33],Floppy Interface,Auto,On,Off;",
 	"P5O[40],MZ-800 RAM Disk,Off,64 KB;",
+	"P5O[42],Floppy CRC Errors,Ignore,Report;",
 	"-;",
 	"P4,ROM and RAM;",
 	"P4O[28],User ROM,Off,On;",
@@ -387,6 +389,7 @@ assign hps_ioctl_din = mz_ioctl_din[7:0];
 /////////////////  TAPE IMAGE  ////////////////////
 
 wire [13:0] cmt_status;
+wire  [7:0] cmt_ctrl;                               // CMT_BUS_IN: bit 0 is the machine's write (record) bit.
 wire [24:0] tape_addr;
 wire        tape_wr;
 wire  [7:0] tape_dout;
@@ -449,8 +452,12 @@ wire [13:0] audio_psg_r;                            // MZ-1500 right PSG; the MZ
 wire        has_psg = (cfg_model == 3'b101) | cfg_mz1500;
 wire [15:0] beep_l  = has_psg ? {3'b000, audio_l_emu, 12'd0} : {1'b0, audio_l_emu, 14'd0};
 wire [15:0] beep_r  = has_psg ? {3'b000, audio_r_emu, 12'd0} : {1'b0, audio_r_emu, 14'd0};
-assign AUDIO_L = beep_l + {2'b00, audio_psg};
-assign AUDIO_R = beep_r + {2'b00, audio_psg_r};
+// Tape Sound: the tape signal (playback, cmt_status[6]; recording, cmt_ctrl[0]) mixed in quietly while the tape
+// moves (cmt_status[4]), like a deck's monitor speaker; Audio Source = Tape plays it instead of the sound.
+wire        tape_bit = cmt_status[4] & (cmt_status[6] | cmt_ctrl[0]);
+wire [15:0] tape_snd = (status[41] & tape_bit) ? 16'h0800 : 16'd0;
+assign AUDIO_L = beep_l + {2'b00, audio_psg} + tape_snd;
+assign AUDIO_R = beep_r + {2'b00, audio_psg_r} + tape_snd;
 assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
@@ -478,6 +485,7 @@ mz_fdc mz_fdc
 	.ce_cpu(ext_ce_cpu),
 	.model_ok(cfg_model[2]),                    // MZ-700, MZ-800, MZ-80B, MZ-2000
 	.mode(status[34:33]),
+	.crc_report(status[42]),
 
 	.io_addr(ext_io_addr),
 	.io_rd(ext_io_rd),
@@ -576,6 +584,7 @@ sharpmz sharp_mz
 	.AUDIO_PSG_R_O(audio_psg_r),
 
 	.CMT_STATUS(cmt_status),
+	.CMT_CTRL(cmt_ctrl),
 	.EXT_IO_ADDR(ext_io_addr),
 	.EXT_IO_RD(ext_io_rd),
 	.EXT_IO_WR(ext_io_wr),
