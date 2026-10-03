@@ -96,13 +96,13 @@ signal SCAN13                : std_logic_vector(7 downto 0);
 signal SCAN14                : std_logic_vector(7 downto 0);
 signal SCANLL                : std_logic_vector(7 downto 0);
 --
--- Minimum key press: every key pressed stays in the matrix until HOLD_CLKS after the latest press, so a
+-- Minimum key press: every key pressed stays in the matrix until 50 ms after the latest press, so a
 -- short tap (a remote or scripted keypress gives make and break back to back) is still seen by software
 -- that scans the keyboard only now and then (the MZ-1500 IPL while it probes the Quick Disk).
 --
 signal HOLD                  : std_logic_vector(119 downto 0);       -- Row r, column c at bit 8r+c.
 signal HOLD_CNT              : std_logic_vector(22 downto 0);
-constant HOLD_CLKS           : natural := 5675008;                   -- 80 ms of the 70.9376 MHz clock.
+constant HOLD_CLKS           : natural := 3546880;                   -- 50 ms of the 70.9376 MHz clock.
 signal K00, K01, K02, K03, K04, K05, K06, K07, K08, K09, K10, K11, K12, K13, K14 : std_logic_vector(7 downto 0);
 --
 -- Key code exchange table
@@ -278,9 +278,10 @@ begin
                         when "1110" => SCAN14(conv_integer(MAP_DATA(2 downto 0))) <= not FLGF0;
                         when others => SCAN14(conv_integer(MAP_DATA(2 downto 0))) <= not FLGF0; FLGF0 <= '0';
                     end case;
-                    -- MZ-80A bank: bit 3 also presses SHIFT (F0 bit 0) for its shifted keys (DOWN, LEFT, INST, CLR).
-                    if KEY_BANK = "011" and MAP_DATA(3) = '1' and MAP_DATA /= X"FF" then
-                        SCAN00(0) <= not FLGF0;
+                    -- MZ-80K/80C/1200/80A banks: bit 3 also presses SHIFT for the keys that need it (cursor, INST,
+                    -- CLR): F8 bit 0 on the MZ-80K/80C, F0 bit 0 on the MZ-1200/80A.
+                    if KEY_BANK(2) = '0' and MAP_DATA(3) = '1' and MAP_DATA /= X"FF" then
+                        if KEY_BANK(1) = '0' then SCAN08(0) <= not FLGF0; else SCAN00(0) <= not FLGF0; end if;
                     end if;
                 end if;
             end if;
@@ -295,8 +296,8 @@ begin
             if CLKBUS(CKENCPU) = '1' and MTEN(3) = '1' and FLGF0 = '0' then
                 if MAP_DATA(7 downto 4) /= "1111" then                         -- FF: not a Sharp key
                     HOLD(conv_integer(MAP_DATA(7 downto 4)) * 8 + conv_integer(MAP_DATA(2 downto 0))) <= '1';
-                    if KEY_BANK = "011" and MAP_DATA(3) = '1' then
-                        HOLD(0)      <= '1';                                     -- MZ-80A SHIFT, as above.
+                    if KEY_BANK(2) = '0' and MAP_DATA(3) = '1' then                -- SHIFT, as above.
+                        if KEY_BANK(1) = '0' then HOLD(64) <= '1'; else HOLD(0) <= '1'; end if;
                     end if;
                 end if;
                 HOLD_CNT <= conv_std_logic_vector(HOLD_CLKS, HOLD_CNT'length);

@@ -23,6 +23,7 @@
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
 #   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
 #   rd_mz800      MZ-800: tests/mz800/ramdisk.mzf writes 5A C3 to the RAM disk board (--ramdisk) and reads them back
+#   kb_mz80k/80a  type AB, cursor LEFT, C at the monitor prompt: *AC (LEFT needs the keymap's added SHIFT)
 #   cg_mz1500     MZ-1500: tests/mz1500/cgread.mzf reads the CG ROM through OUT E5 0 and prints the 8 bytes of 'F' in
 #                 hex, bit 7 = left pixel as the PCG (MAME's mz700fon.jpn bit-reversed: 7E40407840404000)
 #   qd_mz1500     MZ-1500: Q loads Lode Runner from a Quick Disk dump (../software/mz1500); PCG title, frame hash at 600
@@ -51,6 +52,11 @@ done
 ( $BIN --model mz700 --type '120:ABCXYZ0123456789-,./;[] QABCD{LEFT}{LEFT}X{BS}' --stop-at-frame 400 --ascii-end --quiet \
       > "$OUT/kb_mz700.txt" 2> "$OUT/kb_mz700.log" ) &
 pids+=($!); names+=("kb_mz700")
+for m in mz80k mz80a; do      # cursor keys need the added SHIFT (fix_keymap.py); 120 ms presses as a typist's
+    ( $BIN --model $m --type '150:AB{LEFT}C' --type-rate 6:6 --stop-at-frame 300 --ascii-end --quiet 2> "$OUT/kb_$m.log" \
+          | sed -n 2p > "$OUT/kb_$m.txt" ) &
+    pids+=($!); names+=("kb_$m")
+done
 ( $BIN --model mz800 --type 160:M --stop-at-frame 300 --ascii-end --quiet > "$OUT/mon_mz800.txt" 2> "$OUT/mon_mz800.log" ) &
 pids+=($!); names+=("mon_mz800")
 ( $BIN --model mz800 --mzf tests/mz800/gfx320.mzf --mzf-direct --mzf-direct-frame 20 --type 200:M --type '280:J2000\n' \

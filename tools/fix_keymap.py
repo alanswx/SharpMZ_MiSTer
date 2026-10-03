@@ -3,16 +3,17 @@
 
 The keymap is 8 banks of 256 bytes, one per model, indexed by the PS/2 set 2 code with bit 7 set
 for extended (E0) keys. Each byte is the MZ key matrix position: row in bits 7:4, column in 2:0;
-FF means no key. In the MZ-80A bank bit 3 also presses SHIFT (keymatrix.vhd).
+FF means no key. In the MZ-80K/80C/1200/80A banks bit 3 also presses SHIFT (keymatrix.vhd).
 
 1. MZ-700 and MZ-800 banks: the layout of mz800emu (src/iface/iface_keyboard.c), the reference for
    these machines. The old table had 4 on C, no Backspace/Delete/Insert/Home/End, no right SHIFT,
    CTRL on a row the machine doesn't have, and no : ' key.
-2. MZ-80A bank: the cursor keys, Backspace/Delete/Insert and Home/End go to the MZ-80A's own keys, with
-   SHIFT where the MZ-80A needs it (bit 3 of an entry, see below): UP/DOWN and RIGHT/LEFT are one key
-   each, shifted for DOWN and LEFT; INST/DEL is one key, shifted for INST; CLR/HOME shifted for CLR.
-   The keypad keys 0, 1, 2, 4, 5, 7 and 8 go to the MZ-80A keypad (row F8 of the sharpmz.net matrix).
-   The old table had the cursor keys on keypad digits and Backspace on /.
+2. MZ-80K/80C/1200/80A banks: the cursor keys, Backspace/Delete/Insert and Home/End go to the machine's
+   own keys, with SHIFT where needed (bit 3 of an entry, see below). UP/DOWN, RIGHT/LEFT, INST/DEL and
+   CLR/HOME are one key each; which way is shifted comes from the monitors' key tables (SA-1510 and
+   SP-1002): unshifted RIGHT, DEL and HOME on all of them, UP on the MZ-80A but DOWN on the MZ-80K.
+   MZ-80A/1200: the keypad keys 0, 1, 2, 4, 5, 7 and 8 go to its keypad (row F8 of the sharpmz.net
+   matrix). The old tables had the cursor keys on keypad digits and Backspace on / (80A) or on G keys.
 3. Every bank: an extended key with no entry of its own (cursor keys, Insert, Delete, keypad Enter
    and /, right CTRL) gets the entry of its non-extended twin. keymatrix.vhd used to drop the
    extended flag, so these keys only ever reached the twin's entry; this keeps them working now
@@ -23,8 +24,8 @@ usage: fix_keymap.py ROMDIR MIFDIR
 import sys
 
 romdir, mifdir = sys.argv[1], sys.argv[2]
-BANK = {'MZ80A': 3, 'MZ700': 4, 'MZ800': 5}
-SHIFT = 0x08                    # MZ-80A bank: also press SHIFT
+BANK = {'MZ80K': 0, 'MZ80C': 1, 'MZ1200': 2, 'MZ80A': 3, 'MZ700': 4, 'MZ800': 5}
+SHIFT = 0x08                    # MZ-80K/80C/1200/80A banks: also press SHIFT
 EXT = 0x80
 
 
@@ -107,14 +108,30 @@ MZ80A = {
     0x75: k(8, 7),                  # KP 8
 }
 
+# MZ-80K / 80C (sharpmz.net mz80k/kbdmatrix: LSHIFT F8 bit 0; SP-1002's table: unshifted DOWN, RIGHT, DEL, HOME).
+MZ80K = {
+    EXT | 0x75: k(9, 2) | SHIFT,    # Up        shift UP/DOWN
+    EXT | 0x72: k(9, 2),            # Down      UP/DOWN
+    EXT | 0x74: k(8, 3),            # Right     RIGHT/LEFT
+    EXT | 0x6B: k(8, 3) | SHIFT,    # Left      shift RIGHT/LEFT
+    0x66: k(8, 1),                  # Backspace INST/DEL
+    EXT | 0x71: k(8, 1),            # Delete    INST/DEL
+    EXT | 0x70: k(8, 1) | SHIFT,    # Insert    shift INST/DEL
+    EXT | 0x6C: k(9, 0),            # Home      CLR/HOME
+    EXT | 0x69: k(9, 0) | SHIFT,    # End       shift CLR/HOME (CLR)
+}
+
 # Extended keys and their non-extended twins, for the other banks.
 TWINS = [0x69, 0x6B, 0x6C, 0x70, 0x71, 0x72, 0x74, 0x75, 0x7A, 0x7D, 0x4A, 0x5A, 0x14, 0x11]
 
 rom = bytearray(open(f"{romdir}/combined_keymap.rom", "rb").read())
-for model, table in (('MZ80A', MZ80A), ('MZ700', MZ700), ('MZ800', MZ800)):
+for model, table in (('MZ80K', MZ80K), ('MZ80C', MZ80K), ('MZ1200', MZ80A), ('MZ80A', MZ80A), ('MZ700', MZ700), ('MZ800', MZ800)):
     base = BANK[model] * 256
     for code, val in table.items():
         rom[base + code] = val
+# The keyboard's AA (self test passed) reads entry EF; banks 0-3 had EF there, which is bit 3 (SHIFT) now.
+for bank in range(4):
+    rom[bank * 256 + 0xEF] = 0xFF
 for bank in range(8):
     base = bank * 256
     for c in TWINS:

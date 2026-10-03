@@ -43,7 +43,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [x] Quick Disk writes: the SIO transmitter (break, data, CRC on underrun, sync) as the ROM drives it, written sectors back to the image. BASIC INIT "QD:", SAVE and LOAD work on hardware; images check with `tools/qdinfo.py`. Writing needs a full-size image (`tools/make_blank_qd.py`).
 - [x] The two-tape "DATA" titles (Rally-X, Druaga, Dig Dug, Mappy, Door Door, Knither, Zolvass, Burnin' Rubber, ...) are Quick Disk products dumped to tape, not installers: side A asks for side B ("SET PROGRAM QD ?", answer Y). `tools/mzf2qdf.py` makes a disk of each side.
 - [x] Fast tape 32x mapped to the normal CPU speed on the MZ-700/800/1500 and MZ-80B/2000; it now selects the fastest rate (capped at about 35 MHz). The 48 KB Druaga file loads in under a minute on hardware.
-- [x] Short keypresses: a remote or scripted key (make and break back to back) was missed by the MZ-1500 IPL while it probes the Quick Disk. Every key now stays in the matrix until 80 ms after the latest press (`keymatrix.vhd`). This exposed an old bug: the E008 sound gate latched only on the 2 MHz peripheral enable, so some CPU writes to it were lost (no beeper).
+- [x] Short keypresses: a remote or scripted key (make and break back to back) was missed by the MZ-1500 IPL while it probes the Quick Disk. Every key now stays in the matrix until 50 ms after the latest press (`keymatrix.vhd`; 80 ms made the MZ-80K drop fast-typed keys). This exposed an old bug: the E008 sound gate latched only on the 2 MHz peripheral enable, so some CPU writes to it were lost (no beeper).
 - [ ] More `mzf2qdf.py` titles: Dark Storm, Demon Crystal, Devil Land, Feizer-21, Flappy, Holy Knight, Volgurd, Grobda/Battle City tapes, Galaga (two files on one tape).
 - [ ] Tape titles on hardware: the `C` at the IPL menu is sometimes missed (keypress while the IPL still probes the QD); W02 presses it twice, the C tests should too.
 - [x] CG ROM read through OUT E5 0, with bit 7 as the left pixel like the PCG (software copies CG characters into the PCG; Xetter '91's text was mirrored with the ROM dump's order). Test cg_mz1500: 'F' reads 7E40407840404000.
@@ -61,8 +61,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [x] wd1793: EDSK sectors dumped with a CRC error (ST2 bit 5 data field, ST1 bit 5 ID field) now report CRC ERROR. Recheck DISK37/38 (bad dumps) on the MZ-80B: the IPL should report a loading error instead of hanging.
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
 - [ ] MZ-80B: GRAM and 40/80 column switching with real software; SAVE and APSS.
-- [x] MZ-80A keys: cursor keys, Backspace/Delete/Insert and Home/End go to the MZ-80A's UP/DOWN, RIGHT/LEFT, INST/DEL and CLR/HOME keys (with SHIFT where needed), the keypad to its keypad (`tools/fix_keymap.py`). Not yet tried on hardware.
-- [ ] MZ-80K/1200 keys: check the same keys against their matrices.
+- [x] MZ-80K/80C/1200/80A keys: cursor keys, Backspace/Delete/Insert and Home/End go to the machine's UP/DOWN, RIGHT/LEFT, INST/DEL and CLR/HOME keys, with SHIFT where the monitor's key table needs it (SA-1510: unshifted UP; SP-1002: unshifted DOWN); MZ-80A/1200 keypad to its keypad (`tools/fix_keymap.py`). Tests kb_mz80k, kb_mz80a. The MZ-80A reads SHIFT late: a tap shorter than about 80 ms gives the unshifted key.
 - [ ] MZ-80K: 3-D MAZE loads and runs but the screen looks garbled; check whether that's the program.
 
 ### Core and polish
