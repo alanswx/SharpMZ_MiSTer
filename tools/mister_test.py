@@ -216,6 +216,15 @@ test('W03', 'MZ800', 'MZ-800 floppy write: CP/M 4.1 SAVE 1 TEST.COM', files=[('s
      steps=[('wait', 15), ('type', 'SAVE 1 TEST.COM\n'), ('wait', 6), ('type', 'DIR\n'), ('wait', 4), ('shot', 'dir'),
             ('fetch', 0)])
 
+# MZ-800 border (OSD Display > MZ-800 Border): Cybernoid and CP/M 4.1 with the border shown.
+test('T29', 'MZ800', 'MZ-800 border on: Cybernoid', files=[('s', 0, f'{GAMES800}/Cyberno.mzf')], opts=[FAST_TAPE(6), (43, 1, 1)],
+     reset=True, steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 45), ('shot', 'a')])
+test('T31', 'MZ800', 'MZ-800 border on: a program sets the border to light red (OUT (CF) with B = 06)',
+     files=[('s', 0, f'{TESTS}/border.mzf')], opts=[FAST_TAPE(6), (43, 1, 1)], reset=True,
+     steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 15), ('shot', 'a')])
+test('T30', 'MZ800', 'MZ-800 border on: CP/M 4.1', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], opts=[(43, 1, 1)], reset=True,
+     steps=[('wait', 15), ('shot', 'boot')])
+
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, ',': 51, '.': 52, '/': 53, ':': 40, '*': -40, '"': -3}   # Sharp layout by position: PC ' is the : key (shift *), shift+2 is "
 KEYS.update({c: k for c, k in zip('1234567890', range(2, 12))})

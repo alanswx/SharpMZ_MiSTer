@@ -80,6 +80,7 @@ Writes go back to the image; mount a copy if you want to keep the original.
 | ------ | ----------- |
 | Display Type | Default follows the model (MZ-700/800 colour 40x25, MZ-80B/2000 mono 80x25, others mono 40x25). |
 | Video / Graphics | Turn the character or graphics layer off. |
+| MZ-800 Border | Show the MZ-800 border colour around the picture (464 x 288 instead of 320 x 200). |
 | VRAM Wait | Insert the original wait states when the CPU accesses video RAM during the display (MZ-80A/1200/700). Some software relies on this timing. |
 | Aspect ratio | Original, full screen, or the custom ratios from `MiSTer.ini`. |
 
@@ -93,7 +94,7 @@ Writes go back to the image; mount a copy if you want to keep the original.
 ## Known Issues
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
-* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour isn't shown (only the 320x200/640x200 area is output), and the printer port isn't implemented. Joysticks and the RAM disk are new and not yet tried with software.
+* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border), and the printer port isn't implemented. Joysticks and the RAM disk are new and not yet tried with software.
 * Floppy: 1.44 MB images aren't supported, and the MZ-80K/80A floppy interface isn't implemented. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).

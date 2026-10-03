@@ -441,6 +441,16 @@ void Sim::clock()
         prev_io_wr = w;
     }
 
+    if (opt.verbose) {                       // MZ-800 border (sim.v: always on): frame size as hps_io video_calc measures it
+        static int ovs = 0, ode = 0, calch = 0, hcnt = 0, runs = 0;
+        if (top->ce_pix) {
+            if (calch && top->dbg_bde) hcnt++;
+            if (ode && !top->dbg_bde) calch = 0;
+            if (!top->VGA_VS && !ode && top->dbg_bde) runs++;
+            if (ovs && !top->VGA_VS) { if (frame >= 58 && frame <= 60) fprintf(stderr, "[vc] frame %u width %d lines %d\n", frame, hcnt, runs); hcnt = 0; runs = 0; calch = 1; }
+            ovs = top->VGA_VS; ode = top->dbg_bde;
+        }
+    }
     if (opt.verbose) {
         static int last_mw = 0;
         if (top->dbg_memwr && !last_mw && (top->dbg_addr & 0xFFF0) == 0xE000)

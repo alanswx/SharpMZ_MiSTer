@@ -74,6 +74,7 @@ entity video_vc is
         M15_PCG_DO               : out std_logic_vector(7 downto 0);
         M15_DMD                  : in  std_logic_vector(1 downto 0) := "00";
         M15_PAL                  : in  std_logic_vector(23 downto 0) := (others => '0');
+        BCOL                     : out std_logic_vector(3 downto 0);   -- MZ-800 border colour (I, G, R, B).
         IOCTL_DOWNLOAD           : in  std_logic;
         IOCTL_UPLOAD             : in  std_logic;
         IOCTL_CLK                : in  std_logic;
@@ -218,6 +219,7 @@ begin
             M15_PCGON        => M15_PCGON,
             M15_PRIO         => M15_DMD(1),
             M15_PAL          => M15_PAL,
+            BCOL_O           => BCOL,
             PCG_RD_ADDR      => PCG_RD_ADDR,
             PCG_RD_DATA      => PCG_RD_DATA,
             VIDEO_ADDR       => X"00" & T80_A,

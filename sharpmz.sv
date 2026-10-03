@@ -110,6 +110,7 @@ localparam CONF_STR =
 	"P3O[16],Video,On,Off;",
 	"P3O[17],Graphics,On,Off;",
 	"P3O[18],VRAM Wait,Off,On;",
+	"P3O[43],MZ-800 Border,Off,On;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
 	"P5,Floppy;",
@@ -469,6 +470,7 @@ wire hblank_emu;
 wire vblank_emu;
 wire hsync_emu;
 wire vsync_emu;
+wire [3:0] mz800_bcol;
 wire [7:0] main_leds;
 
 // Floppy disk interface (MZ-700/MZ-800), drives A/B on image slots S1/S2.
@@ -574,6 +576,7 @@ sharpmz sharp_mz
 	.VGA_VB_O(vblank_emu),
 	.VGA_HS_O(hsync_emu),
 	.VGA_VS_O(vsync_emu),
+	.BCOL_O(mz800_bcol),
 	.VGA_R_O(R_emu),
 	.VGA_G_O(G_emu),
 	.VGA_B_O(B_emu),
@@ -622,12 +625,21 @@ assign LED_DISK = {1'b0, tape_active | cmt_status[4] | fdd_busy | qd_busy};    /
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL  = clk_video_in;
 
-assign VGA_R  = R_emu;
-assign VGA_G  = G_emu;
-assign VGA_B  = B_emu;
+// MZ-800 border colour around the picture (OSD Display > MZ-800 Border); otherwise the picture as it is.
+mz800_border mz800_border
+(
+	.clk(clk_sys),
+	.ce_pix(clk_video_in),
+	.enable(status[43] & (cfg_model == 3'b101)),
+	.hblank(hblank_emu),
+	.vblank(vblank_emu),
+	.bcol(mz800_bcol),
+	.r_in(R_emu), .g_in(G_emu), .b_in(B_emu),
+	.r_out(VGA_R), .g_out(VGA_G), .b_out(VGA_B),
+	.de(VGA_DE)
+);
 assign VGA_VS = vsync_emu;
 assign VGA_HS = hsync_emu;
-assign VGA_DE = ~(vblank_emu | hblank_emu);
 
 wire [1:0] ar = status[122:121];
 

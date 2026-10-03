@@ -101,6 +101,7 @@ entity sharpmz is
         VGA_VB_O              : out    std_logic;                               -- VGA Vertical Blank
         VGA_HS_O              : out    std_logic;                               -- VGA H_SYNC
         VGA_VS_O              : out    std_logic;                               -- VGA V_SYNC
+        BCOL_O                : out    std_logic_vector(3 downto 0);            -- MZ-800 border colour (I, G, R, B).
         VGA_R_O               : out    std_logic_vector(7 downto 0);            -- VGA Red[3:0], [7:4] = 0
         VGA_G_O               : out    std_logic_vector(7 downto 0);            -- VGA Green[3:0]
         VGA_B_O               : out    std_logic_vector(7 downto 0);            -- VGA Blue[3:0]
@@ -889,6 +890,7 @@ begin
             M15_PCG_DO       => M15_PCG_DO,
             M15_DMD          => M15_DMD,
             M15_PAL          => M15_PAL,
+            BCOL             => BCOL_O,
 
             -- HPS Interface
             IOCTL_DOWNLOAD   => MZ_IOCTL_DOWNLOAD,

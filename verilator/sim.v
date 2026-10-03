@@ -110,6 +110,7 @@ module top(
    output        dbg_readbit /*verilator public_flat*/,
    output        dbg_snd_en /*verilator public_flat*/,
    output        dbg_snd /*verilator public_flat*/,
+   output        dbg_bde /*verilator public_flat*/,
    output [2:0]  dbg_map /*verilator public_flat*/,
    output        dbg_memwr /*verilator public_flat*/,
    output [15:0] dbg_addr /*verilator public_flat*/,
@@ -245,6 +246,8 @@ module top(
    assign cpu_ce = core.clkgen0.ckencpui;
    assign cpu_m1_n = core.cpu0.u0.m1_n;
    assign dbg_io_wr = ~core.t80_iorq_n & ~core.t80_wr_n;
+   mz800_border bdr(.clk(clk_sys), .ce_pix(ce_pix), .enable(1'b1), .hblank(VGA_HB), .vblank(VGA_VB), .bcol(4'd1),
+                    .r_in(8'd0), .g_in(8'd0), .b_in(8'd0), .r_out(), .g_out(), .b_out(), .de(dbg_bde));
    assign dbg_snd_en = core.mz80hw.sound_enable;        // 8253 GATE0 (E008 bit 0)
    assign dbg_snd    = core.mz80hw.sound_pulse_x2;      // 8253 OUT0
    assign dbg_memwr  = ~core.t80_mreq_n & ~core.t80_wr_n;

@@ -112,6 +112,7 @@ entity VideoController is
         M15_PCGON                : in    std_logic := '0';                               -- MZ-1500 with port F0 bit 0 set.
         M15_PRIO                 : in    std_logic := '0';                               -- Port F0 bit 1: 0 = BPF (characters over PCG), 1 = BFP.
         M15_PAL                  : in    std_logic_vector(23 downto 0) := (others => '0'); -- Port F1: colour of PCG index i in bits 3i+2..3i (b0 B, b1 R, b2 G).
+        BCOL_O                   : out   std_logic_vector(3 downto 0);                   -- MZ-800 border colour (BCOL: I, G, R, B), for the border outside.
         PCG_RD_ADDR              : out   std_logic_vector(12 downto 0);                  -- PCG character row address (char * 8 + row).
         PCG_RD_DATA              : in    std_logic_vector(23 downto 0) := (others => '0'); -- Planes 2, 1, 0.
 
@@ -1027,6 +1028,7 @@ begin
             FB_PALETTE_B <= pal(PALETTE_B_MUX, 2);
         end if;
     end process;
+    BCOL_O       <= GD_BCOL;
     PALETTE_DO_R <= (others => '0');
     PALETTE_DO_G <= (others => '0');
     PALETTE_DO_B <= (others => '0');

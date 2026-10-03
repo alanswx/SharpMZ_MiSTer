@@ -19,7 +19,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
 | FPGA | Latest build (6e70d0e, clean) meets timing (core clock +2.1 ns): about 18,750 ALMs (45%), 74% of block memory bits (the RAM disk adds 64 KB). Built on cottageubuntu or locally in the Quartus container. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
-| Regression | `make test`: 40 tests (including ipl/qd/cg_mz1500, rd_mz800 and kb_mz80k/80a), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 85 MGL tests (T01-T28, Q01-Q05, B01-B04, C01-C24, W01-W03, G01-G18, H01-H05). |
+| Regression | `make test`: 40 tests (including ipl/qd/cg_mz1500, rd_mz800 and kb_mz80k/80a), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 88 MGL tests (T01-T31, Q01-Q05, B01-B04, C01-C24, W01-W03, G01-G18, H01-H05). |
 
 ## Open work
 
@@ -33,7 +33,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [ ] 8253: the CP/M 1.x loader waits for counter 2's first clock (the first 1 s pulse of counter 1): about 1 s here, as the 8253 datasheet gives, and 2 s in mz800emu. Only the boot pause differs; confirm on hardware.
 
 ### MZ-800
-- [ ] Border colour (CF register 6): only the 320x200/640x200 area is output. VideoController can draw a border (display window inside a wider display area), but widening the area moves the canvas within the line and changes every MZ-700/800 frame hash: do it behind an OSD option (mz800emu: 154/134 pixels left/right in 640 mode, 46/42 lines top/bottom).
+- [x] Border colour: OSD Display > MZ-800 Border draws the BCOL colour around the picture (77/67 pixels left/right, 46/42 lines top/bottom in 320 mode, as mz800emu), 464 x 288 (928 x 288 in 640 mode) on hardware (T29-T31). Done after the video controller (`rtl/mz800_border.sv`), in the blanking, so the picture and the frame tests are unchanged.
 - [x] Joysticks: ports F0/F1 read MiSTer joysticks 1/2 while 8255 PA5/PA6 strobe them (mz800emu's bit layout). Not yet tried with software.
 - [ ] Printer port.
 - [x] RAM disk board: the 64 KB "standard" board of mz800emu (EA/EB, F8-FA; OSD MZ-800 RAM Disk). Not yet tried with CP/M; the Pezik boards (E8, EC-EF) and larger sizes aren't implemented.
