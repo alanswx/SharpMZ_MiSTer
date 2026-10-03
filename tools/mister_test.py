@@ -225,6 +225,19 @@ test('T31', 'MZ800', 'MZ-800 border on: a program sets the border to light red (
 test('T30', 'MZ800', 'MZ-800 border on: CP/M 4.1', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], opts=[(43, 1, 1)], reset=True,
      steps=[('wait', 15), ('shot', 'boot')])
 
+# More MZ-2000 tapes (software/mz2200): the IPL loads them from the tape image (fast tape 16x).
+for n, f in enumerate(['Explorer (1989)(Micom Basic)(Taka Yamashita) [CT].mzt', 'Flicky Mz-2200_Loader.mzt',
+                       'Itasandrias (1983)(Hudson Soft)(Fumihiko Itagaki) [CT].mzt',
+                       'Piranha-Kun no Isshukan (1983)(Enix)(Atsushi Shirai) [CT].mzt',
+                       'Project A (1984)(Pony Canyon)(Tatsuji Otsuka) [CT].mzt', 'Puckn Boy.mzt',
+                       'Super Doors (1983)(Hudson Soft)(TNT) [CT].mzt']):
+    test(f'K{n + 1:02d}', 'MZ2000', f'MZ-2000 tape: {f}', files=[('s', 0, f'{SW}/mz2200/{f}')], opts=[FAST_TAPE(5)], reset=True,
+         steps=[('wait', 45), ('shot', 'a'), ('wait', 45), ('shot', 'b'), ('wait', 120), ('shot', 'c')])
+
+test('K08', 'MZ80B', 'MZ-80B tape: Puckn Boy (stays at "IPL is loading" on the MZ-2000)', files=[('s', 0, f'{SW}/mz2200/Puckn Boy.mzt')],
+     opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 45), ('shot', 'a'), ('type', ' '), ('wait', 5), ('type', 'S'), ('wait', 10),
+                                             ('shot', 'b')])
+
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, ',': 51, '.': 52, '/': 53, ':': 40, '*': -40, '"': -3}   # Sharp layout by position: PC ' is the : key (shift *), shift+2 is "
 KEYS.update({c: k for c, k in zip('1234567890', range(2, 12))})
