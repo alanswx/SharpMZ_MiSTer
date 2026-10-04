@@ -26,7 +26,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 ### Plan while away from the hardware (sim, local Quartus container, emulators)
 In order; each result is checked on mister.local later.
 1. [x] `--dump-mem` in the sim: the dump was right, the address was read as decimal (1200 = 04B0). A and L are hex now.
-2. [ ] Youkai Toubatsu Hidejirou (MZ-1500 QD, G18): the sim has `--qd-swap FRAME:FILE` now; trace what the game does after SPACE at "set side B".
+2. [x] Youkai Toubatsu Hidejirou (MZ-1500 QD, G18): works; **hold SPACE** for a second or two at "set side B". The game's INKEY (compiled BASIC, scanner at 033F) reads the keyboard once per pass of a loop with a 1.3 s delay (B238: 5 x 255 x 255 x 14 T) and reports only keys that were up at the previous read, so a tap is missed. In the sim (`--qd-swap 1500:sideB --type-rate 100:3`) side B loads and the game starts. To confirm on hardware.
 3. [x] Puckn Boy (MZ-2000 tape): not a core bug. It loads at 8D00, starts at 9000 and calls 0E50/0562 in MZ-1Z002 BASIC (its keyboard routine reads port EA), so it runs under BASIC's monitor (MON, L, J9000), not from the IPL, which jumps to 0000 and runs into empty RAM.
 4. [x] MZ-80B CP/M (DISK01) on the MZ-2000: not a core bug. CP/M runs (it sits in its keyboard scan) but its BIOS sets PIO A bits 7-6 = 11, which on the MZ-80B maps text VRAM at 5000 and on the MZ-2000 maps it at D000 (as MAME's mz2000). The BIOS writes its screen to 5000, plain RAM on the MZ-2000. Needs an MZ-2000 CP/M.
 5. [ ] Triage the year-based collection (`software/Year-Based Collection ...`, about 1,800 titles): batches of MZ-700/800 titles in the sim, frames compared with mz800emu at the same points; a table of works / differs / fails for the hardware runs.
@@ -64,7 +64,7 @@ Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lor
 - [x] CG ROM read through OUT E5 0, with bit 7 as the left pixel like the PCG (software copies CG characters into the PCG; Xetter '91's text was mirrored with the ROM dump's order). Test cg_mz1500: 'F' reads 7E40407840404000.
 - [x] Yakyu-kyou's tape ends on blue/green stripes, identical in mz1500emu: the program (or the dump), not the core.
 - [x] Nonbarla Panic (PCG set + main) is a Quick Disk title too and runs from a converted disk (G17).
-- [ ] Youkai Toubatsu Hidejirou (G18): side A from a converted disk runs to "set side B and hit SPACE", but with side B mounted SPACE doesn't continue. Check in mz1500emu (key, or how it reads side B).
+- [x] Youkai Toubatsu Hidejirou (G18): SPACE has to be held, the game polls the keyboard every 1.3 s (plan item 2).
 - [x] Galaga's tape (GALAGA DATA + GALAGA MZ-1500) is a Quick Disk title: `mzf2qdf.py` puts both files on one disk and it plays (G09).
 - [x] Joysticks: MZ-1X03 on E008 bits 1-4 (OSD MZ-1X03 Joysticks, also for the MZ-700): buttons during the picture, axis pulses of 68 + 28 x position T-states from the start of vertical blank, as mz800emu's joymz-1x03.c. Not yet tried with software.
 - [x] MZ-1500 ROMs: identical to MAME's mz1500 set (9z-502m.rom, mz700fon.jpn).
