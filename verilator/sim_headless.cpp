@@ -71,6 +71,7 @@ struct Options {
     std::string qd;
     bool        qd_readonly = false;
     bool        ramdisk = false;
+    uint32_t    joy0 = 0;                // joystick 1, MiSTer bits (5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right)
     std::set<uint32_t> warm_resets;
     bool        fdd_readonly = false;
     int         fdc_mode = 0;
@@ -100,6 +101,7 @@ static void usage()
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
 "  --warm-reset N        OSD Reset (warm reset) at frame N (repeatable)\n"
 "  --ramdisk              MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk)\n"
+"  --joy0 BITS            joystick 1 held all run (MiSTer bits: 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
@@ -192,6 +194,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--qd") o.qd = next();
         else if (a == "--qd-readonly") o.qd_readonly = true;
         else if (a == "--ramdisk") o.ramdisk = true;
+        else if (a == "--joy0") o.joy0 = parse_num(next());
         else if (a == "--warm-reset") o.warm_resets.insert((uint32_t)std::stoul(next()));
         else if (a == "--fdd-readonly") o.fdd_readonly = true;
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
@@ -608,6 +611,7 @@ void Sim::write_config()
     top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
     top->cfg_audio    = 0;
     top->ramdisk_en   = opt.ramdisk;
+    top->joy0         = opt.joy0;
     top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape
 }
 

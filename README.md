@@ -15,7 +15,7 @@ How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and 
 ## Features
 
 * Z80 CPU at the original speed (2 MHz MZ-80K/C/1200/A, 3.547 MHz MZ-700/800, 4 MHz MZ-80B/2000), with turbo steps up to about 32–35 MHz.
-* Native video timing (MZ-700/800 are 50 Hz PAL, the others 60 Hz), scaled by the MiSTer framework: HDMI, analog, scandoubler, scanlines and aspect ratio work as in other cores.
+* Native video timing, 15.6 kHz (MZ-700/800/1500 50 Hz PAL, the others 60 Hz), scaled by the MiSTer framework for HDMI; analog output gets the native 15 kHz signal, or 31 kHz through the scandoubler (HQ2x, scanlines) for VGA monitors.
 * 40x25 and 80x25, mono and colour character modes; programmable character generator (PCG); MZ-80B/2000 graphics RAM.
 * MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, all 320x200/640x200 graphics modes with hardware scroll, the SN76489 sound chip and the Z80 PIO.
 * Floppy disk (MB8876 interface on the MZ-700, MZ-800, MZ-80B and MZ-2000): two drives from Extended DSK (`.dsk`) or D88/D77 images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks; the MZ-80B/2000 IPL boots Disk BASIC, CP/M and TF-DOS.
@@ -80,6 +80,7 @@ Writes go back to the image; mount a copy if you want to keep the original.
 | ------ | ----------- |
 | Display Type | Default follows the model (MZ-700/800 colour 40x25, MZ-80B/2000 mono 80x25, others mono 40x25). |
 | Video / Graphics | Turn the character or graphics layer off. |
+| Scandoubler Fx | None (native 15 kHz), HQ2x or CRT scanlines 25/50/75%: doubles the picture to 31 kHz for VGA monitors. MiSTer.ini `forced_scandoubler=1` doubles it too. |
 | MZ-800 Border | Show the MZ-800 border colour around the picture (464 x 288 instead of 320 x 200). |
 | VRAM Wait | Insert the original wait states when the CPU accesses video RAM during the display (MZ-80A/1200/700). Some software relies on this timing. |
 | Aspect ratio | Original, full screen, or the custom ratios from `MiSTer.ini`. |

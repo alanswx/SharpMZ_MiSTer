@@ -6,8 +6,8 @@
 //  BCOL, OUT (CF) with B = 06, IGRB) around it: in 640-mode pixels 154 on the left, 134 on the right, 46
 //  lines above and 42 below (mz800emu's mz800_video.h; half the widths in 320 mode). All of that lies in
 //  the blanking time of the 568 (1136) x 312 frame, clear of sync, so the border is added here, after the
-//  video controller: the blanking is opened over the border area and filled with the border colour. The
-//  picture itself, its timing and the frame tests are unchanged.
+//  video controller and before video_mixer: the blanking is opened over the border area and filled with the
+//  border colour. The picture itself, its timing and the frame tests are unchanged.
 //
 //  Copyright (C) 2026 SharpMZ MiSTer contributors. GPL v2 or later.
 //
@@ -23,7 +23,8 @@ module mz800_border
 	input  [3:0] bcol,            // I, G, R, B
 	input  [7:0] r_in, g_in, b_in,
 	output [7:0] r_out, g_out, b_out,
-	output       de
+	output       hblank_out,      // the blanking with the border area opened (to video_mixer)
+	output       vblank_out
 );
 
 // MZ-800 16 colours, 4-bit levels (VideoController.vhd PALETTE_LUT, mz800emu's colours).
@@ -66,7 +67,10 @@ wire        in_hv = (in_h_head & v_in_cur) | (in_h_tail & v_in_next);
 wire        pic  = ~hblank & ~vblank;
 wire        brd  = enable & ~pic & in_hv;
 
-assign de    = pic | brd;
+// Horizontally the border is open on every line; vertically by the line it belongs to (the next one for the
+// left border), so ~(hblank_out | vblank_out) is exactly pic | brd.
+assign hblank_out = hblank & ~(enable & (in_h_head | in_h_tail));
+assign vblank_out = vblank & ~(enable & ((in_h_head & v_in_cur) | (in_h_tail & v_in_next)));
 assign r_out = pic ? r_in : brd ? {2{pal_r[bcol]}} : 8'd0;
 assign g_out = pic ? g_in : brd ? {2{pal_g[bcol]}} : 8'd0;
 assign b_out = pic ? b_in : brd ? {2{pal_b[bcol]}} : 8'd0;

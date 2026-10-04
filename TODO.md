@@ -19,7 +19,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | MZ-80B | Boots the IPL; loads SB-5520 BASIC from a tape image and SB-6511 Disk BASIC / CP/M 2.2 from floppy (sim and hardware). |
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
 | FPGA | Latest build (6e70d0e, clean) meets timing (core clock +2.1 ns): about 18,750 ALMs (45%), 74% of block memory bits (the RAM disk adds 64 KB). Built on cottageubuntu or locally in the Quartus container. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
-| Regression | `make test`: 40 tests (including ipl/qd/cg_mz1500, rd_mz800 and kb_mz80k/80a), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 96 MGL tests (T01-T31, Q01-Q05, B01-B04, C01-C24, W01-W03, G01-G18, H01-H05, K01-K08). |
+| Regression | `make test`: 41 tests (including ipl/qd/cg_mz1500, rd_mz800 and kb_mz80k/80a), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, 101 MGL tests (T01-T31, Q01-Q05, B01-B04, C01-C24, W01-W03, G01-G18, H01-H05, K01-K08, V01-V05). |
 
 ## Open work
 
@@ -34,7 +34,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ### MZ-800
 - [x] Border colour: OSD Display > MZ-800 Border draws the BCOL colour around the picture (77/67 pixels left/right, 46/42 lines top/bottom in 320 mode, as mz800emu), 464 x 288 (928 x 288 in 640 mode) on hardware (T29-T31). Done after the video controller (`rtl/mz800_border.sv`), in the blanking, so the picture and the frame tests are unchanged.
-- [x] Joysticks: ports F0/F1 read MiSTer joysticks 1/2 while 8255 PA5/PA6 strobe them (mz800emu's bit layout). Not yet tried with software.
+- [x] Joysticks: ports F0/F1 read MiSTer joysticks 1/2 while 8255 PA4/PA5 strobe them, as the MZ-800 Technical Reference Manual gives (mz800emu's code uses PA5/PA6, one bit off from its comments; Exolon strobes PA4 only and saw nothing). Test joy_mz800. Knight Lore and Exolon have joystick options; to be tried on hardware.
 - [ ] Printer port.
 - [x] RAM disk board: the 64 KB "standard" board of mz800emu (EA/EB, F8-FA; OSD MZ-800 RAM Disk). Not yet tried with CP/M; the Pezik boards (E8, EC-EF) and larger sizes aren't implemented.
 - [ ] 1.44 MB disk images (`_Vzor144`, `_Vzor_Nova`): `wd1793.sv` addresses 1 MB.
@@ -71,6 +71,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 ### Core and polish
 - [x] Audio mixing: OSD Tape Sound mixes the tape signal in quietly while it moves. Not yet heard on hardware.
 - [x] Joystick mapping in the OSD (Fire 1, Fire 2).
+- [x] Analog video: native 15.6 kHz on every model; video_mixer adds the 31 kHz scandoubler (MiSTer.ini forced_scandoubler, OSD Scandoubler Fx with HQ2x and scanlines). The MZ-80K/80A/80B 60 Hz modes now use clk_sys / 8 (/ 4) pixel clocks with a 568 (1136) pixel line, like the MZ-700: their 8/16 MHz enables were uneven and the scandoubler cut lines short. Checked through the scaler on hardware (V01-V05); not yet seen on a real CRT or VGA monitor.
 - [ ] Show tape status (record number, tape full) in the OSD.
 - [x] Tape PLAY_READY delay: half a second of clk_sys (`CLK_SYS_HZ` in clkgen_pkg), was a bare 32,000,000.
 - [ ] Optional 64 MHz clock for the MZ-80K/80A/80B family, so their clock enables are exact (±1 clk_sys jitter now).
@@ -78,6 +79,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 - [x] WAV to MZF converter: `tools/wav2mzf.py` (WAV, or FLAC etc. through ffmpeg; either polarity; header and body copies). Decodes the No-Intro MZ-700 "BASIC" and "Applications" recordings.
 - [ ] Release RBF `releases/SharpMZ_YYYYMMDD.rbf` after hardware testing.
 - [ ] Later: v2 machine options (RAM size, GRAM, MZ-1R25), and removing `support/sharpmz/` from Main_MiSTer.
+- [ ] MZ-2500/2520: researched in `docs/mz2500.md` (new video controller, MMU, YM2203, RTC, kanji ROMs; needs SDRAM; best as a separate core or second top level sharing the common RTL; about 4-6 months part-time).
 
 ## Known issues
 - Changing the model doesn't reset MZ-800 characters redefined through C000; the IPL restores the font on the next boot.

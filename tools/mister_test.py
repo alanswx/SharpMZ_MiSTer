@@ -238,6 +238,18 @@ test('K08', 'MZ80B', 'MZ-80B tape: Puckn Boy (stays at "IPL is loading" on the M
      opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 45), ('shot', 'a'), ('type', ' '), ('wait', 5), ('type', 'S'), ('wait', 10),
                                              ('shot', 'b')])
 
+# Scandoubler (OSD Display > Scandoubler Fx; also MiSTer.ini forced_scandoubler): the doubled 31 kHz picture.
+SDFX = lambda v: (44, 3, v)                # 0 None, 1 HQ2x, 2-4 CRT 25/50/75%
+test('V01', 'MZ700', 'Scandoubler CRT 50%: MZ-700 monitor', opts=[SDFX(3)], steps=[('wait', 6), ('shot', 'boot')])
+test('V02', 'MZ80A', 'Scandoubler HQ2x: MZ-80A monitor (60 Hz, 8 MHz pixels)', opts=[SDFX(1)], steps=[('wait', 6), ('shot', 'boot')])
+test('V03', 'MZ800', 'Scandoubler CRT 25%: MZ-800 CP/M 4.1 (640 mode)', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], opts=[SDFX(2)],
+     reset=True, steps=[('wait', 15), ('shot', 'boot')])
+test('V04', 'MZ800', 'Scandoubler CRT 50% with the MZ-800 border', files=[('s', 0, f'{TESTS}/border.mzf')],
+     opts=[FAST_TAPE(6), (43, 1, 1), SDFX(3)], reset=True,
+     steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 15), ('shot', 'a')])
+test('V05', 'MZ80B', 'Scandoubler CRT 50%: MZ-80B (80 columns, 16 MHz pixels)', files=[('s', 1, f'{RB}/DISK23.DSK')], opts=[SDFX(3)],
+     reset=True, steps=[('wait', 20), ('shot', 'boot')])
+
 # Linux input key codes (uinput); a leading '-' holds shift (mrext keyboard-raw).
 KEYS = {'\n': 28, ' ': 57, '-': 12, '=': 13, ';': 39, ',': 51, '.': 52, '/': 53, ':': 40, '*': -40, '"': -3}   # Sharp layout by position: PC ' is the : key (shift *), shift+2 is "
 KEYS.update({c: k for c, k in zip('1234567890', range(2, 12))})

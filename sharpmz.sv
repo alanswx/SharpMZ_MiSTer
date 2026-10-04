@@ -62,7 +62,6 @@ assign FB_PAL_WR = 0;
 `endif
 `endif
 
-assign VGA_SL = 0;
 assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
 assign VGA_DISABLE = 0;
@@ -111,6 +110,7 @@ localparam CONF_STR =
 	"P3O[17],Graphics,On,Off;",
 	"P3O[18],VRAM Wait,Off,On;",
 	"P3O[43],MZ-800 Border,Off,On;",
+	"P3O[46:44],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
 	"P5,Floppy;",
@@ -152,6 +152,7 @@ pll pll
 /////////////////  HPS  ///////////////////////////
 
 wire forced_scandoubler;
+wire [21:0] gamma_bus;
 wire [1:0] buttons;
 wire [127:0] status;
 wire [10:0] ps2_key;
@@ -187,7 +188,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 	.EXT_BUS(),
-	.gamma_bus(),
+	.gamma_bus(gamma_bus),
 
 	.buttons(buttons),
 	.status(status),
@@ -623,9 +624,10 @@ assign LED_USER = hps_ioctl_download;
 assign LED_DISK = {1'b0, tape_active | cmt_status[4] | fdd_busy | qd_busy};    // Tape image, CMT, floppy or Quick Disk activity.
 
 assign CLK_VIDEO = clk_sys;
-assign CE_PIXEL  = clk_video_in;
 
 // MZ-800 border colour around the picture (OSD Display > MZ-800 Border); otherwise the picture as it is.
+wire [7:0] R_brd, G_brd, B_brd;
+wire       hblank_brd, vblank_brd;
 mz800_border mz800_border
 (
 	.clk(clk_sys),
@@ -635,11 +637,34 @@ mz800_border mz800_border
 	.vblank(vblank_emu),
 	.bcol(mz800_bcol),
 	.r_in(R_emu), .g_in(G_emu), .b_in(B_emu),
-	.r_out(VGA_R), .g_out(VGA_G), .b_out(VGA_B),
-	.de(VGA_DE)
+	.r_out(R_brd), .g_out(G_brd), .b_out(B_brd),
+	.hblank_out(hblank_brd),
+	.vblank_out(vblank_brd)
 );
-assign VGA_VS = vsync_emu;
-assign VGA_HS = hsync_emu;
+
+// Native 15 kHz video, or doubled to 31 kHz for VGA monitors (MiSTer.ini forced_scandoubler, or the OSD
+// Scandoubler Fx: HQ2x or CRT scanlines). The pixel enable is at most 17.7344 MHz, a quarter of clk_sys.
+wire [2:0] scale = status[46:44];
+wire [2:0] sl    = scale ? scale - 1'd1 : 3'd0;
+assign VGA_SL = sl[1:0];
+
+video_mixer #(.LINE_LENGTH(1024), .HALF_DEPTH(0), .GAMMA(1)) video_mixer
+(
+	.CLK_VIDEO(CLK_VIDEO),
+	.CE_PIXEL(CE_PIXEL),
+	.ce_pix(clk_video_in),
+	.scandoubler(scale || forced_scandoubler),
+	.hq2x(scale == 3'd1),
+	.gamma_bus(gamma_bus),
+	.R(R_brd), .G(G_brd), .B(B_brd),
+	.HSync(hsync_emu), .VSync(vsync_emu),
+	.HBlank(hblank_brd), .VBlank(vblank_brd),
+	.HDMI_FREEZE(1'b0),
+	.freeze_sync(),
+	.VGA_R(VGA_R), .VGA_G(VGA_G), .VGA_B(VGA_B),
+	.VGA_VS(VGA_VS), .VGA_HS(VGA_HS),
+	.VGA_DE(VGA_DE)
+);
 
 wire [1:0] ar = status[122:121];
 

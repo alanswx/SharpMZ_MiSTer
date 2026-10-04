@@ -1192,12 +1192,14 @@ begin
         port map (clock_a => CLKBUS(CKMASTER), address_a => std_logic_vector(RD_OFF), data_a => RD_DI, wren_a => RD_WE, q_a => RD_Q,
                   clock_b => CLKBUS(CKMASTER), address_b => (others => '0'), data_b => (others => '0'), wren_b => '0', q_b => open);
 
-    -- MZ-800 joysticks: port F0 (F1) reads joystick 1 (2) while 8255 PA5 (PA6) is low, as mz800emu: bits 0 up, 1 down,
-    -- 2 left, 3 right, 4 fire 1, 5 fire 2, low = active.
+    -- MZ-800 joysticks: port F0 (F1) reads joystick 1 (2) while 8255 PA4 (PA5) is low, low active strobes (MZ-800
+    -- Technical Reference Manual, 9 Joystick; mz800emu's code tests PA5/PA6, one bit off from its own comments, and
+    -- Exolon, which strobes only PA4, then never saw the stick). Bits 0 up, 1 down, 2 left, 3 right, 4 fire 1,
+    -- 5 fire 2, low = active.
     M8_JOY_DO <= "11" & not JOY0(5) & not JOY0(4) & not JOY0(0) & not JOY0(1) & not JOY0(2) & not JOY0(3)
-                     when M8_IO(0) = '0' and i8255_PA_O(5) = '0' else
+                     when M8_IO(0) = '0' and i8255_PA_O(4) = '0' else
                  "11" & not JOY1(5) & not JOY1(4) & not JOY1(0) & not JOY1(1) & not JOY1(2) & not JOY1(3)
-                     when M8_IO(0) = '1' and i8255_PA_O(6) = '0' else
+                     when M8_IO(0) = '1' and i8255_PA_O(5) = '0' else
                  X"FF";
 
     -- Video Output.

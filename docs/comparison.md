@@ -14,7 +14,7 @@ for the MZ-700/800/1500; MAME is 0.264 with its own driver status flags. Sources
 | MZ-1500 | Yes: PCG, 2 PSGs, Quick Disk | Partial: 2nd PSG and palette, no PCG, no QD | No (`vup1500` is a PSG/PCG add-on board) | Yes | Preliminary |
 | MZ-80B | Yes: tape and floppy | Yes | Yes (`mz80b_de0`) | No | Preliminary |
 | MZ-2000 / 2200 | Yes: real IPL, colour graphics, katakana | Yes | Yes (`mz80b_de0`) | No | Preliminary |
-| MZ-2500 | No | No (model constant only) | No | No | Imperfect |
+| MZ-2500 | No (feasibility study: `docs/mz2500.md`) | No (model constant only) | No | No | Imperfect |
 
 ## Features
 
