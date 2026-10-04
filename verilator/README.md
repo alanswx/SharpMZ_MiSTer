@@ -82,6 +82,6 @@ The test programs are in `tests/mz800/`, with the Python scripts that generate t
 - **Frames:** a frame is counted at each vsync after the machine is configured; frame 0 is the first.
 - **`fb_hash`:** FNV-1a 32 over the RGB888 bytes of the active picture (e.g. 320x200), the same bytes as the PNG. mz800emu includes its border unless run with `--crop canvas`; `tests/mz800/cmp_emu.py` compares a screenshot with an mz800emu canvas.
 - **Comparing traces with mz800emu:** our `--trace-cpu` logs every opcode fetch (prefixed instructions appear twice), while mz800emu logs each instruction.
-- **`--dump-mem`:** reads physical main RAM, not the CPU's banked view.
+- **`--dump-mem A:L:FILE`:** reads physical main RAM, not the CPU's banked view. A and L are hex (`1200:100:ram.bin`).
 - **Tape speed:** real-speed tapes have a 10 s lead-in, so use `--fast-tape 4` or `5` to save time.
 - **Speed:** about 1/44 real time (~1.6M clk_sys cycles per second on an M-series Mac). A 450-frame run takes several minutes.

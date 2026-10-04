@@ -120,7 +120,7 @@ static void usage()
 "  --ascii-end            print the text screen (display codes -> ASCII) at exit\n"
 "  --ascii-cols 40|80     text width for --ascii-end (default 40)\n"
 "  --dump-mem A:L:FILE    write main RAM A..A+L-1 at exit (physical RAM, not the\n"
-"                         CPU's banked view; addresses in hex or decimal)\n"
+"                         CPU's banked view; A and L in hex, e.g. 1200:100:ram.bin)\n"
 "  --trace-cpu FILE       PC of each instruction fetch\n"
 "  --trace-io FILE        each I/O write: frame,pc,port,data,MZ-800 DMD\n"
 "  --wav FILE             audio at 48 kHz, 16-bit mono (sound/tape bit + MZ-800 PSG, as sharpmz.sv)\n"
@@ -187,7 +187,9 @@ static bool parse_args(int argc, char **argv, Options &o)
             std::string v = next();
             size_t c1 = v.find(':'), c2 = v.find(':', c1 + 1);
             if (c1 == std::string::npos || c2 == std::string::npos) { fprintf(stderr, "--dump-mem wants ADDR:LEN:FILE\n"); return false; }
-            o.memdumps.push_back({parse_num(v.substr(0, c1)), parse_num(v.substr(c1 + 1, c2 - c1 - 1)), v.substr(c2 + 1)});
+            // Hex, as memory addresses are written everywhere else ("1200" is 0x1200, not 1200 decimal).
+            auto hex = [](const std::string &t) { return (uint32_t)strtoul(t.c_str(), nullptr, 16); };
+            o.memdumps.push_back({hex(v.substr(0, c1)), hex(v.substr(c1 + 1, c2 - c1 - 1)), v.substr(c2 + 1)});
         }
         else if (a == "--tape-image") o.tape_image = next();
         else if (a == "--fdd") o.fdd = next();
