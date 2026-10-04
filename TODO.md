@@ -23,6 +23,21 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ## Open work
 
+### Plan while away from the hardware (sim, local Quartus container, emulators)
+In order; each result is checked on mister.local later.
+1. [ ] Fix `--dump-mem` in the sim: it reads the wrong memory (it returned monitor ROM bytes for RAM at 1200 after a direct load), so RAM checks have needed on-screen hex instead.
+2. [ ] Youkai Toubatsu Hidejirou (MZ-1500 QD, G18): add a mid-run Quick Disk swap to the sim (`--qd-swap FRAME:FILE`), trace what the game does after SPACE at "set side B".
+3. [ ] Puckn Boy (MZ-2000/80B tape): CPU trace in the sim; IPL rejecting the file or the program hanging?
+4. [ ] MZ-80B CP/M (DISK01) on the MZ-2000: black screen after "IPL is loading CP/M 2.2"; trace in the sim.
+5. [ ] Triage the year-based collection (`software/Year-Based Collection ...`, about 1,800 titles): batches of MZ-700/800 titles in the sim, frames compared with mz800emu at the same points; a table of works / differs / fails for the hardware runs.
+6. [ ] Knight Lore and Exolon in the sim with `--joy0` held after choosing joystick, to see them react (the PA4/PA5 strobe fix).
+7. [ ] 1.44 MB disk images: widen `wd1793.sv`'s 20-bit image paths (buff_a, disk_size, scan_addr, edsk_offset in the EDSK table RAM, the .d77 parser); test with `_Vzor144` under CP/M 4.1.
+8. [ ] Unit testbenches for `cmt.vhd` and the i8254.
+9. [ ] Printer: parallel on both machines (MZ-800: Z80 PIO port B FF data, port A FE control/status RDA, STA, strobe; MZ-700: ports FE/FF for the MZ-1P01). Plan: latch each byte on the strobe, answer the handshake in the core, and send it out of the MiSTer UART (USER_IO / HPS serial) for the serial printer daemon in `../printeremulation`; OSD option to enable it. Not started.
+10. [ ] Tester pack: rebuild with the newest core (joystick fix, scandoubler) and add verified titles from the year-based collection.
+
+Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lore and Exolon with a real joystick; Tape Sound by ear; hardware runs of whatever 1-7 fix.
+
 ### Next
 - [ ] Sound tests for the other models: MZ-80K/80A note table (does the MZ-80K need the counter 0 divide-by-2?), MZ-800 PSG channels and noise, MZ-80B/2000 PC2.
 - [x] Beeper vs PSG level: on the MZ-800/1500 the beeper is now one PSG channel's level, as mz800emu mixes them; full range on the models without a PSG.
@@ -35,7 +50,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 ### MZ-800
 - [x] Border colour: OSD Display > MZ-800 Border draws the BCOL colour around the picture (77/67 pixels left/right, 46/42 lines top/bottom in 320 mode, as mz800emu), 464 x 288 (928 x 288 in 640 mode) on hardware (T29-T31). Done after the video controller (`rtl/mz800_border.sv`), in the blanking, so the picture and the frame tests are unchanged.
 - [x] Joysticks: ports F0/F1 read MiSTer joysticks 1/2 while 8255 PA4/PA5 strobe them, as the MZ-800 Technical Reference Manual gives (mz800emu's code uses PA5/PA6, one bit off from its comments; Exolon strobes PA4 only and saw nothing). Test joy_mz800. Knight Lore and Exolon have joystick options; to be tried on hardware.
-- [ ] Printer port.
+- [ ] Printer port: see plan item 9 (parallel, bridged to the MiSTer UART for `../printeremulation`).
 - [x] RAM disk board: the 64 KB "standard" board of mz800emu (EA/EB, F8-FA; OSD MZ-800 RAM Disk). Not yet tried with CP/M; the Pezik boards (E8, EC-EF) and larger sizes aren't implemented.
 - [ ] 1.44 MB disk images (`_Vzor144`, `_Vzor_Nova`): `wd1793.sv` addresses 1 MB.
 - [x] MZ-800 tapes with exec 1108 (66 games): the header holds a relocating loader that reads the body with the ROM's tape routine, not a turbo format. Lunar Jetman, Three Weeks in Paradise, Silent Service, Boulder Dash III and Robocop 2 load on hardware (H01-H05). The other unusual header types are later parts of multi-part games.
