@@ -1111,13 +1111,20 @@ begin
                 if PLAYING = "001" then
                     XMIT_PADDING_LOAD                   <= '0';
                     XMIT_RAM_LOAD                       <= '0';
-                    PLAY_READY_CLR_CNT                  <= to_unsigned(1, 22);
     
                     -- If the data block was received on first attempt, MZ will stop the motor, so skip the second block.
+                    -- Stopped after the header, the record waits for its data block however long the motor stays off
+                    -- (the MZ-2000 BASIC monitor prints LOADING and restarts the deck later than the timer below);
+                    -- only a finished record starts the timer that releases it for the next one.
                     if XMIT_RAM_TYPE = '0' and TAPE_READ_STATE > 6 and TAPE_READ_STATE < 15 then
                         TAPE_READ_STATE                 <= 14;
+                    -- Stopped in the gap before the data block (the MZ-2000 monitor stops the deck after the header
+                    -- while the gap is already playing): play the data block from its gap on the next PLAY.
+                    elsif XMIT_RAM_TYPE = '1' and TAPE_READ_STATE < 7 then
+                        TAPE_READ_STATE                 <= 0;
                     else
                         TAPE_READ_STATE                 <= 15;
+                        PLAY_READY_CLR_CNT              <= to_unsigned(1, 22);
                     end if;
     
                 -- Change in play state, start fsm to play out the ram contents when the HPS upload has completed.

@@ -1089,21 +1089,21 @@ begin
 
     -- Mux the pallet address, top end 0xF0-0xFF is reserved for the MZ800, 16 colours, selected by the GPALLET register
     -- or direct plane drive, I = Blue, II = Red, III = Green, IV = Intensity.
-    PALETTE_R_MUX            <= "11111" & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1'                             when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: the bright half of the MZ-800 colours.
+    PALETTE_R_MUX            <= "1111" & (SR_G_MUX or SR_R_MUX or SR_B_MUX) & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1' when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: colours 1-7 are the bright half of the MZ-800 colours, black stays black (mz800emu's {0, 9..15}).
                                 else
                                 PALETTE_REG & SR_R_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
                                 else
                                 "1111" & GPALLET_REG(to_integer(unsigned(GPALLET_IDX(1 downto 0)))) & '1' when MODE_VIDEO_MZ800 = '1' and GPALLET_IDX(2) = '0'
                                 else
                                 "1111" & SR_PLANE_IV & SR_PLANE_III & SR_PLANE_II & SR_PLANE_I & '1';
-    PALETTE_G_MUX            <= "11111" & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1'                             when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: the bright half of the MZ-800 colours.
+    PALETTE_G_MUX            <= "1111" & (SR_G_MUX or SR_R_MUX or SR_B_MUX) & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1' when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: colours 1-7 are the bright half of the MZ-800 colours, black stays black (mz800emu's {0, 9..15}).
                                 else
                                 PALETTE_REG & SR_G_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
                                 else
                                 "1111" & GPALLET_REG(to_integer(unsigned(GPALLET_IDX(1 downto 0)))) & '1' when MODE_VIDEO_MZ800 = '1' and GPALLET_IDX(2) = '0'
                                 else
                                 "1111" & SR_PLANE_IV & SR_PLANE_III & SR_PLANE_II & SR_PLANE_I & '1';
-    PALETTE_B_MUX            <= "11111" & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1'                             when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: the bright half of the MZ-800 colours.
+    PALETTE_B_MUX            <= "1111" & (SR_G_MUX or SR_R_MUX or SR_B_MUX) & SR_G_MUX & SR_R_MUX & SR_B_MUX & '1' when CONFIG(MZ800) = '1' and MODE_VIDEO_MZ800 = '0'    -- MZ-800 in 700 mode: colours 1-7 are the bright half of the MZ-800 colours, black stays black (mz800emu's {0, 9..15}).
                                 else
                                 PALETTE_REG & SR_B_MUX                                                    when MODE_VIDEO_MZ800 = '0' or (VGA_ATTR_REG(6) = '1' and ((V_COUNT >= V_MNU_START and V_COUNT < V_MNU_END) and (H_COUNT >= H_MNU_START and H_COUNT <= H_MNU_END)))
                                 else
