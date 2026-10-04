@@ -102,7 +102,7 @@ signal SCANLL                : std_logic_vector(7 downto 0);
 --
 signal HOLD                  : std_logic_vector(119 downto 0);       -- Row r, column c at bit 8r+c.
 signal HOLD_CNT              : std_logic_vector(22 downto 0);
-constant HOLD_CLKS           : natural := 3546880;                   -- 50 ms of the 70.9376 MHz clock.
+constant HOLD_CLKS           : natural := CLK_SYS_HZ / 20;           -- 50 ms.
 signal K00, K01, K02, K03, K04, K05, K06, K07, K08, K09, K10, K11, K12, K13, K14 : std_logic_vector(7 downto 0);
 --
 -- Key code exchange table

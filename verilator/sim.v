@@ -157,7 +157,10 @@ module top(
    assign ext_io_oe  = fdc_io_oe | qd_io_oe;
    assign ext_io_din = fdc_io_oe ? fdc_io_din : qd_io_din;
 
-   mz_qdisk qd(
+`ifndef SIM_CLK_DIV
+`define SIM_CLK_DIV 1
+`endif
+   mz_qdisk #(.BYTE_CLKS(5583 / `SIM_CLK_DIV)) qd(
       .clk_sys(clk_sys), .reset(reset | warm_reset),
       .enable(cfg_display3[3] | (cfg_model[2:0] == 3'b101 & qd_mounted_l)),       // MZ-1500; MZ-800 with an image
       .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),

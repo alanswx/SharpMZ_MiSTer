@@ -25,10 +25,10 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ### Plan while away from the hardware (sim, local Quartus container, emulators)
 In order; each result is checked on mister.local later.
-1. [ ] Fix `--dump-mem` in the sim: it reads the wrong memory (it returned monitor ROM bytes for RAM at 1200 after a direct load), so RAM checks have needed on-screen hex instead.
-2. [ ] Youkai Toubatsu Hidejirou (MZ-1500 QD, G18): add a mid-run Quick Disk swap to the sim (`--qd-swap FRAME:FILE`), trace what the game does after SPACE at "set side B".
-3. [ ] Puckn Boy (MZ-2000/80B tape): CPU trace in the sim; IPL rejecting the file or the program hanging?
-4. [ ] MZ-80B CP/M (DISK01) on the MZ-2000: black screen after "IPL is loading CP/M 2.2"; trace in the sim.
+1. [x] `--dump-mem` in the sim: the dump was right, the address was read as decimal (1200 = 04B0). A and L are hex now.
+2. [ ] Youkai Toubatsu Hidejirou (MZ-1500 QD, G18): the sim has `--qd-swap FRAME:FILE` now; trace what the game does after SPACE at "set side B".
+3. [x] Puckn Boy (MZ-2000 tape): not a core bug. It loads at 8D00, starts at 9000 and calls 0E50/0562 in MZ-1Z002 BASIC (its keyboard routine reads port EA), so it runs under BASIC's monitor (MON, L, J9000), not from the IPL, which jumps to 0000 and runs into empty RAM.
+4. [x] MZ-80B CP/M (DISK01) on the MZ-2000: not a core bug. CP/M runs (it sits in its keyboard scan) but its BIOS sets PIO A bits 7-6 = 11, which on the MZ-80B maps text VRAM at 5000 and on the MZ-2000 maps it at D000 (as MAME's mz2000). The BIOS writes its screen to 5000, plain RAM on the MZ-2000. Needs an MZ-2000 CP/M.
 5. [ ] Triage the year-based collection (`software/Year-Based Collection ...`, about 1,800 titles): batches of MZ-700/800 titles in the sim, frames compared with mz800emu at the same points; a table of works / differs / fails for the hardware runs.
 6. [ ] Knight Lore and Exolon in the sim with `--joy0` held after choosing joystick, to see them react (the PA4/PA5 strobe fix).
 7. [ ] 1.44 MB disk images: widen `wd1793.sv`'s 20-bit image paths (buff_a, disk_size, scan_addr, edsk_offset in the EDSK table RAM, the .d77 parser); test with `_Vzor144` under CP/M 4.1.
@@ -72,10 +72,10 @@ Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lor
 ### Other models
 - [x] MZ-700 floppy on hardware (T08).
 - [ ] MZ-2Z009 Disk BASIC (loads from tape) on a blank disk.
-- [ ] MZ-2000: MZ-80B CP/M (DISK01) on the MZ-2000 still stays black after "IPL is loading CP/M 2.2" (T18, hardware); find out whether that CP/M supports the MZ-2000 at all.
+- [x] MZ-2000: MZ-80B CP/M (DISK01) stays black on the MZ-2000 because its BIOS is MZ-80B only (plan item 4).
 - [ ] MZ-2000 character ROM is MAME's hand-made font.bin; a real dump of the IX0286PA (also the Japanese MZ-80B font) would replace it.
 - [x] More MZ-2000 tapes (K01-K08): Itasandrias, Super Doors and Project A (its own loader reads a 37 KB DATA file) run; Explorer and Piranha-kun are BASIC programs (the IPL says "File mode error", as it should); the Flicky tape is only its loader. Ice Block's MZT is malformed.
-- [ ] Puckn Boy (software/mz2200, unknown source, header comment full of FF 00) stays at "IPL is loading" on the MZ-2000 and MZ-80B, keys or not; probably a bad dump, check against another copy.
+- [x] Puckn Boy stays at "IPL is loading": it is a machine-code program for MZ-1Z002 BASIC, not an IPL tape (plan item 3).
 - [ ] MZ-80B SB-7010 (DISK29) loads and stops at its monitor's `*` prompt; find out how FDOS is started from there.
 - [x] wd1793: EDSK sectors dumped with a CRC error (ST2 bit 5 data field, ST1 bit 5 ID field) report CRC ERROR when the OSD Floppy CRC Errors is Report: at the end of the sector's data, ending a multi-sector read there (a WD179x checks the CRC after the data; flagging it at the ID broke reads force-interrupted before the bad sector). Default Ignore: DISK38 has sector 4 flagged on its boot tracks but good data, and boots; DISK37 gives the IPL's "Loading error" with Report and hung before.
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).

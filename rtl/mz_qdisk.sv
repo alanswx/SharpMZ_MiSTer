@@ -63,7 +63,7 @@ module mz_qdisk
 );
 
 localparam [16:0] QD_MAX    = 17'd89826;         // mz800emu QDISK_IMAGE_MAX_SIZE
-parameter         BYTE_CLKS = 5583;              // clk_sys clocks per byte (70.9 MHz, ~101.6 kbit/s)
+parameter         BYTE_CLKS = 5583;              // clk_sys clocks per byte (70.9 MHz, ~101.6 kbit/s; sim.v scales it)
 
 wire sel   = enable & (io_addr[7:2] == 6'b111101); // F4-F7
 assign io_oe = sel & io_rd;

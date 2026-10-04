@@ -51,7 +51,7 @@ use pkgs.mctrl_pkg.all;
 
 entity clkgen is
     Generic (
-        CLK_HZ                     : natural := 70937600                 -- Frequency of CKBASE (clk_sys).
+        CLK_HZ                     : natural := CLK_SYS_HZ               -- Frequency of CKBASE (clk_sys).
     );
     Port (
         RST                        : in  std_logic;                      -- Reset

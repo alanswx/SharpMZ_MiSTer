@@ -91,12 +91,13 @@ use     ieee.numeric_std.all;
 use     work.VideoController_pkg.all;
 use     work.vc_mctrl_pkg.all;
 use     work.vc_rams_pkg.all;
+use     pkgs.clkgen_pkg.all;
 
 entity VideoController is
     --generic (
     --);
     generic (
-        CLK_HZ                   : natural := 70937600                           -- SYS_CLK frequency; the video runs on it with clock enables.
+        CLK_HZ                   : natural := CLK_SYS_HZ                           -- SYS_CLK frequency; the video runs on it with clock enables.
     );
     port (    
         -- Primary FPGA clock for generation of video clocks.

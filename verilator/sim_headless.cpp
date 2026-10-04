@@ -23,6 +23,7 @@
 #include <cstring>
 #include <algorithm>
 #include <deque>
+#include <map>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -31,7 +32,10 @@
 #include <sys/stat.h>
 #include <vector>
 
-static const double CLK_HZ = 70937600.0;
+#ifndef SIM_CLK_DIV
+#define SIM_CLK_DIV 1
+#endif
+static const double CLK_HZ = 70937600.0 / SIM_CLK_DIV;      // clk_sys; `make fast` builds at half rate
 
 // ---------------------------------------------------------------------------
 // Options
@@ -60,6 +64,7 @@ struct Options {
     bool     ascii_end = false;
     int      ascii_cols = 40;
     std::vector<MemDump> memdumps;
+    std::map<uint32_t, std::string> qd_swaps;   // frame -> Quick Disk image to mount then (side B etc.)
     std::string trace_file;
     std::string wav_file;
     std::string io_file;
@@ -103,6 +108,7 @@ static void usage()
 "  --ramdisk              MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk)\n"
 "  --joy0 BITS            joystick 1 held all run (MiSTer bits: 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
+"  --qd-swap FRAME:FILE   mount another Quick Disk image at FRAME (side B); repeatable\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
@@ -195,6 +201,12 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fdd") o.fdd = next();
         else if (a == "--qd") o.qd = next();
         else if (a == "--qd-readonly") o.qd_readonly = true;
+        else if (a == "--qd-swap") {
+            std::string v = next();
+            size_t c = v.find(':');
+            if (c == std::string::npos) { fprintf(stderr, "--qd-swap wants FRAME:FILE\n"); return false; }
+            o.qd_swaps[parse_num(v.substr(0, c))] = v.substr(c + 1);
+        }
         else if (a == "--ramdisk") o.ramdisk = true;
         else if (a == "--joy0") o.joy0 = parse_num(next());
         else if (a == "--warm-reset") o.warm_resets.insert((uint32_t)std::stoul(next()));
@@ -277,6 +289,7 @@ private:
     FILE    *qd = nullptr;
     uint64_t qd_size = 0;
     void mount_qd();
+    std::string qd_path;                         // the Quick Disk image mounted now (opt.qd, then --qd-swap)
     int      sd_slot = 0;
     void mount_fdd();
     enum { SD_IDLE, SD_READ, SD_READ_END, SD_WRITE } sd_state = SD_IDLE;
@@ -366,8 +379,9 @@ void Sim::sd_step()
 
 void Sim::mount_qd()
 {
-    qd = fopen(opt.qd.c_str(), opt.qd_readonly ? "rb" : "r+b");
-    if (!qd) { fprintf(stderr, "cannot open Quick Disk image %s\n", opt.qd.c_str()); exit_code = 2; return; }
+    if (qd_path.empty()) qd_path = opt.qd;
+    qd = fopen(qd_path.c_str(), opt.qd_readonly ? "rb" : "r+b");
+    if (!qd) { fprintf(stderr, "cannot open Quick Disk image %s\n", qd_path.c_str()); exit_code = 2; return; }
     fseeko(qd, 0, SEEK_END);
     qd_size = (uint64_t)ftello(qd);
     top->qd_size = qd_size;
@@ -375,7 +389,7 @@ void Sim::mount_qd()
     top->qd_mounted = 1;
     clock();
     top->qd_mounted = 0;
-    if (!opt.quiet) fprintf(stderr, "[sim] Quick Disk image '%s' mounted, %llu bytes\n", opt.qd.c_str(), (unsigned long long)qd_size);
+    if (!opt.quiet) fprintf(stderr, "[sim] Quick Disk image '%s' mounted at frame %u, %llu bytes\n", qd_path.c_str(), frame, (unsigned long long)qd_size);
 }
 
 void Sim::mount_fdd()
@@ -585,6 +599,14 @@ void Sim::on_frame_end()
     for (auto it = range.first; it != range.second; ++it) ps2_queue.push_back(it->second);
 
     if (!opt.mzf.empty() && opt.mzf_direct && frame == opt.mzf_direct_frame && frame != 0) load_mzf(true);
+
+    auto sw = opt.qd_swaps.find(frame);
+    if (sw != opt.qd_swaps.end()) {
+        if (qd) fclose(qd);
+        qd = nullptr;
+        qd_path = sw->second;
+        mount_qd();
+    }
 
     top->tape_rewind = opt.tape_rewinds.count(frame) ? 1 : 0;   // Held for one frame.
     if (opt.warm_resets.count(frame)) { top->warm_reset = 1; for (int i = 0; i < 64; i++) clock(); top->warm_reset = 0; }

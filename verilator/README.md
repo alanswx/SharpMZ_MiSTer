@@ -9,12 +9,13 @@ The options match the headless CLI of the reference emulator in `../refs/mz800em
 ```sh
 cd verilator
 make                 # -> ./obj_dir_headless/Vtop
+make fast            # -> ./obj_dir_fast/Vtop: the same core at half clk_sys, about 2x faster (see Speed)
 make test            # regression tests (run_tests.sh; QUICK=1 skips the slow tape tests)
 make test-clkgen     # GHDL testbench: clock enable rates and jitter
 ./obj_dir_headless/Vtop --help
 ```
 
-Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Run the binary from this directory**, because the RAM init files are loaded from `./software/mif/*.hex`.
+Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Run the binary from this directory**, because the RAM init files are loaded from `./software/mif/*.hex`. Run from anywhere else, the ROMs are silently left empty and the screen stays blank.
 
 ## How the build works
 
@@ -45,13 +46,15 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--fdd FILE` | Extended DSK image in floppy drive A. Also `--fdd-readonly`, and `--fdc-mode auto\|on\|off`. |
 | `--ramdisk` | MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk). |
 | `--qd FILE` | Quick Disk image (`.qdf` or `.mzq`) in slot S3 (MZ-1500, MZ-800); writes go back to the file. `--qd-readonly` mounts it write protected. |
+| `--qd-swap FRAME:FILE` | Mount another Quick Disk image at FRAME, e.g. side B of a two-sided game (repeatable). |
+| `--joy0 N` | Hold joystick 1 with MiSTer bits N (decimal; 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2) all run. |
 | `--warm-reset N` | Press the OSD Reset at frame N (repeatable). |
 | `--mz800-mode 700\|800` | The MZ-800 rear switch (default 700, as mz800emu). |
 | `--turbo N`, `--vmode` | CPU speed step; video mode. |
 | `--trace-cpu FILE` | PC of every opcode fetch; `--trace-from`/`--trace-to` limit the frames. |
 | `--trace-io FILE` | Every I/O write: frame, PC, port, data. |
 | `--wav FILE` | Audio at 48 kHz, as `sharpmz.sv` mixes it. |
-| `--dump-mem` | Main RAM at exit. |
+| `--dump-mem A:L:FILE` | Main RAM at exit (hex address and length). |
 | `--verbose` | Tape status, record FSM and pulse widths. |
 
 ## Tests
@@ -71,6 +74,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `ipl_mz2000`, `tape_mz80b`, `tape_mz2000` | The MZ-2000 IPL; MZ-80B BASIC (SB-5520) and Gang Man from tape images (`../software/mz80b`, `mz2200`). |
 | `ipl_mz1500`, `qd_mz1500` | The MZ-1500 IPL menu; Lode Runner from a Quick Disk dump with its PCG title screen (pixel-identical to mz1500emu). |
 | `cg_mz1500` | MZ-1500: `tests/mz1500/cgread.mzf` reads 'F' from the CG ROM through OUT E5 0 and prints it in hex (bit 7 = left pixel). |
+| `joy_mz800` | MZ-800 with `--joy0 17` (right + fire 1): `tests/mz800/joytest.mzf` strobes the 8255 (PA4 low = joystick 1) and reads F0/F1. |
 | `rd_mz800` | MZ-800 with `--ramdisk`: `tests/mz800/ramdisk.mzf` writes two bytes to the RAM disk board and reads them back. |
 | `tape_image`, `tape_mz800` | Load from a tape image, on the MZ-700 monitor and the MZ-800 IPL. Slow; skipped with `QUICK=1`. |
 | `fdd_cpm`, `fdd_hry` | CP/M 4.1 boots from disk and runs DIR; a games disk starts its file manager (pixel-identical to mz800emu). They need the images in `../software/dsk/` (not in the repository) and are skipped otherwise. |
@@ -84,4 +88,5 @@ The test programs are in `tests/mz800/`, with the Python scripts that generate t
 - **Comparing traces with mz800emu:** our `--trace-cpu` logs every opcode fetch (prefixed instructions appear twice), while mz800emu logs each instruction.
 - **`--dump-mem A:L:FILE`:** reads physical main RAM, not the CPU's banked view. A and L are hex (`1200:100:ram.bin`).
 - **Tape speed:** real-speed tapes have a 10 s lead-in, so use `--fast-tape 4` or `5` to save time.
-- **Speed:** about 1/44 real time (~1.6M clk_sys cycles per second on an M-series Mac). A 450-frame run takes several minutes.
+- **Speed:** about 1/60 real time (~1.2M clk_sys cycles per second on an M-series Mac, 1.2 s a frame). A 450-frame run takes about 9 minutes. The time is spread over the whole model (a profile shows no hot spot, and clang PGO gained only 7%), so for batches run many sims at once, one per core.
+- **`make fast`:** builds the same RTL with clk_sys at 35.47 MHz instead of 70.94 MHz (a copy of `clkgen_pkg.vhd` with `CLK_SYS_HZ / 2`; every clock enable, the key hold and the Quick Disk byte time follow it), into `obj_dir_fast`. Half the cycles per frame, so about twice as fast. MZ-700/800 rates stay exact. Not for: the 640-pixel modes and turbo above 17.7 MHz (the video controller and the CPU are capped at clk_sys/2), and exact floppy timing (the controller fills its sector buffer at clk_sys rate, so disk boots finish a little later: `fdd_mz700`, `fdd_cpm`, `fdd_hry` differ), and the MZ-80B/2000 (`tape_mz80b`, `tape_mz2000` differ). Use it for MZ-700/800/1500 batches; 36 of the 41 tests match the full-rate build. `BIN=./obj_dir_fast/Vtop OUT=out/test_fast ./run_tests.sh` shows which tests differ. `../tools/triage.py` uses it.

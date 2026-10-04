@@ -5,6 +5,8 @@
 #    make netlist    # VHDL -> Verilog only    -> gen/sharpmz.v
 #    make test       # smoke tests (run_tests.sh)
 #    make test-clkgen  # GHDL testbench for the clock enable generator
+#    make fast       # the same sim at half clk_sys (35.47 MHz) -> ./obj_dir_fast/Vtop,
+#                    # about twice as fast; for batch runs (run_tests.sh BIN=... shows what differs)
 #    make clean
 #
 #  The RTL is VHDL and Verilator reads only Verilog, so every build starts by
@@ -22,6 +24,9 @@ V      = verilator
 GHDL   = ghdl
 RTL    = ../rtl
 GEN    = gen
+# clk_sys divider for the sim build: 1 = 70.9376 MHz as the FPGA, 2 = `make fast`. Every clock enable comes
+# from clkgen_pkg's CLK_SYS_HZ, so a copy of that package with the rate divided is analysed instead.
+SIM_CLK_DIV = 1
 WORK   = ghdl_work
 
 GHDL_FLAGS = --std=08 -fsynopsys -fexplicit -frelaxed -Wno-hide -Wno-shared -Wno-binding \
@@ -30,7 +35,7 @@ GHDL_FLAGS = --std=08 -fsynopsys -fexplicit -frelaxed -Wno-hide -Wno-shared -Wno
 # Analysis order: packages first, then leaves, then the assembly.
 VHD_SRC = \
 	$(RTL)/config_pkg.vhd \
-	$(RTL)/clkgen_pkg.vhd \
+	$(CLK_PKG) \
 	$(RTL)/mctrl_pkg.vhd \
 	$(RTL)/functions.vhd \
 	$(RTL)/clkgen.vhd \
@@ -59,6 +64,16 @@ VHD_SRC = \
 	$(RTL)/vc/video_vc.vhd \
 	$(RTL)/sharpmz.vhd
 
+ifeq ($(SIM_CLK_DIV),1)
+CLK_PKG = $(RTL)/clkgen_pkg.vhd
+else
+CLK_PKG = $(GEN)/clkgen_pkg.vhd
+$(CLK_PKG): $(RTL)/clkgen_pkg.vhd Makefile
+	@mkdir -p $(GEN)
+	perl -pe 's/(CLK_SYS_HZ\s*:\s*natural\s*:=\s*)70937600/$${1}70937600 \/ $(SIM_CLK_DIV)/' $< > $@
+	grep -q "70937600 / $(SIM_CLK_DIV)" $@
+endif
+
 GEN_V = $(GEN)/sharpmz.v
 V_SRC = sim.v $(GEN_V) rtl_v/dpram.v rtl_v/dprom.v $(RTL)/tape_image.sv $(RTL)/mz_fdc.sv $(RTL)/mz_qdisk.sv $(RTL)/mz800_border.sv $(RTL)/wd1793.sv $(RTL)/wd1793_mem.v
 
@@ -70,7 +85,7 @@ V_OPT = -O3 --x-assign fast --x-initial fast --noassert \
 	-Wno-UNSIGNED -Wno-CMPCONST -Wno-DECLFILENAME -Wno-MULTIDRIVEN -Wno-LATCH \
 	-Wno-TIMESCALEMOD -Wno-COMBDLY
 
-CXXFLAGS = -O3 -std=c++17
+CXXFLAGS = -O3 -std=c++17 -DSIM_CLK_DIV=$(SIM_CLK_DIV)
 HL_DIR   = obj_dir_headless
 HL_EXE   = ./$(HL_DIR)/Vtop
 
@@ -101,11 +116,15 @@ software/mif/%.mif.hex: $(RTL)/software/mif/%.mif mif2hex.py
 # Headless: no SDL. Screenshots, frame logs and state dumps for regressions.
 # ---------------------------------------------------------------------------
 $(HL_EXE): $(V_SRC) sim_headless.cpp ps2_keys.h sharp_vcode.h Makefile
-	$V -cc $(V_OPT) --exe --build -j 0 --Mdir $(HL_DIR) --top-module top \
+	$V -cc $(V_OPT) +define+SIM_CLK_DIV=$(SIM_CLK_DIV) --exe --build -j 0 --Mdir $(HL_DIR) --top-module top \
 		-CFLAGS "$(CXXFLAGS)" $(V_SRC) sim_headless.cpp -o Vtop
+
+fast:
+	$(MAKE) headless SIM_CLK_DIV=2 GEN=gen_fast WORK=ghdl_work_fast HL_DIR=obj_dir_fast
 
 test: headless
 	./run_tests.sh
+
 
 # ---------------------------------------------------------------------------
 # GHDL unit testbenches.
@@ -116,6 +135,6 @@ test-clkgen: $(GEN_V)
 	cd $(WORK) && ./tb_clkgen --assert-level=error
 
 clean:
-	rm -rf $(HL_DIR) $(GEN) $(WORK) software out
+	rm -rf $(HL_DIR) $(GEN) $(WORK) obj_dir_fast gen_fast ghdl_work_fast software out
 
-.PHONY: all headless netlist test test-clkgen clean
+.PHONY: all headless netlist test test-clkgen clean fast

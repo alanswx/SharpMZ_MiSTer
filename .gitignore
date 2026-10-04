@@ -46,7 +46,9 @@ c5_pin_model_dump.txt
 
 # Verilator sim build products
 verilator/gen/
+verilator/gen_fast/
 verilator/ghdl_work/
+verilator/ghdl_work_fast/
 verilator/obj_dir*/
 verilator/software/
 verilator/out/

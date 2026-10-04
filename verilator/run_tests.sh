@@ -38,8 +38,8 @@
 # the tape test (it takes several minutes).
 
 cd "$(dirname "$0")"
-BIN=./obj_dir_headless/Vtop
-OUT=out/test
+BIN=${BIN:-./obj_dir_headless/Vtop}
+OUT=${OUT:-out/test}
 mkdir -p "$OUT"
 
 MODELS="mz80k mz80c mz1200 mz80a mz700 mz800"
