@@ -39,6 +39,9 @@ module top(
    input  [5:0]  joy0,           // joystick 1, MiSTer order (5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right)
    input         joy_1x03,       // MZ-1X03 joysticks connected (MZ-700/1500)
    input         ramdisk_en,     // MZ-800 64 KB RAM disk
+   input         prn_en,         // printer (OSD Printer: UART)
+   input  [31:0] prn_baud,       // uart_speed from Main
+   output        prn_txd /*verilator public_flat*/,
 
    // Machine configuration, as sharpmz.sv derives it from the OSD status bits.
    input  [7:0]  cfg_model,
@@ -197,6 +200,10 @@ module top(
       .JOY1           (6'd0),
       .JOY_1X03       (joy_1x03),
       .RAMDISK_EN     (ramdisk_en),
+      .PRN_EN         (prn_en),
+      .PRN_RDA        (prn_rda),
+      .PRN_DATA       (prn_data),
+      .PRN_STB        (prn_stb),
       .CFG_MODEL      (cfg_model),
       .CFG_DISPLAY    (cfg_display),
       .CFG_DISPLAY2   (cfg_display2),
@@ -253,6 +260,12 @@ module top(
                     .r_in(8'd0), .g_in(8'd0), .b_in(8'd0), .r_out(), .g_out(), .b_out(), .hblank_out(bdr_hb), .vblank_out(bdr_vb));
    wire bdr_hb, bdr_vb;
    assign dbg_bde = ~(bdr_hb | bdr_vb);
+
+   wire       prn_rda, prn_stb;
+   wire [7:0] prn_data;
+   mz_printer #(.CLK_HZ(70937600 / `SIM_CLK_DIV)) prn(
+      .clk(clk_sys), .reset(reset), .enable(prn_en), .rdp(prn_stb), .data(prn_data), .rda(prn_rda),
+      .uart_speed(prn_baud), .txd(prn_txd), .count());
    assign dbg_snd_en = core.mz80hw.sound_enable;        // 8253 GATE0 (E008 bit 0)
    assign dbg_snd    = core.mz80hw.sound_pulse_x2;      // 8253 OUT0
    assign dbg_memwr  = ~core.t80_mreq_n & ~core.t80_wr_n;

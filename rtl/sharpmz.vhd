@@ -96,6 +96,10 @@ entity sharpmz is
         JOY1                  : in     std_logic_vector(5 downto 0) := (others => '0');
         JOY_1X03              : in     std_logic := '0';                        -- MZ-700/1500: MZ-1X03 joysticks connected.
         RAMDISK_EN            : in     std_logic := '0';                        -- MZ-800: 64 KB RAM disk board.
+        PRN_EN                : in     std_logic := '0';                        -- Printer connected (OSD Printer: UART).
+        PRN_RDA               : in     std_logic := '0';                        -- Printer busy / acknowledge.
+        PRN_DATA              : out    std_logic_vector(7 downto 0);            -- Printer data byte.
+        PRN_STB               : out    std_logic;                               -- Printer strobe (RDP, active high).
         --------------------                        VGA                         ----------------------------
         VGA_HB_O              : out    std_logic;                               -- VGA Horizontal Blank
         VGA_VB_O              : out    std_logic;                               -- VGA Vertical Blank
@@ -581,6 +585,10 @@ component mz80c
           JOY1               : in  std_logic_vector(5 downto 0);
           JOY_1X03           : in  std_logic;
           RAMDISK_EN         : in  std_logic;
+          PRN_EN             : in  std_logic;
+          PRN_RDA            : in  std_logic;
+          PRN_DATA           : out std_logic_vector(7 downto 0);
+          PRN_STB            : out std_logic;
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -1011,6 +1019,10 @@ begin
             JOY1             => JOY1,
             JOY_1X03         => JOY_1X03,
             RAMDISK_EN       => RAMDISK_EN,
+            PRN_EN           => PRN_EN,
+            PRN_RDA          => PRN_RDA,
+            PRN_DATA         => PRN_DATA,
+            PRN_STB          => PRN_STB,
 
             -- Different operations modes.
             CONFIG           => CONFIG,

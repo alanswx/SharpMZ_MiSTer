@@ -64,6 +64,8 @@ struct Options {
     bool     ascii_end = false;
     int      ascii_cols = 40;
     std::vector<MemDump> memdumps;
+    std::string printer;                     // --printer FILE: bytes the printer port sends out of the UART
+    uint32_t    printer_baud = 9600;
     std::map<uint32_t, std::string> qd_swaps;   // frame -> Quick Disk image to mount then (side B etc.)
     std::string trace_file;
     std::string wav_file;
@@ -109,6 +111,8 @@ static void usage()
 "  --joy0 BITS            joystick 1 held all run (MiSTer bits: 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
 "  --qd-swap FRAME:FILE   mount another Quick Disk image at FRAME (side B); repeatable\n"
+"  --printer FILE         printer connected (OSD Printer: UART); the UART line is decoded into FILE\n"
+"  --printer-baud N       UART speed (default 9600)\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
@@ -201,6 +205,8 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fdd") o.fdd = next();
         else if (a == "--qd") o.qd = next();
         else if (a == "--qd-readonly") o.qd_readonly = true;
+        else if (a == "--printer") o.printer = next();
+        else if (a == "--printer-baud") o.printer_baud = parse_num(next());
         else if (a == "--qd-swap") {
             std::string v = next();
             size_t c = v.find(':');
@@ -255,6 +261,11 @@ private:
     std::unique_ptr<Vtop> top;
 
     uint64_t cycle = 0;
+    FILE    *fprn = nullptr;                 // --printer
+    int      prn_state = -1, prn_byte = 0;
+    uint64_t prn_next = 0;
+    bool     prev_prn_rx = true;
+    unsigned prn_errors = 0;
     uint64_t cpu_cycles = 0;
     uint32_t frame = 0;
     bool     prev_vs = false, prev_hb = false, prev_m1 = true;
@@ -451,6 +462,19 @@ void Sim::clock()
     top->eval();
     cycle++;
 
+    if (fprn) {                               // UART receiver, 8N1: sample each bit in its middle
+        double bit = CLK_HZ / opt.printer_baud;
+        bool rx = top->prn_txd;
+        if (prn_state < 0) {
+            if (prev_prn_rx && !rx) { prn_state = 0; prn_next = cycle + (uint64_t)(bit * 1.5); prn_byte = 0; }
+        }
+        else if (cycle >= prn_next) {
+            if (prn_state < 8) { prn_byte |= (rx ? 1 : 0) << prn_state; prn_state++; prn_next += (uint64_t)bit; }
+            else { if (rx) fputc(prn_byte, fprn); else prn_errors++; fflush(fprn); prn_state = -1; }
+        }
+        prev_prn_rx = rx;
+    }
+
     if (top->cpu_ce) cpu_cycles++;
 
     if (fio) {
@@ -635,6 +659,8 @@ void Sim::write_config()
     top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
     top->cfg_audio    = 0;
     top->ramdisk_en   = opt.ramdisk;
+    top->prn_en       = opt.printer.empty() ? 0 : 1;
+    top->prn_baud     = opt.printer_baud;
     top->joy0         = opt.joy0;
     top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape
 }
@@ -812,6 +838,10 @@ int Sim::run()
     if (!opt.tape_image.empty()) { mount_tape(); if (exit_code) return exit_code; }
     if (!opt.fdd.empty()) { mount_fdd(); if (exit_code) return exit_code; }
     if (!opt.qd.empty()) { mount_qd(); if (exit_code) return exit_code; }
+    if (!opt.printer.empty()) {
+        fprn = fopen(opt.printer.c_str(), "wb");
+        if (!fprn) { fprintf(stderr, "cannot write %s\n", opt.printer.c_str()); return 2; }
+    }
 
     uint32_t last = opt.stop_set ? opt.stop_frame : 150;
     while (frame <= last && !Verilated::gotFinish()) clock();

@@ -12,6 +12,8 @@ make                 # -> ./obj_dir_headless/Vtop
 make fast            # -> ./obj_dir_fast/Vtop: the same core at half clk_sys, about 2x faster (see Speed)
 make test            # regression tests (run_tests.sh; QUICK=1 skips the slow tape tests)
 make test-clkgen     # GHDL testbench: clock enable rates and jitter
+make test-i8254      # GHDL testbench: 8253 power-up, modes 0/2/3, counter latch (seconds)
+make test-cmt        # GHDL testbench: tape playback byte for byte, record kept over a deck stop (~15 min)
 ./obj_dir_headless/Vtop --help
 ```
 
@@ -47,6 +49,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--ramdisk` | MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk). |
 | `--qd FILE` | Quick Disk image (`.qdf` or `.mzq`) in slot S3 (MZ-1500, MZ-800); writes go back to the file. `--qd-readonly` mounts it write protected. |
 | `--qd-swap FRAME:FILE` | Mount another Quick Disk image at FRAME, e.g. side B of a two-sided game (repeatable). |
+| `--printer FILE` | Printer connected (OSD Printer: UART); the UART line is decoded into FILE. `--printer-baud N` (9600). Feed FILE to `mister_printerd -d - -m epson` for a PDF. |
 | `--joy0 N` | Hold joystick 1 with MiSTer bits N (decimal; 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2) all run. |
 | `--warm-reset N` | Press the OSD Reset at frame N (repeatable). |
 | `--mz800-mode 700\|800` | The MZ-800 rear switch (default 700, as mz800emu). |
@@ -75,6 +78,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `ipl_mz1500`, `qd_mz1500` | The MZ-1500 IPL menu; Lode Runner from a Quick Disk dump with its PCG title screen (pixel-identical to mz1500emu). |
 | `cg_mz1500` | MZ-1500: `tests/mz1500/cgread.mzf` reads 'F' from the CG ROM through OUT E5 0 and prints it in hex (bit 7 = left pixel). |
 | `joy_mz800` | MZ-800 with `--joy0 17` (right + fire 1): `tests/mz800/joytest.mzf` strobes the 8255 (PA4 low = joystick 1) and reads F0/F1. |
+| `prn_mz700`, `prn_mz800` | `tests/printer/prntest.mzf` prints two lines through the printer port (MZ-700 FE/FF, MZ-800 PIO); the bytes decoded from the UART match. |
 | `rd_mz800` | MZ-800 with `--ramdisk`: `tests/mz800/ramdisk.mzf` writes two bytes to the RAM disk board and reads them back. |
 | `tape_image`, `tape_mz800` | Load from a tape image, on the MZ-700 monitor and the MZ-800 IPL. Slow; skipped with `QUICK=1`. |
 | `fdd_cpm`, `fdd_hry` | CP/M 4.1 boots from disk and runs DIR; a games disk starts its file manager (pixel-identical to mz800emu). They need the images in `../software/dsk/` (not in the repository) and are skipped otherwise. |

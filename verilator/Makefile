@@ -5,6 +5,8 @@
 #    make netlist    # VHDL -> Verilog only    -> gen/sharpmz.v
 #    make test       # smoke tests (run_tests.sh)
 #    make test-clkgen  # GHDL testbench for the clock enable generator
+#    make test-i8254   # GHDL testbench for the 8253/8254 timer
+#    make test-cmt     # GHDL testbench for the tape unit (record kept over a deck stop)
 #    make fast       # the same sim at half clk_sys (35.47 MHz) -> ./obj_dir_fast/Vtop,
 #                    # about twice as fast; for batch runs (run_tests.sh BIN=... shows what differs)
 #    make clean
@@ -75,7 +77,7 @@ $(CLK_PKG): $(RTL)/clkgen_pkg.vhd Makefile
 endif
 
 GEN_V = $(GEN)/sharpmz.v
-V_SRC = sim.v $(GEN_V) rtl_v/dpram.v rtl_v/dprom.v $(RTL)/tape_image.sv $(RTL)/mz_fdc.sv $(RTL)/mz_qdisk.sv $(RTL)/mz800_border.sv $(RTL)/wd1793.sv $(RTL)/wd1793_mem.v
+V_SRC = sim.v $(GEN_V) rtl_v/dpram.v rtl_v/dprom.v $(RTL)/tape_image.sv $(RTL)/mz_fdc.sv $(RTL)/mz_qdisk.sv $(RTL)/mz800_border.sv $(RTL)/mz_printer.sv $(RTL)/wd1793.sv $(RTL)/wd1793_mem.v
 
 MIFS    = $(wildcard $(RTL)/software/mif/*.mif)
 MIF_HEX = $(patsubst $(RTL)/software/mif/%.mif,software/mif/%.mif.hex,$(MIFS))
@@ -134,7 +136,23 @@ test-clkgen: $(GEN_V)
 	$(GHDL) -e $(GHDL_FLAGS) -o $(WORK)/tb_clkgen tb_clkgen
 	cd $(WORK) && ./tb_clkgen --assert-level=error
 
-clean:
-	rm -rf $(HL_DIR) $(GEN) $(WORK) obj_dir_fast gen_fast ghdl_work_fast software out
+# The tape unit on its own, with a behavioural dpram, in a separate GHDL library (ghdl_work_tb) so the
+# netlist build never sees that dpram. CLK_SYS_HZ / 64 shortens the CMT's PLAY_READY quiet time.
+TB_WORK  = ghdl_work_tb
+TB_FLAGS = $(subst --workdir=$(WORK),--workdir=$(TB_WORK),$(GHDL_FLAGS))
+test-cmt: tests/tb_cmt.vhd tests/dpram_beh.vhd $(RTL)/cmt.vhd
+	@mkdir -p $(TB_WORK)
+	perl -pe 's/(CLK_SYS_HZ\s*:\s*natural\s*:=\s*)70937600/$${1}70937600 \/ 64/' $(RTL)/clkgen_pkg.vhd > $(TB_WORK)/clkgen_pkg.vhd
+	$(GHDL) -a $(TB_FLAGS) $(RTL)/config_pkg.vhd $(TB_WORK)/clkgen_pkg.vhd $(RTL)/mctrl_pkg.vhd tests/dpram_beh.vhd $(RTL)/cmt.vhd tests/tb_cmt.vhd
+	$(GHDL) -e $(TB_FLAGS) -o $(TB_WORK)/tb_cmt tb_cmt
+	cd $(TB_WORK) && ./tb_cmt --assert-level=error --ieee-asserts=disable
 
-.PHONY: all headless netlist test test-clkgen clean fast
+test-i8254: $(GEN_V)
+	$(GHDL) -a $(GHDL_FLAGS) tests/tb_i8254.vhd
+	$(GHDL) -e $(GHDL_FLAGS) -o $(WORK)/tb_i8254 tb_i8254
+	cd $(WORK) && ./tb_i8254 --assert-level=error --ieee-asserts=disable-at-0
+
+clean:
+	rm -rf $(HL_DIR) $(GEN) $(WORK) $(TB_WORK) obj_dir_fast gen_fast ghdl_work_fast software out
+
+.PHONY: all headless netlist test test-clkgen test-i8254 test-cmt clean fast

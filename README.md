@@ -92,11 +92,19 @@ Writes go back to the image; mount a copy if you want to keep the original.
 | User ROM / FDC ROM | Map the user ROM (E800) or FDC ROM (F000) for the current model. |
 | Load System ROM / RAM / Keymap / CGROM | Replace the built-in combined monitor ROM, the initial RAM image, the keymaps or the character generator ROM. The files use the same layout as `rtl/software/roms/combined_*.rom`. |
 
+### Printer
+
+| Option | Description |
+| ------ | ----------- |
+| Printer | None, or UART: what the machine prints goes out of the MiSTer UART (8N1, at the speed set in Main's UART menu, 9600 by default) for the printer daemon [mister_printerd](https://github.com/alanswx/printeremulation), which makes a PDF (Epson model). Set the UART connection to Printer in Main's UART menu. |
+
+The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B data, PA7 strobe, PA0 ready), with the handshake of the MZ-800 Technical Reference Manual and MZ-700 BASIC (`rtl/mz_printer.sv`). BASIC's `LIST/P` and `PRINT/P` print. The MZ-731's 4-colour plotter is driven through the same port, so its commands (`MODE GR`, `LINE`, `PCOLOR`) are sent too, but the daemon doesn't draw them yet. With the option off the port behaves as before (no printer: the MZ-700 BASIC times out, the MZ-800 PIO reads ready).
+
 ## Known Issues
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
-* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border), and the printer port isn't implemented. Joysticks and the RAM disk are new and not yet tried with software.
-* Floppy: 1.44 MB images aren't supported, and the MZ-80K/80A floppy interface isn't implemented. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
+* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border). Joysticks work in Knight Lore and Exolon in simulation; the RAM disk is new. Load Direct runs the IPL afterwards, which clears 10F0-11FF, so programs that start there must be loaded from tape (`docs/triage.md`).
+* Floppy: 1.44 MB images aren't supported (2,880 sectors don't fit the controller's sector index, and the FPGA's block RAM is full; see `TODO.md`), and the MZ-80K/80A floppy interface isn't implemented. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). They don't run from tape; `tools/mzf2qdf.py OUT.qdf SIDE.mzt` makes a Quick Disk of each side (answer `Y` to "SET PROGRAM QD ?" after swapping in side B). `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.

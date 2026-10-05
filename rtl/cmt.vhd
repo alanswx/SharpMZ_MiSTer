@@ -628,8 +628,9 @@ begin
                 RECORD_READY                        <= '0';
             end if;
 
-            -- Increment counters if enabled.
-            if PLAY_READY_SET_CNT >= 1 then
+            -- Increment counters if enabled (up to the quiet time, where the branch above sets PLAY_READY and
+            -- clears the counter; counting on past it left the declared range).
+            if PLAY_READY_SET_CNT >= 1 and PLAY_READY_SET_CNT < PLAY_READY_CLKS then
                 PLAY_READY_SET_CNT                  <= PLAY_READY_SET_CNT + 1;
             end if;
         end if;

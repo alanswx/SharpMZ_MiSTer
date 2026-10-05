@@ -45,7 +45,9 @@ entity mz800_pio is
         VECTOR_OE            : out std_logic;                                -- Driving the vector (interrupt acknowledge).
         INT_n                : out std_logic;
         PA_IN                : in  std_logic_vector(7 downto 0);
-        PB_IN                : in  std_logic_vector(7 downto 0)
+        PB_IN                : in  std_logic_vector(7 downto 0);
+        PA_OUT               : out std_logic_vector(7 downto 0);             -- Output registers (printer: PB data, PA7 RDP).
+        PB_OUT               : out std_logic_vector(7 downto 0)
     );
 end mz800_pio;
 
@@ -76,6 +78,8 @@ architecture rtl of mz800_pio is
     signal PIN               : byte2;
 begin
     PIN(0)                   <= PA_IN;
+    PA_OUT                   <= OUTREG(0);
+    PB_OUT                   <= OUTREG(1);
     PIN(1)                   <= PB_IN;
     INTA                     <= '1' when M1_n = '0' and IORQ_n = '0' else '0';
 

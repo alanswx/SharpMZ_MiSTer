@@ -123,6 +123,10 @@ entity mz80c is
           JOY1               : in  std_logic_vector(5 downto 0);
           JOY_1X03           : in  std_logic;                            -- MZ-700/1500: MZ-1X03 joysticks connected.
           RAMDISK_EN         : in  std_logic;                            -- MZ-800: 64 KB RAM disk board at E9-EB, F8-FA.
+          PRN_EN             : in  std_logic;                            -- Printer connected (OSD Printer: UART).
+          PRN_RDA            : in  std_logic;                            -- Printer busy / acknowledge (high).
+          PRN_DATA           : out std_logic_vector(7 downto 0);         -- Printer data (MZ-700 FF, MZ-800/1500 PIO port B).
+          PRN_STB            : out std_logic;                            -- Printer strobe RDP (MZ-700 FE bit 7, MZ-800/1500 PA7).
 
           -- Different operations modes.
           CONFIG             : in  std_logic_vector(CONFIG_WIDTH);
@@ -294,6 +298,11 @@ signal M8_PIO_DO             :     std_logic_vector(7 downto 0);
 signal M8_PIO_VOE            :     std_logic;
 signal M8_PIO_INT_n          :     std_logic;
 signal M8_PIO_PA             :     std_logic_vector(7 downto 0);
+signal M8_PIO_PAO            :     std_logic_vector(7 downto 0);
+signal M8_PIO_PBO            :     std_logic_vector(7 downto 0);
+signal M7_PRN_DATA           :     std_logic_vector(7 downto 0);            -- MZ-700 printer port FF.
+signal M7_PRN_CTRL           :     std_logic_vector(7 downto 0);            -- MZ-700 printer port FE: 7 RDP, 6 IRT.
+signal M7_PRN                :     std_logic;                               -- MZ-700 model (not the MZ-800/1500).
 signal M8_PSG_MIX            :     unsigned(13 downto 0);
 --
 -- Debug
@@ -474,10 +483,33 @@ begin
             VECTOR_OE        => M8_PIO_VOE,
             INT_n            => M8_PIO_INT_n,
             PA_IN            => M8_PIO_PA,
-            PB_IN            => x"FF"
+            PB_IN            => x"FF",
+            PA_OUT           => M8_PIO_PAO,
+            PB_OUT           => M8_PIO_PBO
         );
     M8_PIO_CS                <= '1' when (M8 = '1' or M15 = '1') and M8_IO(7 downto 2) = "111111" else '0';   -- MZ-800 and MZ-1500
-    M8_PIO_PA                <= "11" & (not VBLANK) & (not SOUND_PULSE_X2) & "0010";
+    -- PA0 RDA: always ready with no printer (as before), the printer's acknowledge with one. PA1 STA high: paper.
+    M8_PIO_PA                <= "11" & (not VBLANK) & (not SOUND_PULSE_X2) & "001" & (PRN_RDA and PRN_EN);
+
+    -- Printer port. MZ-800/1500: Z80 PIO port B data, PA7 RDP. MZ-700: the plotter/printer port at I/O FF (data)
+    -- and FE (write: 7 RDP, 6 IRT; read: 0 RDA, 1 STA, 2-3 low), as MZ-700 BASIC 1Z-013B drives it (2871): wait
+    -- for FE AND 0D = 0, OUT FF, OUT FE 80, wait for bit 0 high, OUT FE 0. Without a printer FE reads FF, as before.
+    M7_PRN                   <= '1' when CONFIG(MZ700) = '1' and M8 = '0' and M15 = '0' else '0';
+    process( MZ_RESET, CLKBUS(CKMASTER) )
+    begin
+        if MZ_RESET = '1' then
+            M7_PRN_CTRL      <= (others => '0');
+        elsif rising_edge(CLKBUS(CKMASTER)) then
+            if M7_PRN = '1' and T80_WR_n = '0' and M8_IO = X"FF" then
+                M7_PRN_DATA  <= T80_DO;
+            end if;
+            if M7_PRN = '1' and T80_WR_n = '0' and M8_IO = X"FE" then
+                M7_PRN_CTRL  <= T80_DO;
+            end if;
+        end if;
+    end process;
+    PRN_DATA                 <= M8_PIO_PBO    when M8 = '1' or M15 = '1' else M7_PRN_DATA;
+    PRN_STB                  <= M8_PIO_PAO(7) when M8 = '1' or M15 = '1' else M7_PRN_CTRL(7) and M7_PRN;
     AUDIO_PSG                <= std_logic_vector(M8_PSG_MIX)   when (M8 = '1' or M15 = '1') and CONFIG(AUDIOSRC) = '0' else (others => '0');
     AUDIO_PSG_R              <= std_logic_vector(M15_PSG1_MIX) when M15 = '1' and CONFIG(AUDIOSRC) = '0' else
                                 std_logic_vector(M8_PSG_MIX)   when M8 = '1'  and CONFIG(AUDIOSRC) = '0' else (others => '0');
@@ -540,6 +572,8 @@ begin
                                 M15_PCG_DI when M15_WIN = '1' and T80_RD_n = '0'                                     -- MZ-1500 PCG plane or CG ROM
                                 else
                                 M8_JOY_DO when M8 = '1' and T80_RD_n = '0' and M8_IO(7 downto 1) = "1111000"             -- MZ-800 joysticks F0/F1
+                                else
+                                "1111001" & PRN_RDA when M7_PRN = '1' and PRN_EN = '1' and T80_RD_n = '0' and M8_IO = X"FE"  -- MZ-700 printer status
                                 else
                                 RD_DO     when RD_SEL = '1' and T80_RD_n = '0'                                          -- MZ-800 RAM disk
                                 else

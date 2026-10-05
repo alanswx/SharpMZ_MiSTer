@@ -37,7 +37,7 @@ module emu
 
 assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
-assign {UART_RTS, UART_TXD, UART_DTR} = 0;
+assign {UART_RTS, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
@@ -78,7 +78,7 @@ assign BUTTONS = 0;
 
 localparam CONF_STR =
 {
-	"SharpMZ;;",
+	"SharpMZ;UART9600:19200:38400:4800:2400:1200;",
 	"-;",
 	// Tape and disk entries stay on the top level: MGL files can only load F/S entries that are
 	// not on a sub-page.
@@ -117,6 +117,12 @@ localparam CONF_STR =
 	"P5O[34:33],Floppy Interface,Auto,On,Off;",
 	"P5O[40],MZ-800 RAM Disk,Off,64 KB;",
 	"P5O[42],Floppy CRC Errors,Ignore,Report;",
+	"-;",
+	"P6,Printer;",
+	"P6O[47],Printer,None,UART (mister_printerd);",
+	"P6-;",
+	"P6-,Set UART connection to Printer;",
+	"P6-,in the MiSTer UART menu;",
 	"-;",
 	"P4,ROM and RAM;",
 	"P4O[28],User ROM,Off,On;",
@@ -183,9 +189,12 @@ wire        sd_buff_wr;
 
 wire        tape_active;
 
+wire [31:0] uart_speed;
+
 hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 (
 	.clk_sys(clk_sys),
+	.uart_speed(uart_speed),
 	.HPS_BUS(HPS_BUS),
 	.EXT_BUS(),
 	.gamma_bus(gamma_bus),
@@ -458,6 +467,24 @@ wire [15:0] beep_r  = has_psg ? {3'b000, audio_r_emu, 12'd0} : {1'b0, audio_r_em
 // moves (cmt_status[4]), like a deck's monitor speaker; Audio Source = Tape plays it instead of the sound.
 wire        tape_bit = cmt_status[4] & (cmt_status[6] | cmt_ctrl[0]);
 wire [15:0] tape_snd = (status[41] & tape_bit) ? 16'h0800 : 16'd0;
+
+// Printer (OSD Printer: UART): the MZ-700 / MZ-800 / MZ-1500 printer port, sent out of the MiSTer UART for the
+// printer daemon (rtl/mz_printer.sv).
+wire        prn_rda, prn_stb, prn_txd;
+wire  [7:0] prn_data;
+mz_printer #(.CLK_HZ(70937600)) mz_printer
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.enable(status[47]),
+	.rdp(prn_stb),
+	.data(prn_data),
+	.rda(prn_rda),
+	.uart_speed(uart_speed),
+	.txd(prn_txd),
+	.count()
+);
+assign UART_TXD = status[47] ? prn_txd : 1'b1;
 assign AUDIO_L = beep_l + {2'b00, audio_psg} + tape_snd;
 assign AUDIO_R = beep_r + {2'b00, audio_psg_r} + tape_snd;
 assign AUDIO_S = 0;
@@ -572,6 +599,10 @@ sharpmz sharp_mz
 	.JOY1(joystick_1[5:0]),
 	.JOY_1X03(status[39]),
 	.RAMDISK_EN(status[40]),
+	.PRN_EN(status[47]),
+	.PRN_RDA(prn_rda),
+	.PRN_DATA(prn_data),
+	.PRN_STB(prn_stb),
 
 	.VGA_HB_O(hblank_emu),
 	.VGA_VB_O(vblank_emu),

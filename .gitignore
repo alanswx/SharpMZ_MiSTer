@@ -49,6 +49,7 @@ verilator/gen/
 verilator/gen_fast/
 verilator/ghdl_work/
 verilator/ghdl_work_fast/
+verilator/ghdl_work_tb/
 verilator/obj_dir*/
 verilator/software/
 verilator/out/
