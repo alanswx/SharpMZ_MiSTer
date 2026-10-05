@@ -25,7 +25,6 @@
 #include <deque>
 #include <map>
 #include <fstream>
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -80,9 +79,11 @@ struct Options {
     bool        ramdisk = false;
     uint32_t    joy0 = 0;                // joystick 1, MiSTer bits (5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right)
     std::set<uint32_t> warm_resets;
+    std::map<uint32_t, int> fast_tape_at;   // --fast-tape-at FRAME:STEP
     bool        fdd_readonly = false;
     std::string fdd_b;                       // --fdd-b: drive B image
-    bool        fdd_b_hd = false;            // --fdd-b-hd: drive B is unit 2 (OSD Drive B Unit: 3rd)
+    bool        fdd_b_hd = false;
+    bool        direct_start = false;        // --direct-start: Load Direct starts the program (OSD default)            // --fdd-b-hd: drive B is unit 2 (OSD Drive B Unit: 3rd)
     int         fdc_mode = 0;
     bool     tape_readonly = false;
     std::set<uint32_t> tape_rewinds;
@@ -106,9 +107,12 @@ static void usage()
 "  --mzf FILE             put an MZF in the tape buffer (Load Tape to CMT)\n"
 "  --mzf-direct           load it straight to RAM instead (Load Direct to RAM)\n"
 "  --mzf-direct-frame N   frame to do the direct load at (default 0)\n"
+"  --direct-start         after a direct load, boot, restore 10F0-11FF and jump to the exec address\n"
+"                         (OSD Load Direct: Start Program; off here so the tests that type J still work)\n"
 "Tape image (the OSD Tape Image slot):\n"
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
 "  --warm-reset N        OSD Reset (warm reset) at frame N (repeatable)\n"
+"  --fast-tape-at F:N     change the Fast Tape step to N at frame F (repeatable)\n"
 "  --ramdisk              MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk)\n"
 "  --joy0 BITS            joystick 1 held all run (MiSTer bits: 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
@@ -164,6 +168,11 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--mz800-mode") o.mz800_700 = next() == "700";
         else if (a == "--turbo") o.turbo = (int)parse_num(next());
         else if (a == "--fast-tape") o.fast_tape = (int)parse_num(next());
+        else if (a == "--fast-tape-at") {
+            std::string v = next(); size_t c = v.find(':');
+            if (c == std::string::npos) { fprintf(stderr, "--fast-tape-at wants FRAME:STEP\n"); exit(2); }
+            o.fast_tape_at[(uint32_t)std::stoul(v.substr(0, c))] = std::stoi(v.substr(c + 1));
+        }
         else if (a == "--stop-at-frame") { o.stop_frame = parse_num(next()); o.stop_set = true; }
         else if (a == "--quiet") o.quiet = true;
         else if (a == "--verbose") o.verbose = true;
@@ -222,6 +231,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fdd-readonly") o.fdd_readonly = true;
         else if (a == "--fdd-b") o.fdd_b = next();
         else if (a == "--fdd-b-hd") o.fdd_b_hd = true;
+        else if (a == "--direct-start") o.direct_start = true;
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
         else if (a == "--tape-readonly") o.tape_readonly = true;
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
@@ -658,6 +668,8 @@ void Sim::on_frame_end()
     }
 
     top->tape_rewind = opt.tape_rewinds.count(frame) ? 1 : 0;   // Held for one frame.
+    if (opt.fast_tape_at.count(frame))
+        top->cfg_cmt = (uint8_t)((top->cfg_cmt & ~7) | fast_tape_code(opt.fast_tape_at.at(frame)));
     if (opt.warm_resets.count(frame)) { top->warm_reset = 1; for (int i = 0; i < 64; i++) clock(); top->warm_reset = 0; }
 }
 
@@ -686,6 +698,7 @@ void Sim::write_config()
     top->cfg_audio    = 0;
     top->ramdisk_en   = opt.ramdisk;
     top->fdd_b_unit2  = opt.fdd_b_hd;
+    top->direct_start_en = opt.direct_start;
     top->prn_en       = opt.printer.empty() ? 0 : 1;
     top->prn_baud     = opt.printer_baud;
     top->joy0         = opt.joy0;
@@ -704,6 +717,7 @@ bool Sim::load_mzf(bool direct)
                 direct ? "direct-loading" : "loading tape", opt.mzf.c_str(), size, load, exec, frame);
 
     top->ioctl_download = 1;
+    top->ioctl_direct = direct;
     if (direct) top->warm_reset = 1;
     for (size_t i = 0; i < d.size(); i++) {
         uint32_t a;
@@ -716,6 +730,7 @@ bool Sim::load_mzf(bool direct)
         ioctl_write(a, d[i]);
     }
     top->ioctl_download = 0;
+    top->ioctl_direct = 0;
     for (int i = 0; i < 64; i++) clock();
     top->warm_reset = 0;
     return true;

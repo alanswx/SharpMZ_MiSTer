@@ -51,7 +51,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Option | Description |
 | ------ | ----------- |
 | Load Tape to CMT | Put an `.mzf` on the virtual tape. Start it from the machine as normal (`L` or `LOAD` in the monitor, `LOAD` in BASIC). |
-| Load Direct to RAM | Copy the program straight into memory at its load address and reset. Start it from the monitor with `J` and the exec address. |
+| Load Direct to RAM | Copy the program straight into memory at its load address and start it (see Load Direct below). |
 | Tape Image | Mount an `.mzt`/`.mzf` as the cassette. The first program is ready to play; when the machine stops the tape after reading one program, the next one is loaded, so multi-part programs work. Programs saved with SAVE are appended to the image. |
 | Rewind Tape Image | Go back to the first program on the mounted image. |
 | Tape Buttons | Auto (play or record as the machine needs), Off, Play, Record. |
@@ -59,6 +59,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Sharp ASCII Name | Convert tape file names between Sharp display codes and ASCII on save and/or load. |
 | Audio Source | The 8253 sound, or the tape signal. |
 | Tape Sound | Mix the tape signal in quietly while the tape is playing or recording, as the machines' own tape monitor would (Audio Source stays on the sound). |
+| Load Direct | Start Program (default): after Load Direct to RAM the machine boots for about 1.5 s, then the core puts back what the load wrote to 10F0-11FF (the boot uses that area), sets the memory map and jumps to the exec address with SP at 10F0, as after a tape load. Only machine-code files (MZF type 01) are started; BASIC programs and data just reset. Reset Only: just reset, then start it yourself with `J` and the exec address in the monitor. The MZ-80B and MZ-2000 always reset only. |
 
 **Saving programs.** MiSTer can't grow a mounted file, so saving needs a tape image with spare room. Make a blank one with `tools/make_blank_tape.py` (default 1 MB, zero-filled), mount it as the Tape Image, and SAVE as usual (for example `S120012FF1200` then a file name in the MZ-700 monitor). Each program is appended after the last one. If the image is read-only or full, the save is skipped.
 
@@ -104,7 +105,7 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 ## Known Issues
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
-* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border). Joysticks work in Knight Lore and Exolon in simulation; the RAM disk is new. Load Direct runs the IPL afterwards, which clears 10F0-11FF, so programs that start there must be loaded from tape (`docs/triage.md`).
+* MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border). Joysticks work in Knight Lore and Exolon in simulation; the RAM disk is new. Load Direct starts the program as mz800emu's direct load does, so programs that start in or read their MZF header at 10F0 (Exploding Fist, Jumpin' Jack, Solomon's Key) work (`docs/triage.md`).
 * Floppy: the MZ-80K/80A floppy interface isn't implemented. 1.44 MB images read and write at the controller level (simulation, `fdd_hd`); CP/M 4.1's HD drive C: still to be confirmed. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).

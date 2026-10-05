@@ -29,6 +29,8 @@ module top(
    output [13:0] AUDIO_PSG /*verilator public_flat*/,
 
    input         ioctl_download,
+   input         ioctl_direct,   // the download is a direct load (OSD Load Direct to RAM)
+   input         direct_start_en,// Load Direct starts the program (OSD Load Direct: Start Program)
    input         ioctl_wr,
    input         ioctl_rd,
    input  [24:0] ioctl_addr,
@@ -140,6 +142,9 @@ module top(
    wire        tape_wr;
    wire [7:0]  tape_dout;
    wire        tape_mounted;
+   wire        ds_bus_active, ds_bus_wr;
+   wire [24:0] ds_bus_addr;
+   wire [7:0]  ds_bus_dout;
    wire        tape_rd, tape_b_busy;
    wire [7:0]  tape_b_dout;
    wire        tape_data_region;
@@ -149,16 +154,25 @@ module top(
       .img_mounted(img_mounted), .img_readonly(img_readonly), .img_size(img_size),
       .sd_lba(sd_lba), .sd_rd(sd_rd), .sd_wr(sd_wr), .sd_ack(sd_ack),
       .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(sd_buff_din), .sd_buff_wr(sd_buff_wr),
-      .rewind(tape_rewind), .host_busy(ioctl_download), .cmt_status(cmt_status),
+      .rewind(tape_rewind), .host_busy(ioctl_download | ds_bus_active), .cmt_status(cmt_status),
       .active(tape_active), .bus_addr(tape_addr), .bus_wr(tape_wr), .bus_dout(tape_dout),
       .bus_din(tape_data_region ? tape_b_dout : din32[7:0]), .bus_busy(tape_b_busy), .bus_rd(tape_rd),
       .mounted(tape_mounted), .tape_full(tape_full), .record_no(tape_record)
    );
 
    // Same bus mux as sharpmz.sv.
-   wire        mz_wr   = ioctl_download ? ioctl_wr   : tape_active & tape_wr;     // as sharpmz.sv: downloads first
-   wire [24:0] mz_addr = ioctl_download ? ioctl_addr : tape_active ? tape_addr : 25'h1000000;
-   wire [7:0]  mz_dout = ioctl_download ? ioctl_dout : tape_dout;
+   wire        mz_wr   = ioctl_download ? ioctl_wr   : ds_bus_active ? ds_bus_wr : tape_active & tape_wr;     // as sharpmz.sv: downloads first
+   wire [24:0] mz_addr = ioctl_download ? ioctl_addr : ds_bus_active ? ds_bus_addr : tape_active ? tape_addr : 25'h1000000;
+   wire [7:0]  mz_dout = ioctl_download ? ioctl_dout : ds_bus_active ? ds_bus_dout : tape_dout;
+
+   wire        ds_inj_go, ds_m1_n, ds_mreq_n, ds_rd_n;
+   wire [7:0]  ds_inj_data;
+   direct_start #(.CLK_HZ(70937600 / `SIM_CLK_DIV)) dstart(
+      .clk(clk_sys), .reset(reset), .enable(direct_start_en & (cfg_model[2:1] != 2'b11)),
+      .is_mz800(cfg_model[2:0] == 3'd5), .has_e0(cfg_model[2]),
+      .dl_active(ioctl_download & ioctl_direct), .dl_wr(mz_wr), .dl_addr(mz_addr), .dl_data(mz_dout),
+      .bus_active(ds_bus_active), .bus_wr(ds_bus_wr), .bus_addr(ds_bus_addr), .bus_dout(ds_bus_dout),
+      .m1_n(ds_m1_n), .mreq_n(ds_mreq_n), .rd_n(ds_rd_n), .inj_go(ds_inj_go), .inj_data(ds_inj_data));
 
    // Tape data buffer in DDR3, as sharpmz.sv, with a behavioural DDR3 below.
    assign tape_data_region = (mz_addr[24:16] == 9'h041);
@@ -265,6 +279,11 @@ module top(
       .TAPEDATA_WE    (tapedata_we),
       .TAPEDATA_DIN   (tapedata_rdata),
       .TAPEDATA_READY (tapedata_ready),
+      .INJ_GO         (ds_inj_go),
+      .INJ_DATA       (ds_inj_data),
+      .CPU_M1_n       (ds_m1_n),
+      .CPU_MREQ_n     (ds_mreq_n),
+      .CPU_RD_n       (ds_rd_n),
       .PRN_EN         (prn_en),
       .PRN_RDA        (prn_rda),
       .PRN_DATA       (prn_data),

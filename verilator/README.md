@@ -43,6 +43,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--frame-log FILE` | Per frame: hash, CPU cycles, PC. |
 | `--type FRAME:TEXT` | Type text from a frame on, with escapes like `\n` and `{WAIT n}`, and key names such as `{LEFT}`, `{BS}`, `{BREAK}`. |
 | `--mzf FILE` | Put an MZF on the tape. `--mzf-direct` / `--mzf-direct-frame N` load it into RAM instead. |
+| `--direct-start` | After a direct load, start the program as the core's Load Direct: Start Program does (boot, restore 10F0-11FF, jump to exec). Off by default in the sim, so the tests that type `J` still work. |
 | `--tape-image FILE` | Mount a tape image (S0). Also `--tape-readonly`, `--tape-rewind`. |
 | `--fast-tape STEP` | The OSD Fast Tape step (0–7), not a multiplier. 4 is about 8x; 5 is the fastest (capped at clk_sys/2). |
 | `--fdd FILE` | Extended DSK image in floppy drive A. Also `--fdd-readonly`, and `--fdc-mode auto\|on\|off`. |
@@ -50,7 +51,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--ramdisk` | MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk). |
 | `--qd FILE` | Quick Disk image (`.qdf` or `.mzq`) in slot S3 (MZ-1500, MZ-800); writes go back to the file. `--qd-readonly` mounts it write protected. |
 | `--qd-swap FRAME:FILE` | Mount another Quick Disk image at FRAME, e.g. side B of a two-sided game (repeatable). |
-| `--printer FILE` | Printer connected (OSD Printer: UART); the UART line is decoded into FILE. `--printer-baud N` (9600). Feed FILE to `mister_printerd -d - -m epson` for a PDF. |
+| `--printer FILE` | Printer connected (OSD Printer: UART); the UART line is decoded into FILE. `--printer-baud N` (9600). Feed FILE to `mister_printerd -d - -m sharpmz` (plotter) or `-m epson` for a PDF. |
 | `--joy0 N` | Hold joystick 1 with MiSTer bits N (decimal; 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2) all run. |
 | `--warm-reset N` | Press the OSD Reset at frame N (repeatable). |
 | `--mz800-mode 700\|800` | The MZ-800 rear switch (default 700, as mz800emu). |

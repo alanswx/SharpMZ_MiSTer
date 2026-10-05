@@ -130,6 +130,11 @@ entity sharpmz is
         TAPEDATA_WE           : out    std_logic;
         TAPEDATA_DIN          : in     std_logic_vector(7 downto 0) := (others => '0');
         TAPEDATA_READY        : in     std_logic := '1';
+        INJ_GO                : in     std_logic := '0';                        -- Load Direct start (rtl/direct_start.sv):
+        INJ_DATA              : in     std_logic_vector(7 downto 0) := (others => '0'); -- feed this to the CPU's memory reads.
+        CPU_M1_n              : out    std_logic;
+        CPU_MREQ_n            : out    std_logic;
+        CPU_RD_n              : out    std_logic;
         CMT_CTRL              : out    std_logic_vector(7 downto 0);            -- CMT_BUS_IN (machine to deck), for debug.
         CMT_DEBUG             : out    std_logic_vector(31 downto 0);           -- cmt.vhd DEBUG_STATUS_LEDS, for debug.
         --------------------                   Machine configuration              ------------------------------
@@ -1160,7 +1165,9 @@ begin
     T80_INT_n                <= (MZ80C_INT_n and EXT_INT_n) when CONFIG(MZ_80C) = '1'   else MZ80B_INT_n;
     T80_NMI_n                <= MZ80C_NMI_n       when CONFIG(MZ_80C) = '1'   else MZ80B_NMI_n;
     T80_BUSRQ_n              <= MZ80C_BUSRQ_n     when CONFIG(MZ_80C) = '1'   else MZ80B_BUSRQ_n;
-    T80_DI                   <= SYSRAM_DO         when MZ_CS_RAM_n ='0' and T80_RD_n = '0'                    -- Read from System RAM
+    T80_DI                   <= INJ_DATA          when INJ_GO = '1'                                             -- Load Direct start program
+                                else
+                                SYSRAM_DO         when MZ_CS_RAM_n ='0' and T80_RD_n = '0'                    -- Read from System RAM
                                 else 
                                 SYSROM_DO         when MZ_CS_ROM_n ='0' and T80_RD_n = '0'                    -- Read from System ROM        
                                 else 
@@ -1173,6 +1180,9 @@ begin
                                 MZ80B_DI          when CONFIG(MZ_80B) = '1'
                                 else
                                 (others=>'1');                                                                -- Float the bus as high when not driven.
+    CPU_M1_n                 <= T80_M1_n;
+    CPU_MREQ_n               <= T80_MREQ_n;
+    CPU_RD_n                 <= T80_RD_n;
     MZ_SYSMEM_A16            <= T80_A16           when CONFIG(MZ_80C) = '1'   else T80_A16           when CONFIG(MZ_80B) = '1' and MZ_SWP_MEM_BANK_n = '1' else '0' & T80_A16(14 downto 0);
     MZ_CS_ROM_n              <= MZ80C_CS_ROM_n    when CONFIG(MZ_80C) = '1'   else MZ80B_CS_ROM_n;
     MZ_CS_RAM_n              <= MZ80C_CS_RAM_n    when CONFIG(MZ_80C) = '1'   else MZ80B_CS_RAM_n;

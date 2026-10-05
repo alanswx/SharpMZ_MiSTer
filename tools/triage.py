@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Triage a folder of MZ-700 / MZ-800 programs: run each in the core's simulation and in mz800emu, side by side.
 
-Usage: triage.py MODEL DIR [--jobs N] [--frames N] [--limit N] [--out DIR]
+Usage: triage.py MODEL DIR [--jobs N] [--frames N] [--limit N] [--only N,N] [--direct-start] [--out DIR]
        MODEL is mz700 or mz800; DIR is searched for folders named MZ-700 / MZ-800 (as in the year-based collection)
        holding .mzf files, or with --any-folder every .mzf under DIR is taken.
 
@@ -27,7 +27,7 @@ def header(path):
     return d[0], d[18] | d[19] << 8, d[20] | d[21] << 8, d[22] | d[23] << 8
 
 
-def run_one(model, i, path, frames, out):
+def run_one(model, i, path, frames, out, direct_start=False):
     path, out = os.path.abspath(path), os.path.abspath(out)
     t, size, load, exe = header(path)
     core_png = os.path.join(out, f'{i:04d}_core.png')
@@ -37,8 +37,11 @@ def run_one(model, i, path, frames, out):
     start = 200 if model == 'mz800' else 100
     types = ['--type', '200:M', '--type', f'280:{jtype}'] if model == 'mz800' else ['--type', f'100:{jtype}']
     shot = start + 80 + frames
+    if direct_start:                     # the core starts the program itself, about 75 frames after the load
+        types, shot = [], 100 + frames
     sdir = os.path.join(out, f'c{i:04d}')
     subprocess.run([SIM, '--model', model, '--mzf', path, '--mzf-direct', '--mzf-direct-frame', '20', *types,
+                    *(['--direct-start'] if direct_start else []),
                     '--stop-at-frame', str(shot + 1), '--screenshot', str(shot), '--out', sdir, '--quiet'],
                    cwd=os.path.dirname(os.path.dirname(SIM)),          # the sim reads its ROMs from software/mif there
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=7200)
@@ -87,6 +90,9 @@ def main():
     ap.add_argument('--frames', type=int, default=500)
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--any-folder', action='store_true', help='take every .mzf, not only those in MZ-700 / MZ-800 folders')
+    ap.add_argument('--direct-start', action='store_true',
+                    help='the core starts the program after the load (OSD Load Direct: Start Program) instead of J typed')
+    ap.add_argument('--only', default='', help='comma-separated title numbers to run (from an earlier results.csv)')
     ap.add_argument('--out', default=os.path.join(ROOT, 'verilator/out/triage'))
     a = ap.parse_args()
     out = os.path.join(a.out, a.model)
@@ -108,10 +114,12 @@ def main():
     files.sort()
     if a.limit:
         files = files[:a.limit]
+    only = {int(n) for n in a.only.split(',') if n}
     print(f'{len(files)} single-file machine-code programs, {len(skipped)} skipped (multi-file or BASIC)', flush=True)
     rows = []
     with ThreadPoolExecutor(a.jobs) as ex:
-        futs = [ex.submit(run_one, a.model, i, p, a.frames, out) for i, p in enumerate(files)]
+        futs = [ex.submit(run_one, a.model, i, p, a.frames, out, a.direct_start)
+                for i, p in enumerate(files) if not only or i in only]
         for f in futs:
             r = f.result()
             rows.append(r)

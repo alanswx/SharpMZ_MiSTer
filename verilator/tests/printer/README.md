@@ -48,6 +48,10 @@ In the demo: `02`, `C0`, four `D` lines (the square), `C1`, `M 220,-120` and abo
 `C2`, `M`, `X0,-20, 10`, `M`, `X1, 24, 10` (two axes), `C3`, `M 20,-280`, `PMISTER`, `H`, `0A 03 01` (back to text),
 `DONE`.
 
+The printer daemon (`printeremulation`, `-m sharpmz`, picked automatically for a core named SharpMZ) draws these
+streams as an MZ-1P16 plotter would: four pen colours, round pen ends, text mode and graphic mode. The same three
+files are its regression samples (`tests/samples/sharpmz_*.prn`, `make test`).
+
 The plotter's own self-test (PAPER FEED held at power-on; mz800emu's plotter window, "Run drawing self-test") is
 drawn by the plotter's 8050 firmware from its ROM: nothing crosses the printer port, so there is no stream for it.
 `PTEST` (code 04) is the computer-side pen test.

@@ -88,6 +88,8 @@ This menu controls the hardware CMT unit and has the following choices:
   This option allows you to load an MZF format tape file (ie. 128 bytes header + code) directly into RAM. It uses the Load Address and Size stored in the header in order to correctly 
   locate the code and also stores the header in the Cassette Work area at 10F0H. After load is completed and warm reset is made, the details of the tape are displayed on-screen. In 
   order to run the loaded program, simply issue the correct monitor command, ie. J1200 (Jump to 1200H where 1200H is shown as the Execution Address in the tape summary).
+  (Standard core: with Tape > Load Direct: Start Program, the default, the core starts a machine-code program itself
+  after the boot; see the top-level README.)
 - Queue Tape
 
   A real cassette has 1 or more programs stored on it sequentially. The emulation cache only stores 1 full program so this is a mechanism to line up multiple programs and they will 

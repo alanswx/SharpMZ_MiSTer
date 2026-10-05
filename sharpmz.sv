@@ -102,6 +102,7 @@ localparam CONF_STR =
 	"P2O[27:26],Sharp ASCII Name,Off,On Save,On Load,Both;",
 	"P2O[20],Audio Source,Sound,Tape;",
 	"P2O[41],Tape Sound,Off,On;",
+	"P2O[49],Load Direct,Start Program,Reset Only;",
 	"-;",
 	"P3,Display;",
 	"P3O[8:7],Display Type,Default,Mono 80x25,Colour 40x25,Colour 80x25;",
@@ -188,6 +189,10 @@ wire  [7:0] sd_buff_din[4];
 wire        sd_buff_wr;
 
 wire        tape_active;
+wire        ds_bus_active, ds_bus_wr, ds_inj_go;   // Load Direct start (direct_start, below)
+wire [24:0] ds_bus_addr;
+wire  [7:0] ds_bus_dout, ds_inj_data;
+wire        cpu_m1_n, cpu_mreq_n, cpu_rd_n;
 wire        tape_data_region, tape_rd, tape_b_busy;   // tape data buffer in DDR3 (tape_ddr, below)
 wire  [7:0] tape_b_dout;
 
@@ -427,7 +432,7 @@ tape_image tape_image
 	.sd_buff_wr(sd_buff_wr),
 
 	.rewind(status[31]),
-	.host_busy(hps_ioctl_download),
+	.host_busy(hps_ioctl_download | ds_bus_active),
 	.cmt_status(cmt_status),
 
 	.active(tape_active),
@@ -445,9 +450,33 @@ tape_image tape_image
 
 // Core download bus: the tape engine, an OSD download, or parked on an unused address. The CMT clears
 // its record-ready flag whenever the bus points at its buffers, so it must not idle there.
-wire        mz_ioctl_wr   = hps_ioctl_download ? (hps_ioctl_wr && mzf_direct_wr_valid) : tape_active & tape_wr;
-wire [24:0] mz_ioctl_addr = hps_ioctl_download ? hps_ioctl_addr_mapped : tape_active ? tape_addr : 25'h1000000;
-wire  [7:0] mz_ioctl_dout = hps_ioctl_download ? hps_ioctl_dout : tape_dout;
+wire        mz_ioctl_wr   = hps_ioctl_download ? (hps_ioctl_wr && mzf_direct_wr_valid) : ds_bus_active ? ds_bus_wr : tape_active & tape_wr;
+wire [24:0] mz_ioctl_addr = hps_ioctl_download ? hps_ioctl_addr_mapped : ds_bus_active ? ds_bus_addr : tape_active ? tape_addr : 25'h1000000;
+wire  [7:0] mz_ioctl_dout = hps_ioctl_download ? hps_ioctl_dout : ds_bus_active ? ds_bus_dout : tape_dout;
+
+// Load Direct starts the program: after the machine has booted, the bytes the load put in 10F0-11FF are written
+// back and the CPU is fed DI, the bank switches the program needs, LD SP,10F0 and JP exec (rtl/direct_start.sv).
+direct_start #(.CLK_HZ(70937600)) direct_start
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.enable(~status[49] & (cfg_model[2:1] != 2'b11)),   // not the MZ-80B / MZ-2000
+	.is_mz800(cfg_model == 3'd5),
+	.has_e0(cfg_model[2]),
+	.dl_active(direct_load_active),
+	.dl_wr(mz_ioctl_wr),
+	.dl_addr(mz_ioctl_addr),
+	.dl_data(mz_ioctl_dout),
+	.bus_active(ds_bus_active),
+	.bus_wr(ds_bus_wr),
+	.bus_addr(ds_bus_addr),
+	.bus_dout(ds_bus_dout),
+	.m1_n(cpu_m1_n),
+	.mreq_n(cpu_mreq_n),
+	.rd_n(cpu_rd_n),
+	.inj_go(ds_inj_go),
+	.inj_data(ds_inj_data)
+);
 
 // The CMT's tape data buffer (64 KB) is in DDR3 (rtl/tape_ddr.sv): the CMT plays and records through port A,
 // downloads and tape_image through port B (the data region of the core bus, 410000-41FFFF).
@@ -647,6 +676,11 @@ sharpmz sharp_mz
 	.TAPEDATA_WE(tapedata_we),
 	.TAPEDATA_DIN(tapedata_rdata),
 	.TAPEDATA_READY(tapedata_ready),
+	.INJ_GO(ds_inj_go),
+	.INJ_DATA(ds_inj_data),
+	.CPU_M1_n(cpu_m1_n),
+	.CPU_MREQ_n(cpu_mreq_n),
+	.CPU_RD_n(cpu_rd_n),
 
 	.VGA_HB_O(hblank_emu),
 	.VGA_VB_O(vblank_emu),

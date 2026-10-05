@@ -50,8 +50,8 @@ counters now power up in mode 0 with OUT low and idle until a count is written, 
 | Same screen | 72 |
 | Differ only by timing, animation, border, palette shade | 8 |
 | Core bug, fixed | 10 (black drawn grey in MZ-700 mode) |
-| Header area wiped by the direct-load reset (see below) | 12 |
-| Cause not known yet | 4 (Abu Simbel Profanation, Antiriad (Eng), Planetoids v3.1, Space Guerilla) |
+| Header area wiped by the direct-load reset; fixed by Load Direct: Start Program (see below) | 12 |
+| Cause not known yet | 2 (Abu Simbel Profanation, Antiriad (Eng)); Space Guerilla fixed with the 12, Planetoids by the palette reset |
 | Both blank, no usable reference, or not runnable this way | 8 |
 
 **Fixed: black drawn as grey on the MZ-800 in MZ-700 mode.** The palette index for 700 mode was `1111 & '1' & GRB`,
@@ -62,7 +62,21 @@ Attack, Moty, James, Space Duel, HOBRA-Schach, Hell Diver, IS-Chess, Life, Point
 **Load Direct and the MZF header.** A direct load holds the machine in a warm reset (`sharpmz.sv`, as on hardware),
 so the MZ-800 IPL runs afterwards and clears 10F0-11FF, where the MZF header was put. Programs that start in that
 area or read their own header there (Exploding Fist, Jumpin' Jack, Tetris, Solomon's Key, Brouk, Jack the Nipper,
-...) fail after Load Direct; mz800emu with the header zeroed fails the same way. From tape they load normally. A
-fix would be for Load Direct to start the program itself, as mz800emu does (TODO).
+...) failed after Load Direct; mz800emu with the header zeroed fails the same way. From tape they load normally.
+
+**Fixed (2026-10-05): Load Direct starts the program.** `rtl/direct_start.sv` keeps what the load writes to
+10F0-11FF, lets the machine boot for about 1.5 s, writes those bytes back and feeds the CPU `DI`, the bank switches
+the program needs (MZ-800: `IN (E1)` and `OUT (E3)`, CG ROM and VRAM out; `OUT (E0)` when it loads below 1000),
+`LD SP,10F0` and `JP exec`, as mz800emu's bootstrap does. Only MZF type 01 is started. Rerun with
+`tools/triage.py mz800 DIR --direct-start --only 25,35,42,43,45,51,54,56,57,65,72,83,103`: all 12 match, and so does
+Space Guerilla (it loads at 11D0, inside the area the boot used). Pool and Moty differ only by the border (the
+MZ-800 Border option is off in the sim).
+
+**Fixed (2026-10-05): MZ-800 palette at reset.** Planetoids v3.1 sets only palette 0 (`OUT (F0),00`) and draws
+with colours 1-3. `VideoController.vhd` reset all four palette registers to 0, so it drew black on black. They now
+reset to mz800emu's power-on values (`gdg_init`: 9, F, 9, F) and Planetoids shows its instructions screen as in
+mz800emu. Abu Simbel (top line shows every other character of "ABUSIMBEL COPYRIGHT DINAMIC SOFT", white bars at
+the edges) and Antiriad (Eng) (noise band where the credits should be) are unchanged; both look like scrolling
+text, next to check.
 
 The reviews are in `verilator/out/triage/<model>/review.md` (not in git; rerun the script to rebuild them).

@@ -2701,7 +2701,8 @@ begin
                 GDMD_REG           <= "00001000";                          -- Graphics Display LSI Command Register. Default to MZ700 mode.
                 GRF_REG            <= (others => '0');                     -- Graphics Display LSI Read Format Register.
                 GWF_REG            <= (others => '0');                     -- Graphics Display LSI Write Format Register.
-                GPALLET_REG        <= (others => (others => '0'));         -- Graphics Display LSI Pallet Register.
+                GPALLET_REG        <= (X"9", X"F", X"9", X"F");            -- Graphics Display LSI Pallet Register: mz800emu's power-on
+                                                                           -- values (gdg_init); Planetoids sets only palette 0 and draws in 1-3.
                 GD_SOF             <= std_logic_vector(to_unsigned(0, GD_SOF'length)); -- Scroll offset regiser (SOF) 10 bits.
                 GD_SW              <= std_logic_vector(to_unsigned(0, GD_SW'length));  -- Scroll width regiser (SW), 7 bits
                 GD_SSA             <= std_logic_vector(to_unsigned(0, GD_SSA'length)); -- Scroll start address register (SSA), 7 bits

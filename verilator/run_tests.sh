@@ -27,6 +27,9 @@
 #   prn_mz700/800 tests/printer/prntest.mzf prints through the printer port; the bytes decoded from the UART match
 #   joy_mz800     MZ-800: tests/mz800/joytest.mzf strobes the 8255 with 07, EF (PA4 low: joystick 1) and FF and reads F0/F1
 #                 with right + fire 1 held (--joy0 17): E7 FF E7 FF
+#   ds_mz700/800  Load Direct: Start Program (--direct-start) runs tests/direct/dstest.mzf, whose code is in its own MZF
+#                 header (exec 1108): it stores the header's name byte, a body byte and SP: 44 5A F0 10 (MZ-800 in
+#                 MZ-800 mode, where the CG ROM sits at 1000 until the start switches it out)
 #   rd_mz800      MZ-800: tests/mz800/ramdisk.mzf writes 5A C3 to the RAM disk board (--ramdisk) and reads them back
 #   kb_mz80k/80a  type AB, cursor LEFT, C at the monitor prompt: *AC (LEFT needs the keymap's added SHIFT)
 #   cg_mz1500     MZ-1500: tests/mz1500/cgread.mzf reads the CG ROM through OUT E5 0 and prints the 8 bytes of 'F' in
@@ -103,6 +106,12 @@ if [ -f ../software/dsk/_Vzor144.dsk ]; then
           > /dev/null 2> "$OUT/fdd_hd.log"; xxd -p "$OUT/fdd_hd.bin" > "$OUT/fdd_hd.txt" ) &
     pids+=($!); names+=("fdd_hd")
 fi
+for t in "ds_mz700|--model mz700" "ds_mz800|--model mz800 --mz800-mode 800"; do
+    IFS='|' read -r n a <<< "$t"
+    ( $BIN $a --mzf tests/direct/dstest.mzf --mzf-direct --mzf-direct-frame 20 --direct-start --stop-at-frame 220 \
+          --dump-mem 2000:4:"$OUT/$n.bin" --quiet > /dev/null 2> "$OUT/$n.log"; xxd -p "$OUT/$n.bin" > "$OUT/$n.txt" ) &
+    pids+=($!); names+=("$n")
+done
 cp tests/mz800/joytest.mzf "$OUT/joy_mz800.mzt"
 ( $BIN --model mz800 --joy0 17 --fast-tape 4 --tape-image "$OUT/joy_mz800.mzt" --type '160:C' --stop-at-frame 700 \
       --ascii-end --quiet 2> "$OUT/joy_mz800.log" | head -1 | cut -c1-8 > "$OUT/joy_mz800.txt" ) &
@@ -195,7 +204,7 @@ for p in "${pids[@]}"; do wait $p; done
 fail=0
 for n in "${names[@]}"; do
     case $n in
-        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*|ipl_*|qd_*|cg_*|rd_*|joy_*|prn_*|tape_mz80b|tape_mz2000)
+        boot_*|mon_*|gfx_*|pcg_*|m800_*|kb_*|fdd_*|ipl_*|qd_*|cg_*|rd_*|joy_*|prn_*|ds_*|tape_mz80b|tape_mz2000)
             if diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
                 echo "PASS $n"
             else

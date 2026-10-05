@@ -11,6 +11,9 @@ How the core is put together, and the hardware facts it relies on. `TODO.md` has
 ```
 sharpmz.sv           MiSTer top: hps_io, OSD, PLL, tape image, floppy, video/audio out
   rtl/tape_image.sv    tape image slot (S0) <-> the CMT buffers
+  rtl/tape_ddr.sv      CMT tape buffer in DDR3 (port A the CMT, port B the host download / tape image)
+  rtl/direct_start.sv  Load Direct: restore 10F0-11FF after the boot and start the program
+  rtl/mz_printer.sv    printer port -> 512-byte FIFO -> MiSTer UART (8N1)
   rtl/mz_fdc.sv        floppy interface, 2 x rtl/wd1793.sv (S1/S2)
   rtl/sharpmz.vhd      the machine: T80, RAM/ROM, clkgen, mctrl, cmt, keymatrix, video
     rtl/mz80c/mz80c.vhd    MZ-80K/80C/1200/80A/700/800 hardware (8255, 8253, MZ-800 branch)
@@ -48,6 +51,17 @@ The author's v2 VideoController (`rtl/vc/VideoController.vhd`), changed as follo
 - `rtl/cmt.vhd` plays and records MZF records.
 - `rtl/tape_image.sv` feeds it from an MZT/MZF image on slot S0. It loads the next record when the machine stops the tape, and appends records the machine saves (the image must have spare room, e.g. from `tools/make_blank_tape.py`).
 - The MZ-700 and MZ-800 use the same pulse timings: short/long 676/1300 T-states, sampled 988 T-states after the edge.
+- The tape data buffer is in DDR3 (`rtl/tape_ddr.sv`, byte address 0x30000000), freeing block RAM for the 1.44 MB
+  floppy tables. The CMT waits on `TAPEDATA_READY`; each port keeps one cached line, written through.
+
+**Load Direct** (`rtl/direct_start.sv`). The download writes the MZF header to 10F0 and the body to its load address
+during a warm reset. With Load Direct: Start Program (default) and an MZF type 01, the module keeps what was written
+to 10F0-11FF, lets the machine boot for 1.5 s (the IPL/monitor set up the 8255, 8253, PIO and video, and use 10F0-11FF
+as their work area), writes the kept bytes back over the download bus, then puts a short program on the CPU's data bus
+for its next memory reads, starting at an opcode fetch: `NOP, DI`, the bank switches (MZ-800: `IN A,(E1)` to take
+the CG ROM and VRAM out and `OUT (E3),A` for the ROM at E000, the map mz800emu's start leaves; with E0-E4:
+`OUT (E0),A` when it loads below 1000), `LD SP,10F0`, `JP exec`. This follows mz800emu's `mzarch_bootstrap_run_mzf`. The MZ-80B/2000
+only reset.
 
 ## MZ-800
 
