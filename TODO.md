@@ -59,9 +59,9 @@ Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lor
 ### MZ-800
 - [x] Border colour: OSD Display > MZ-800 Border draws the BCOL colour around the picture (77/67 pixels left/right, 46/42 lines top/bottom in 320 mode, as mz800emu), 464 x 288 (928 x 288 in 640 mode) on hardware (T29-T31). Done after the video controller (`rtl/mz800_border.sv`), in the blanking, so the picture and the frame tests are unchanged.
 - [x] Joysticks: ports F0/F1 read MiSTer joysticks 1/2 while 8255 PA4/PA5 strobe them, as the MZ-800 Technical Reference Manual gives (mz800emu's code uses PA5/PA6, one bit off from its comments; Exolon strobes PA4 only and saw nothing). Test joy_mz800. Knight Lore and Exolon have joystick options; to be tried on hardware.
-- [ ] Printer port: see plan item 9 (parallel, bridged to the MiSTer UART for `../printeremulation`).
+- [x] Printer port: see plan item 9 (parallel, bridged to the MiSTer UART for `../printeremulation`).
 - [x] RAM disk board: the 64 KB "standard" board of mz800emu (EA/EB, F8-FA; OSD MZ-800 RAM Disk). Not yet tried with CP/M; the Pezik boards (E8, EC-EF) and larger sizes aren't implemented.
-- [ ] 1.44 MB disk images (`_Vzor144`, `_Vzor_Nova`): `wd1793.sv` addresses 1 MB.
+- [x] 1.44 MB disk images: see plan item 7 (CP/M 4.1 drive C: on a blank E5 disk; the `_Vzor` templates are MS-DOS formatted).
 - [x] MZ-800 tapes with exec 1108 (66 games): the header holds a relocating loader that reads the body with the ROM's tape routine, not a turbo format. Lunar Jetman, Three Weeks in Paradise, Silent Service, Boulder Dash III and Robocop 2 load on hardware (H01-H05). The other unusual header types are later parts of multi-part games.
 
 ### MZ-1500
@@ -99,7 +99,7 @@ Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lor
 - [ ] Show tape status (record number, tape full) in the OSD.
 - [x] Tape PLAY_READY delay: half a second of clk_sys (`CLK_SYS_HZ` in clkgen_pkg), was a bare 32,000,000.
 - [ ] Optional 64 MHz clock for the MZ-80K/80A/80B family, so their clock enables are exact (±1 clk_sys jitter now).
-- [ ] Unit testbenches for `cmt.vhd` and the i8254.
+- [x] Unit testbenches for `cmt.vhd` and the i8254 (`make test-cmt`, `make test-i8254`).
 - [x] WAV to MZF converter: `tools/wav2mzf.py` (WAV, or FLAC etc. through ffmpeg; either polarity; header and body copies). Decodes the No-Intro MZ-700 "BASIC" and "Applications" recordings.
 - [ ] Release RBF `releases/SharpMZ_YYYYMMDD.rbf` after hardware testing.
 - [ ] Later: v2 machine options (RAM size, GRAM, MZ-1R25), and removing `support/sharpmz/` from Main_MiSTer.
