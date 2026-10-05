@@ -6,6 +6,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mz_fdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mz800_border.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mz_qdisk.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mz_printer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/tape_ddr.sv
 set_global_assignment -name SDC_FILE sharpmz.sdc
 
 set_global_assignment -name VHDL_FILE rtl/config_pkg.vhd

@@ -52,7 +52,7 @@ module wd1793 #(parameter RWMODE=0, EDSK=1)
 
 	// SD access (RWMODE == 1)
 	input        img_mounted, // signaling that new image has been mounted
-	input [19:0] img_size,    // size of image in bytes. 1MB MAX!
+	input [20:0] img_size,    // size of image in bytes. 2MB MAX (1.44 MB EDSK images are ~1.5 MB).
 	// The TRUE image size, untruncated. A .d77 multi-disk container is routinely
 	// larger than 1 MB (XANADU.D77 is 2.4 MB, six disks), and comparing its
 	// header size field against the truncated img_size can never match:
@@ -90,10 +90,10 @@ module wd1793 #(parameter RWMODE=0, EDSK=1)
 
 	// RAM access (RWMODE == 0)
 	input        input_active,
-	input [19:0] input_addr,
+	input [20:0] input_addr,
 	input  [7:0] input_data,
 	input        input_wr,
-	output[19:0] buff_addr,	  // buffer RAM address
+	output[20:0] buff_addr,	  // buffer RAM address
 	output       buff_read,	  // buffer RAM read enable
 	input  [7:0] buff_din     // buffer RAM data input
 );
@@ -109,15 +109,15 @@ assign dout      = q;
 assign drq       = s_drq;
 assign busy      = s_busy;
 assign intrq     = s_intrq;
-assign sd_lba    = scan_active ? scan_addr[19:9] : buff_a[19:9] + sd_block;
+assign sd_lba    = scan_active ? scan_addr[20:9] : buff_a[20:9] + sd_block;
 assign prepare   = EDSK ? scan_active : img_mounted;
-assign buff_addr = {buff_a[19:9], 9'd0} + byte_addr;
+assign buff_addr = {buff_a[20:9], 9'd0} + byte_addr;
 assign buff_read = ((addr == A_DATA) && buff_rd);
 
 reg   [7:0] sectors_per_track, edsk_spt = 0;
 wire [10:0] sector_size = 11'd128 << wd_size_code;
 reg  [10:0] byte_addr;
-reg  [19:0] buff_a;
+reg  [20:0] buff_a;
 reg   [1:0] wd_size_code;
 
 wire  [7:0] buff_dout;
@@ -146,7 +146,7 @@ generate
 endgenerate
 
 reg         var_size  = 0;
-reg  [19:0] disk_size;
+reg  [20:0] disk_size;
 reg         layout_r;
 
 // Bound for the mount-time D77 scan. It must be min(true size, the 20-bit
@@ -167,9 +167,12 @@ reg         layout_r;
 //
 // Under 1 MB this is bit-identical to the old expression, so ordinary single
 // disk images are untouched -- the gate is unchanged, every counter included.
-wire [19:0] scan_limit = (img_size_id[23:20] != 4'd0) ? 20'hFFFFF
-                                                      : img_size_id[19:0];
-wire [19:0] hs  = (layout_r & side) ? disk_size >> 1 : 20'd0;
+// The image size at mount: hps_io's img_size is one bus shared by every image slot, so mounting another drive
+// while this image is still being scanned changed the limit under the scanner.
+reg  [23:0] size_id_r = 0;
+wire [20:0] scan_limit = (size_id_r[23:21] != 3'd0) ? 21'h1FFFFF
+                                                    : size_id_r[20:0];
+wire [20:0] hs  = (layout_r & side) ? disk_size >> 1 : 21'd0;
 wire  [7:0] dts = {disk_track[6:0], side} >> layout_r;
 always @(posedge clk_sys) begin
 	case({var_size,size_code})
@@ -476,7 +479,8 @@ always @(posedge clk_sys) begin
 				scan_wr    <= 0;
 				sd_block   <= 0;
 			end
-			disk_size <= img_size[19:0];
+			disk_size <= img_size[20:0];
+			size_id_r <= img_size_id;
 			layout_r  <= layout;
 		end
 	end else begin
@@ -1155,7 +1159,7 @@ end
 `endif
 
 reg        scan_active = 0;
-reg [19:0] scan_addr;
+reg [20:0] scan_addr;
 reg        scan_wr;
 
 wire [1:0] edsk_sizecode;          // sector size: 0=128K, 1=256K, 2=512K, 3=1024K
@@ -1166,13 +1170,13 @@ wire [1:0] edsk_crc;
 wire       edsk_side;              // Side number (0 or 1)
 wire [6:0] edsk_track;             // Track number
 wire [7:0] edsk_sector;            // Sector number 0..15
-wire[19:0] edsk_offset;
+wire[20:0] edsk_offset;
 wire [7:0] edsk_trackf, edsk_sidef;
 
-reg [10:0] edsk_addr, edsk_start;
+reg [11:0] edsk_addr, edsk_start;
 
-reg [10:0] edsk_size = 0;
-wire[10:0] edsk_next = ((edsk_addr + 1'd1) >= edsk_size) ? 11'd0 : edsk_addr + 1'd1;
+reg [11:0] edsk_size = 0;
+wire[11:0] edsk_next = ((edsk_addr + 1'd1) >= edsk_size) ? 12'd0 : edsk_addr + 1'd1;
 
 reg  [7:0] spt_size = 0;
 
@@ -1201,14 +1205,14 @@ generate
 		// the device. Funnel both parsers through one registered write port and
 		// use the core's explicit Cyclone V altsyncram wrapper.
 		reg         edsk_wren = 0;
-		reg  [10:0] edsk_wraddr;
-		reg  [55:0] edsk_wrdata;
-		wire [55:0] edsk_q;
+		reg  [11:0] edsk_wraddr;
+		reg  [56:0] edsk_wrdata;
+		wire [56:0] edsk_q;
 
 		wd1793_mem #(
-			.DATAWIDTH(56),
-			.ADDRWIDTH(11),
-			.NUMWORDS(2048)
+			.DATAWIDTH(57),
+			.ADDRWIDTH(12),
+			.NUMWORDS(4096)
 		) edsk_ram (
 			.clock     (clk_sys),
 			.address_a (edsk_wraddr),
@@ -1216,7 +1220,7 @@ generate
 			.wren_a    (edsk_wren),
 			.q_a       (),
 			.address_b (edsk_addr),
-			.data_b    (56'd0),
+			.data_b    (57'd0),
 			.wren_b    (1'b0),
 			.q_b       (edsk_q)
 		);
@@ -1294,11 +1298,11 @@ generate
 			reg  [7:0] crc2;
 			reg  [7:0] sectors;
 			reg [15:0] track_size, track_pos;
-			reg [19:0] offset, offset1;
+			reg [20:0] offset, offset1;
 			reg  [7:0] size_lo;
 			reg        st1_de;           // EDSK sector info: FDC status 1 bit 5 (data error)
 			reg        st2_dd;           //                   FDC status 2 bit 5 (data error in the data field)
-			reg [10:0] secpos;
+			reg [11:0] secpos;
 			reg  [7:0] trackf, sidef;
 
 			// .d77 parser state
@@ -1425,7 +1429,7 @@ generate
 				if(rel == 20'h1f) begin
 					if(!edsk_bad) fmt <= FMT_EDSK;
 					else if(~|scan_data && ~|d_tot[23:20] &&
-					        (d_tot[23:0] <= img_size_id) && (d_tot[19:0] >= 20'h2b0)) begin
+					        (d_tot[23:0] <= size_id_r) && (d_tot[19:0] >= 20'h2b0)) begin
 						// This header is sound. If sub-disks remain to be
 						// stepped over, move the base to the next one and keep
 						// scanning WITHOUT committing -- the body below stays
@@ -1607,7 +1611,7 @@ generate
 												// found by its physical position and
 												// still reports the lie to READ ADDRESS.
 												// Data begins at the very next byte.
-												if(edsk_size < 11'd1992) begin
+												if(edsk_size < 12'd4000) begin
 													edsk_wren   <= 1;
 													edsk_wraddr <= edsk_size;
 													edsk_wrdata <= {d_track, d_side, d_C, d_H, d_R, d_N, d_crc, scan_addr + 20'd1};

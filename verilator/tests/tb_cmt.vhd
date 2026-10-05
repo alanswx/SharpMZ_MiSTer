@@ -1,7 +1,8 @@
 -- Unit test for rtl/cmt.vhd (the tape unit), MZ-700 configuration, tape buttons on Auto.
 -- Run: make test-cmt (from verilator/).
 --
--- A 16-byte file is downloaded into the CMT buffer (header at 400000h, data at 410000h, as tape_image.sv does)
+-- A 16-byte file is downloaded into the CMT buffer (header at 400000h into the CMT, data at 410000h into the
+-- testbench's tape buffer, which stands in for DDR3 and answers 5 clocks after each address change)
 -- and played. The WRITEBIT pulse train is decoded (long high = 1, short = 0; after a tape mark, each byte is a
 -- 1 start bit and 8 bits MSB first) and compared with what was downloaded.
 --
@@ -33,6 +34,12 @@ architecture sim of tb_cmt is
     signal ioctl_addr      : std_logic_vector(24 downto 0) := (others => '0');
     signal ioctl_dout      : std_logic_vector(31 downto 0) := (others => '0');
     signal done            : boolean := false;
+    -- Tape data buffer (DDR3 in the core, rtl/tape_ddr.sv): here an array that answers 5 clocks after the
+    -- address changes, so the CMT has to wait for TAPEDATA_READY.
+    signal td_addr         : std_logic_vector(15 downto 0);
+    signal td_wdata, td_rdata : std_logic_vector(7 downto 0) := (others => '0');
+    signal td_we           : std_logic;
+    signal td_ready        : std_logic := '0';
 
     type bytes_t is array(natural range <>) of natural;
     constant DATA_LEN      : natural := 16;
@@ -78,7 +85,32 @@ begin
         port map (RST => rst, CLKBUS => clkbus, CONFIG => config, CMT_BUS_OUT => bus_out, CMT_BUS_IN => bus_in,
                   IOCTL_DOWNLOAD => '0', IOCTL_UPLOAD => '0', IOCTL_CLK => clk, IOCTL_WR => ioctl_wr,
                   IOCTL_RD => '0', IOCTL_ADDR => ioctl_addr, IOCTL_DOUT => ioctl_dout, IOCTL_DIN => open,
+                  TAPEDATA_ADDR => td_addr, TAPEDATA_DOUT => td_wdata, TAPEDATA_WE => td_we,
+                  TAPEDATA_DIN => td_rdata, TAPEDATA_READY => td_ready,
                   DEBUG_STATUS_LEDS => open);
+
+    tape_buffer : process(clk)
+        type mem_t is array(0 to 65535) of std_logic_vector(7 downto 0);
+        variable mem    : mem_t := (others => (others => '0'));
+        variable last   : std_logic_vector(15 downto 0) := (others => '1');
+        variable wait_c : natural := 0;
+        variable we_l   : std_logic := '0';
+    begin
+        if rising_edge(clk) then
+            if ioctl_wr = '1' and ioctl_addr(24 downto 16) = "001000001" then
+                mem(to_integer(unsigned(ioctl_addr(15 downto 0)))) := ioctl_dout(7 downto 0);
+            end if;
+            if td_we = '1' and we_l = '0' then mem(to_integer(unsigned(td_addr))) := td_wdata; end if;
+            we_l := td_we;
+            if td_addr /= last then
+                last := td_addr; wait_c := 5; td_ready <= '0';
+            elsif wait_c /= 0 then
+                wait_c := wait_c - 1;
+            else
+                td_rdata <= mem(to_integer(unsigned(td_addr))); td_ready <= '1';
+            end if;
+        end if;
+    end process;
 
     -- Decoder: pulse high time in clocks -> bit; bits -> blocks after a tape mark (>= 20 ones, then zeros).
     decode : process

@@ -69,6 +69,14 @@ entity cmt is
         IOCTL_DOUT           : in  std_logic_vector(31 downto 0);        -- HPS Data to be written into FPGA.
         IOCTL_DIN            : out std_logic_vector(31 downto 0);        -- HPS Data to be read into HPS.
 
+        -- Tape data buffer (64 KB, in DDR3: rtl/tape_ddr.sv). The host side of it (downloads, saves) is wired
+        -- around this module; IOCTL writes to the data region still reach it for the PLAY_READY timing.
+        TAPEDATA_ADDR        : out std_logic_vector(15 downto 0);
+        TAPEDATA_DOUT        : out std_logic_vector(7 downto 0);         -- Byte to write (recording).
+        TAPEDATA_WE          : out std_logic;
+        TAPEDATA_DIN         : in  std_logic_vector(7 downto 0);         -- Byte at TAPEDATA_ADDR when READY.
+        TAPEDATA_READY       : in  std_logic;
+
         -- Debug Status Leds
         DEBUG_STATUS_LEDS    : out std_logic_vector(31 downto 0)         -- 32 leds to display cmt internal status.
     );
@@ -306,28 +314,11 @@ begin
     -- Data Cache RAM.
     -- Storage of the tape data for play and record operations.
     -- Maximum size of 64K as this is the limit that can be accommodated by the MZ software.
-    TAPEDATA : dpram
-    GENERIC MAP (
-        init_file            => "",
-        widthad_a            => 16,
-        width_a              => 8,
-        widthad_b            => 16,
-        width_b              => 8
-    )
-    PORT MAP (
-        clock_a              => CLKBUS(CKMASTER), --CLKBUS(CKMEM),
-        clocken_a            => '1',
-        address_a            => RAM_ADDR,
-        data_a               => RAM_DATAIN,
-        wren_a               => DATA_RAM_WEN,
-        q_a                  => DATA_RAM_DATAOUT,
-
-        clock_b              => IOCTL_CLK,
-        address_b            => IOCTL_ADDR(15 downto 0),
-        data_b               => IOCTL_DOUT(7 downto 0),
-        wren_b               => IOCTL_TAPEDATA_WEN,
-        q_b                  => IOCTL_DIN_DATA
-    );
+    TAPEDATA_ADDR            <= RAM_ADDR;
+    TAPEDATA_DOUT            <= RAM_DATAIN;
+    TAPEDATA_WE              <= DATA_RAM_WEN;
+    DATA_RAM_DATAOUT         <= TAPEDATA_DIN;
+    IOCTL_DIN_DATA           <= (others => '0');                         -- Host reads of the data region come from tape_ddr.
 
     -- Sharp Ascii <-> Ascii conversion table.
     -- Filenames are generally in Sharp Ascii format which is incompatible with modern
@@ -1346,6 +1337,10 @@ process( RST, CLKBUS(CKMASTER), XMIT_RAM_LOAD, XMIT_RAM_TYPE ) begin
                 case(XMIT_RAM_STATE) is
                     when 0 => 
                     when 1 =>
+                      -- The data buffer is in DDR3: wait until the byte at the new address has arrived.
+                      if XMIT_RAM_TYPE = '1' and XMIT_RAM_COUNT /= 0 and TAPEDATA_READY = '0' then
+                        XMIT_RAM_STATE                  <= 1;
+                      else
                         XMIT_RAM_BIT_CNT                <= 8;      -- 9 bits to transmit, pre 1 + 8 bits of data byte.
                         XMIT_RAM_STATE                  <= 3;
     
@@ -1371,6 +1366,7 @@ process( RST, CLKBUS(CKMASTER), XMIT_RAM_LOAD, XMIT_RAM_TYPE ) begin
                                 XMIT_RAM_SR             <= '1' & DATA_RAM_DATAOUT;
                             end if;
                         end if;
+                      end if;
                     -- Byte to be output is mapped via the Sharp Ascii <-> Ascii lookup table.
                     when 2 =>
                             XMIT_RAM_SR                 <= '1' & ASCII_RAM_DATAOUT;

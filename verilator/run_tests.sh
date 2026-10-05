@@ -22,6 +22,8 @@
 #   tape_mz2000   MZ-2000: the MZ-2200 IPL loads Gang Man (../software/mz2200) to its title; frame hash.
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
 #   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
+#   fdd_hd        MZ-800: 1.44 MB image on unit 2 (--fdd-b-hd); a sector 1.45 MB into the image written and read
+#                 back by tests/fdd/fdhd.mzf (status bytes, count, data). Skipped without ../software/dsk/_Vzor144.dsk.
 #   prn_mz700/800 tests/printer/prntest.mzf prints through the printer port; the bytes decoded from the UART match
 #   joy_mz800     MZ-800: tests/mz800/joytest.mzf strobes the 8255 with 07, EF (PA4 low: joystick 1) and FF and reads F0/F1
 #                 with right + fire 1 held (--joy0 17): E7 FF E7 FF
@@ -92,6 +94,15 @@ pids+=($!); names+=("prn_mz700")
       --type '280:J2000\n' --stop-at-frame 400 --printer "$OUT/prn_mz800.bin" --quiet > /dev/null 2> "$OUT/prn_mz800.log"; \
   xxd -p "$OUT/prn_mz800.bin" > "$OUT/prn_mz800.txt" ) &
 pids+=($!); names+=("prn_mz800")
+# 1.44 MB disk: tests/fdd/fdhd.mzf writes and reads back track 79 side 1 sector 17 (1.45 MB into the image) on
+# unit 2 (--fdd-b-hd). Needs ../software/dsk/_Vzor144.dsk; skipped without it.
+if [ -f ../software/dsk/_Vzor144.dsk ]; then
+    cp ../software/dsk/_Vzor144.dsk "$OUT/fdd_hd.dsk"
+    ( $BIN --model mz800 --fdd-b "$OUT/fdd_hd.dsk" --fdd-b-hd --mzf tests/fdd/fdhd.mzf --mzf-direct --mzf-direct-frame 20 \
+          --type '200:M' --type '280:J2000\n' --stop-at-frame 420 --dump-mem 2FF0:30:"$OUT/fdd_hd.bin" --quiet \
+          > /dev/null 2> "$OUT/fdd_hd.log"; xxd -p "$OUT/fdd_hd.bin" > "$OUT/fdd_hd.txt" ) &
+    pids+=($!); names+=("fdd_hd")
+fi
 cp tests/mz800/joytest.mzf "$OUT/joy_mz800.mzt"
 ( $BIN --model mz800 --joy0 17 --fast-tape 4 --tape-image "$OUT/joy_mz800.mzt" --type '160:C' --stop-at-frame 700 \
       --ascii-end --quiet 2> "$OUT/joy_mz800.log" | head -1 | cut -c1-8 > "$OUT/joy_mz800.txt" ) &

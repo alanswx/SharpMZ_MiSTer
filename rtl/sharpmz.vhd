@@ -125,6 +125,11 @@ entity sharpmz is
         EXT_CE_CPU            : out    std_logic;                               -- CPU clock enable.
         --------------------                      Tape status                   ------------------------------
         CMT_STATUS            : out    std_logic_vector(13 downto 0);           -- CMT_BUS_OUT, see mctrl_pkg.vhd.
+        TAPEDATA_ADDR         : out    std_logic_vector(15 downto 0);           -- CMT tape data buffer (rtl/tape_ddr.sv).
+        TAPEDATA_DOUT         : out    std_logic_vector(7 downto 0);
+        TAPEDATA_WE           : out    std_logic;
+        TAPEDATA_DIN          : in     std_logic_vector(7 downto 0) := (others => '0');
+        TAPEDATA_READY        : in     std_logic := '1';
         CMT_CTRL              : out    std_logic_vector(7 downto 0);            -- CMT_BUS_IN (machine to deck), for debug.
         CMT_DEBUG             : out    std_logic_vector(31 downto 0);           -- cmt.vhd DEBUG_STATUS_LEDS, for debug.
         --------------------                   Machine configuration              ------------------------------
@@ -529,6 +534,11 @@ component cmt
         IOCTL_ADDR           : in  std_logic_vector(24 downto 0);        -- HPS Address in FPGA to write into.
         IOCTL_DOUT           : in  std_logic_vector(31 downto 0);        -- HPS Data to be written into FPGA.
         IOCTL_DIN            : out std_logic_vector(31 downto 0);        -- HPS Data to be read into HPS.
+        TAPEDATA_ADDR        : out std_logic_vector(15 downto 0);
+        TAPEDATA_DOUT        : out std_logic_vector(7 downto 0);
+        TAPEDATA_WE          : out std_logic;
+        TAPEDATA_DIN         : in  std_logic_vector(7 downto 0);
+        TAPEDATA_READY       : in  std_logic;
 
         -- Debug Status Leds
         DEBUG_STATUS_LEDS    : out std_logic_vector(31 downto 0)         -- 24 leds to display cmt internal status.
@@ -934,6 +944,11 @@ begin
             IOCTL_ADDR       => MZ_IOCTL_ADDR,                           -- HPS Address in FPGA to write into.
             IOCTL_DOUT       => MZ_IOCTL_DOUT,                           -- HPS Data to be written into FPGA.
             IOCTL_DIN        => MZ_IOCTL_DIN_CMT,                        -- HPS Data to be sent to HPS.
+            TAPEDATA_ADDR    => TAPEDATA_ADDR,
+            TAPEDATA_DOUT    => TAPEDATA_DOUT,
+            TAPEDATA_WE      => TAPEDATA_WE,
+            TAPEDATA_DIN     => TAPEDATA_DIN,
+            TAPEDATA_READY   => TAPEDATA_READY,
 
             -- Debug Status Leds
             DEBUG_STATUS_LEDS=> MZ_CMT_DEBUG_LEDS(31 downto 0)           -- 24 leds to display cmt internal status.

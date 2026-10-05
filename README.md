@@ -66,10 +66,11 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 
 | Option | Description |
 | ------ | ----------- |
-| Floppy Drive A / B | Mount an Extended DSK or D88/D77 image (up to 1 MB, e.g. the usual 720 KB CP/M disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
+| Floppy Drive A / B | Mount an Extended DSK or D88/D77 image (up to 2 MB: 720 KB CP/M disks and 1.44 MB HD disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80B and MZ-2000. |
 | Quick Disk | Mount a Quick Disk image: a raw dump (`.qdf`) or mz800emu's `.mzq`. Built into the MZ-1500 (press `Q` at the IPL menu); on the MZ-800 it appears while an image is mounted. Writes (BASIC `INIT "QD:"`, `SAVE`) go back to the image, which must be full size: make a blank one with `tools/make_blank_qd.py`. |
 | Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
 | Floppy CRC Errors | Ignore (default): sectors the disk image marks as read with a CRC error are read as good, which suits most dumps. Report: the drive reports CRC ERROR for them, for software that checks (copy protection). |
+| Drive B Unit | Which unit the drive B slot answers as: the 2nd drive (B:), or the 3rd, where the MZ-800 CP/M 4.1 HD driver keeps its 1440 KB drive C:. Mount a 1.44 MB image there and use C:. |
 | MZ-800 RAM Disk | A 64 KB RAM disk board (ports EA/EB, F8-FA), for CP/M's RAM drive. Its contents are lost at power off. |
 
 Writes go back to the image; mount a copy if you want to keep the original.
@@ -104,7 +105,7 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
 * MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border). Joysticks work in Knight Lore and Exolon in simulation; the RAM disk is new. Load Direct runs the IPL afterwards, which clears 10F0-11FF, so programs that start there must be loaded from tape (`docs/triage.md`).
-* Floppy: 1.44 MB images aren't supported (2,880 sectors don't fit the controller's sector index, and the FPGA's block RAM is full; see `TODO.md`), and the MZ-80K/80A floppy interface isn't implemented. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
+* Floppy: the MZ-80K/80A floppy interface isn't implemented. 1.44 MB images read and write at the controller level (simulation, `fdd_hd`); CP/M 4.1's HD drive C: still to be confirmed. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). They don't run from tape; `tools/mzf2qdf.py OUT.qdf SIDE.mzt` makes a Quick Disk of each side (answer `Y` to "SET PROGRAM QD ?" after swapping in side B). `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.
@@ -115,7 +116,7 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 * **One clock.** Everything runs on a single 70.9376 MHz clock (4x the MZ-700's 17.7344 MHz crystal) with clock enables for the CPU, video, sound and timers (`rtl/clkgen.vhd`). The MZ-700/800 rates are exact divides.
 * **Standard MiSTer framework.** The `sys/` folder is stock Template_MiSTer, the OSD is a normal configuration string, and files come in through the standard ioctl and image-slot interfaces. Main_MiSTer's old Sharp MZ driver isn't used.
 * **Video** is the author's v2 VideoController from the [tranZPUter](https://git.eaw.app/eaw/tranZPUter) project, moved onto the core clock (`rtl/vc/`).
-* **Tape images** are handled in the FPGA by `rtl/tape_image.sv`, which moves programs between the image and the core's cassette buffer.
+* **Tape images** are handled in the FPGA by `rtl/tape_image.sv`, which moves programs between the image and the core's cassette buffer. The 64 KB tape data buffer is in the DE10-Nano's DDR3 (`rtl/tape_ddr.sv`, the MiSTer DDRAM port), which leaves block RAM for the floppy sector tables; no SDRAM board is needed.
 * **Floppy** is `rtl/mz_fdc.sv`: the Sharp interface around Sorgelig's `wd1793.sv` (from the FM-7 core), reading DSK images through the image slots.
 * More detail in `docs/design.md`.
 

@@ -81,6 +81,8 @@ struct Options {
     uint32_t    joy0 = 0;                // joystick 1, MiSTer bits (5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right)
     std::set<uint32_t> warm_resets;
     bool        fdd_readonly = false;
+    std::string fdd_b;                       // --fdd-b: drive B image
+    bool        fdd_b_hd = false;            // --fdd-b-hd: drive B is unit 2 (OSD Drive B Unit: 3rd)
     int         fdc_mode = 0;
     bool     tape_readonly = false;
     std::set<uint32_t> tape_rewinds;
@@ -114,6 +116,7 @@ static void usage()
 "  --printer FILE         printer connected (OSD Printer: UART); the UART line is decoded into FILE\n"
 "  --printer-baud N       UART speed (default 9600)\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
+"  --fdd-b FILE           image in floppy drive B; --fdd-b-hd makes it unit 2 (CP/M 4.1 HD drive C:)\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
 "  --tape-rewind N        pulse Rewind Tape Image at frame N (repeatable)\n"
@@ -217,6 +220,8 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--joy0") o.joy0 = parse_num(next());
         else if (a == "--warm-reset") o.warm_resets.insert((uint32_t)std::stoul(next()));
         else if (a == "--fdd-readonly") o.fdd_readonly = true;
+        else if (a == "--fdd-b") o.fdd_b = next();
+        else if (a == "--fdd-b-hd") o.fdd_b_hd = true;
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
         else if (a == "--tape-readonly") o.tape_readonly = true;
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
@@ -297,6 +302,9 @@ private:
     uint64_t img_size = 0;
     FILE    *fdd = nullptr;
     uint64_t fdd_size = 0;
+    FILE    *fdd2 = nullptr;                 // --fdd-b: floppy drive B
+    uint64_t fdd2_size = 0;
+    void mount_fdd2();
     FILE    *qd = nullptr;
     uint64_t qd_size = 0;
     void mount_qd();
@@ -328,17 +336,18 @@ void Sim::sd_step()
 {
     // Slot accessors: the tape (S0) and floppy drive A (S1) share sd_buff_*.
     // Slot 2 is the Quick Disk (S3).
-    auto req_rd = [&](int k) -> bool { return k == 2 ? top->qd_rd : k ? top->fdd_rd : top->sd_rd; };
-    auto req_wr = [&](int k) -> bool { return k == 2 ? top->qd_wr : k ? top->fdd_wr : top->sd_wr; };
-    auto lba    = [&](int k) -> uint32_t { return k == 2 ? top->qd_lba : k ? top->fdd_lba : top->sd_lba; };
-    auto ack    = [&](int k, int v) { if (k == 2) top->qd_ack = v; else if (k) top->fdd_ack = v; else top->sd_ack = v; };
-    auto file   = [&](int k) -> FILE * { return k == 2 ? qd : k ? fdd : img; };
-    auto size   = [&](int k) -> uint64_t { return k == 2 ? qd_size : k ? fdd_size : img_size; };
+    // Slot 3 is floppy drive B (S2).
+    auto req_rd = [&](int k) -> bool { return k == 3 ? top->fdd2_rd : k == 2 ? top->qd_rd : k ? top->fdd_rd : top->sd_rd; };
+    auto req_wr = [&](int k) -> bool { return k == 3 ? top->fdd2_wr : k == 2 ? top->qd_wr : k ? top->fdd_wr : top->sd_wr; };
+    auto lba    = [&](int k) -> uint32_t { return k == 3 ? top->fdd2_lba : k == 2 ? top->qd_lba : k ? top->fdd_lba : top->sd_lba; };
+    auto ack    = [&](int k, int v) { if (k == 3) top->fdd2_ack = v; else if (k == 2) top->qd_ack = v; else if (k) top->fdd_ack = v; else top->sd_ack = v; };
+    auto file   = [&](int k) -> FILE * { return k == 3 ? fdd2 : k == 2 ? qd : k ? fdd : img; };
+    auto size   = [&](int k) -> uint64_t { return k == 3 ? fdd2_size : k == 2 ? qd_size : k ? fdd_size : img_size; };
 
     top->sd_buff_wr = 0;
     switch (sd_state) {
     case SD_IDLE:
-        for (int k = 0; k < 3; k++) {
+        for (int k = 0; k < 4; k++) {
             if (!file(k) || !(req_rd(k) || req_wr(k))) continue;
             sd_slot = k;
             sd_cur_lba = lba(k);
@@ -370,7 +379,7 @@ void Sim::sd_step()
         break;
     case SD_WRITE:
         // sd_buff_din is registered: it holds the byte addressed on the previous clock.
-        if (sd_idx > 0) sd_data[sd_idx - 1] = sd_slot == 2 ? top->qd_buff_din : sd_slot ? top->fdd_buff_din : top->sd_buff_din;
+        if (sd_idx > 0) sd_data[sd_idx - 1] = sd_slot == 3 ? top->fdd2_buff_din : sd_slot == 2 ? top->qd_buff_din : sd_slot ? top->fdd_buff_din : top->sd_buff_din;
         if (sd_idx < 512) {
             top->sd_buff_addr = sd_idx++;
         } else {
@@ -415,6 +424,22 @@ void Sim::mount_fdd()
     clock();
     top->fdd_mounted = 0;
     if (!opt.quiet) fprintf(stderr, "[sim] disk image '%s' mounted, %llu bytes\n", opt.fdd.c_str(), (unsigned long long)fdd_size);
+}
+
+void Sim::mount_fdd2()
+{
+    fdd2 = fopen(opt.fdd_b.c_str(), opt.fdd_readonly ? "rb" : "r+b");
+    if (!fdd2) { fprintf(stderr, "cannot open disk image %s\n", opt.fdd_b.c_str()); exit_code = 2; return; }
+    fseeko(fdd2, 0, SEEK_END);
+    fdd2_size = (uint64_t)ftello(fdd2);
+    top->fdd_size = fdd2_size;                 // one size/readonly bus for both drives, as hps_io's img_size
+    top->fdd_readonly = opt.fdd_readonly;
+    top->fdd2_mounted = 1;
+    clock();
+    top->fdd2_mounted = 0;
+    for (int i = 0; i < 4; i++) clock();      // the size is taken when the strobe falls
+    top->fdd_size = fdd_size;
+    if (!opt.quiet) fprintf(stderr, "[sim] drive B image '%s' mounted, %llu bytes\n", opt.fdd_b.c_str(), (unsigned long long)fdd2_size);
 }
 
 void Sim::mount_tape()
@@ -645,6 +670,7 @@ void Sim::ioctl_write(uint32_t addr, uint8_t data)
     top->ioctl_wr = 0;
     clock();
     clock();
+    for (int i = 0; i < 10000 && top->ioctl_wait; i++) clock();   // tape data buffer (DDR3) busy
 }
 
 void Sim::write_config()
@@ -659,6 +685,7 @@ void Sim::write_config()
     top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
     top->cfg_audio    = 0;
     top->ramdisk_en   = opt.ramdisk;
+    top->fdd_b_unit2  = opt.fdd_b_hd;
     top->prn_en       = opt.printer.empty() ? 0 : 1;
     top->prn_baud     = opt.printer_baud;
     top->joy0         = opt.joy0;
@@ -837,6 +864,7 @@ int Sim::run()
         if (!load_mzf(opt.mzf_direct)) return exit_code;
     if (!opt.tape_image.empty()) { mount_tape(); if (exit_code) return exit_code; }
     if (!opt.fdd.empty()) { mount_fdd(); if (exit_code) return exit_code; }
+    if (!opt.fdd_b.empty()) { mount_fdd2(); if (exit_code) return exit_code; }
     if (!opt.qd.empty()) { mount_qd(); if (exit_code) return exit_code; }
     if (!opt.printer.empty()) {
         fprn = fopen(opt.printer.c_str(), "wb");

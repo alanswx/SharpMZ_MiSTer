@@ -26,7 +26,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
    - VHDL names that are Verilog keywords (`do`, `config`) are renamed.
    - `fix_port_aliases.py` restores `SIG <= in_port;` assignments that GHDL 5.1's Verilog writer drops.
 3. `dpram`/`dprom` (Altera `altsyncram` wrappers) are black boxes, implemented by `rtl_v/dpram.v` and `rtl_v/dprom.v`. `mif2hex.py` converts the `.mif` init files for `$readmemh`, so the ROMs are built in, as on hardware.
-4. `sim.v` stands in for `sharpmz.sv`:
+4. `sim.v` stands in for `sharpmz.sv` (including a behavioural DDR3 for the tape buffer, with random BUSY and read latency):
    - the OSD configuration as inputs;
    - the ioctl download bus (MZF to the tape buffer at `0x400000`/`0x410000`, direct loads into RAM at `0x100000+`);
    - the tape image (`rtl/tape_image.sv`) and floppy (`rtl/mz_fdc.sv`, `rtl/wd1793.sv`) with their image slots.
@@ -46,6 +46,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--tape-image FILE` | Mount a tape image (S0). Also `--tape-readonly`, `--tape-rewind`. |
 | `--fast-tape STEP` | The OSD Fast Tape step (0–7), not a multiplier. 4 is about 8x; 5 is the fastest (capped at clk_sys/2). |
 | `--fdd FILE` | Extended DSK image in floppy drive A. Also `--fdd-readonly`, and `--fdc-mode auto\|on\|off`. |
+| `--fdd-b FILE` | Image in floppy drive B (shares `--fdd-readonly`). `--fdd-b-hd` makes drive B answer as unit 2 (OSD Floppy > Drive B Unit: 3rd), CP/M 4.1's 1440K drive C:. |
 | `--ramdisk` | MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk). |
 | `--qd FILE` | Quick Disk image (`.qdf` or `.mzq`) in slot S3 (MZ-1500, MZ-800); writes go back to the file. `--qd-readonly` mounts it write protected. |
 | `--qd-swap FRAME:FILE` | Mount another Quick Disk image at FRAME, e.g. side B of a two-sided game (repeatable). |
@@ -75,6 +76,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `fdd_mz700` | The MZ-700 boots a disk made by `tools/make_boot_disk.py` with `J F000` (MZ-1E05 ROM). |
 | `fdd_mz80b`, `fdd_mz80b_cpm` | The MZ-80B IPL boots SB-6511 Disk BASIC and CP/M 2.2 (images from idealine.info in `../software/idealine/`). |
 | `ipl_mz2000`, `tape_mz80b`, `tape_mz2000` | The MZ-2000 IPL; MZ-80B BASIC (SB-5520) and Gang Man from tape images (`../software/mz80b`, `mz2200`). |
+| `fdd_hd` | MZ-800: a 1.44 MB image on unit 2 (`--fdd-b-hd`); `tests/fdd/fdhd.mzf` writes and reads back a sector 1.45 MB into it (status bytes, byte count, data). Needs `../software/dsk/_Vzor144.dsk`. |
 | `ipl_mz1500`, `qd_mz1500` | The MZ-1500 IPL menu; Lode Runner from a Quick Disk dump with its PCG title screen (pixel-identical to mz1500emu). |
 | `cg_mz1500` | MZ-1500: `tests/mz1500/cgread.mzf` reads 'F' from the CG ROM through OUT E5 0 and prints it in hex (bit 7 = left pixel). |
 | `joy_mz800` | MZ-800 with `--joy0 17` (right + fire 1): `tests/mz800/joytest.mzf` strobes the 8255 (PA4 low = joystick 1) and reads F0/F1. |

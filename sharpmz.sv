@@ -40,7 +40,6 @@ assign USER_OUT = '1;
 assign {UART_RTS, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 
 `ifdef MISTER_DUAL_SDRAM
 assign {SDRAM2_DQ, SDRAM2_A, SDRAM2_BA, SDRAM2_CLK, SDRAM2_nWE, SDRAM2_nCAS, SDRAM2_nRAS, SDRAM2_nCS} = 'Z;
@@ -117,6 +116,7 @@ localparam CONF_STR =
 	"P5O[34:33],Floppy Interface,Auto,On,Off;",
 	"P5O[40],MZ-800 RAM Disk,Off,64 KB;",
 	"P5O[42],Floppy CRC Errors,Ignore,Report;",
+	"P5O[48],Drive B Unit,2nd drive,3rd (CP/M 4.1 HD);",
 	"-;",
 	"P6,Printer;",
 	"P6O[47],Printer,None,UART (mister_printerd);",
@@ -188,6 +188,8 @@ wire  [7:0] sd_buff_din[4];
 wire        sd_buff_wr;
 
 wire        tape_active;
+wire        tape_data_region, tape_rd, tape_b_busy;   // tape data buffer in DDR3 (tape_ddr, below)
+wire  [7:0] tape_b_dout;
 
 wire [31:0] uart_speed;
 
@@ -225,7 +227,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(4)) hps_io
 	.ioctl_file_ext(hps_ioctl_file_ext),
 	.ioctl_upload_req(1'b0),
 	.ioctl_upload_index(8'd0),
-	.ioctl_wait(1'b0),                      // Never stall the HPS link: tape_image yields to downloads instead.
+	.ioctl_wait(hps_ioctl_download & tape_b_busy),   // Only while a byte of a tape download waits for DDR3.
 
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
@@ -432,7 +434,9 @@ tape_image tape_image
 	.bus_addr(tape_addr),
 	.bus_wr(tape_wr),
 	.bus_dout(tape_dout),
-	.bus_din(mz_ioctl_din[7:0]),
+	.bus_din(tape_data_region ? tape_b_dout : mz_ioctl_din[7:0]),
+	.bus_busy(tape_b_busy),
+	.bus_rd(tape_rd),
 
 	.mounted(tape_mounted),
 	.tape_full(tape_full),
@@ -444,6 +448,40 @@ tape_image tape_image
 wire        mz_ioctl_wr   = hps_ioctl_download ? (hps_ioctl_wr && mzf_direct_wr_valid) : tape_active & tape_wr;
 wire [24:0] mz_ioctl_addr = hps_ioctl_download ? hps_ioctl_addr_mapped : tape_active ? tape_addr : 25'h1000000;
 wire  [7:0] mz_ioctl_dout = hps_ioctl_download ? hps_ioctl_dout : tape_dout;
+
+// The CMT's tape data buffer (64 KB) is in DDR3 (rtl/tape_ddr.sv): the CMT plays and records through port A,
+// downloads and tape_image through port B (the data region of the core bus, 410000-41FFFF).
+assign      tape_data_region = (mz_ioctl_addr[24:16] == 9'h041);
+wire [15:0] tapedata_addr;
+wire  [7:0] tapedata_wdata, tapedata_rdata;
+wire        tapedata_we, tapedata_ready;
+
+tape_ddr tape_ddr
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.a_addr(tapedata_addr),
+	.a_we(tapedata_we),
+	.a_din(tapedata_wdata),
+	.a_dout(tapedata_rdata),
+	.a_ready(tapedata_ready),
+	.b_addr(mz_ioctl_addr[15:0]),
+	.b_we(mz_ioctl_wr & tape_data_region),
+	.b_rd(~hps_ioctl_download & tape_active & tape_rd & tape_data_region),
+	.b_din(mz_ioctl_dout),
+	.b_dout(tape_b_dout),
+	.b_busy(tape_b_busy),
+	.DDRAM_CLK(DDRAM_CLK),
+	.DDRAM_BUSY(DDRAM_BUSY),
+	.DDRAM_BURSTCNT(DDRAM_BURSTCNT),
+	.DDRAM_ADDR(DDRAM_ADDR),
+	.DDRAM_DOUT(DDRAM_DOUT),
+	.DDRAM_DOUT_READY(DDRAM_DOUT_READY),
+	.DDRAM_RD(DDRAM_RD),
+	.DDRAM_DIN(DDRAM_DIN),
+	.DDRAM_BE(DDRAM_BE),
+	.DDRAM_WE(DDRAM_WE)
+);
 
 /////////////////  RESET  /////////////////////////
 
@@ -516,6 +554,7 @@ mz_fdc mz_fdc
 	.model_ok(cfg_model[2]),                    // MZ-700, MZ-800, MZ-80B, MZ-2000
 	.mode(status[34:33]),
 	.crc_report(status[42]),
+	.b_unit2(status[48]),
 
 	.io_addr(ext_io_addr),
 	.io_rd(ext_io_rd),
@@ -603,6 +642,11 @@ sharpmz sharp_mz
 	.PRN_RDA(prn_rda),
 	.PRN_DATA(prn_data),
 	.PRN_STB(prn_stb),
+	.TAPEDATA_ADDR(tapedata_addr),
+	.TAPEDATA_DOUT(tapedata_wdata),
+	.TAPEDATA_WE(tapedata_we),
+	.TAPEDATA_DIN(tapedata_rdata),
+	.TAPEDATA_READY(tapedata_ready),
 
 	.VGA_HB_O(hblank_emu),
 	.VGA_VB_O(vblank_emu),

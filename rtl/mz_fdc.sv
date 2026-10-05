@@ -52,6 +52,7 @@ module mz_fdc
 	output  [7:0] sd_buff_din[2],
 	input         sd_buff_wr,
 
+	input         b_unit2,        // the drive B slot answers as unit 2 (3rd drive) instead of unit 1 (OSD)
 	output        busy,           // drive activity (LED)
 	output        present         // the interface is present (MZ-700: its ROM at F000 is on the same card)
 );
@@ -94,13 +95,18 @@ always @(posedge clk_sys) begin
 	end
 end
 
+// Unit to slot: slot A is unit 0, slot B unit 1, or unit 2 when b_unit2 (MZ-800 CP/M 4.1's HD driver puts its
+// 1440K drive C: on unit 2). Other units are absent.
+wire       sel_a = (drive == 2'd0);
+wire       sel_b = (drive == (b_unit2 ? 2'd2 : 2'd1));
+
 wire [7:0] fdc_dout[2];
 wire [1:0] fdc_drq, fdc_busy, fdc_prepare;
 
 genvar d;
 generate
 	for (d = 0; d < 2; d = d + 1) begin : drv
-		wire selected = (drive == d);
+		wire selected = d ? sel_b : sel_a;
 		// Commands and reads to the selected drive; track, sector and data writes to both.
 		wire io_en = chip & (selected | (io_wr & reg_a != 2'd0));
 
@@ -127,7 +133,7 @@ generate
 			.ready(mounted[d] & ~fdc_prepare[d]),
 
 			.img_mounted(img_mounted[d]),
-			.img_size(img_size[19:0]),
+			.img_size(img_size[20:0]),
 			.img_size_id(img_size[23:0]),
 			.disk_index(3'd0),
 			.prepare(fdc_prepare[d]),
@@ -141,7 +147,7 @@ generate
 			.sd_buff_wr(sd_buff_wr),
 
 			.input_active(1'b0),
-			.input_addr(20'd0),
+			.input_addr(21'd0),
 			.input_data(8'd0),
 			.input_wr(1'b0),
 			.buff_addr(),
@@ -151,7 +157,7 @@ generate
 	end
 endgenerate
 
-wire       drq_sel = drive[1] ? 1'b0 : fdc_drq[drive[0]];
+wire       drq_sel = sel_a ? fdc_drq[0] : sel_b ? fdc_drq[1] : 1'b0;
 
 // A turbo CPU can re-enter the interrupt routine before the chip has dropped DRQ for the byte
 // just transferred; hold the interrupt off from the data access until DRQ falls.
@@ -162,7 +168,7 @@ always @(posedge clk_sys) begin
 end
 
 assign io_oe  = chip & io_rd;
-assign io_din = drive[1] ? 8'hFF : ~fdc_dout[drive[0]];
+assign io_din = sel_a ? ~fdc_dout[0] : sel_b ? ~fdc_dout[1] : 8'hFF;
 assign int_n  = ~(enable & eint & drq_sel & ~drq_taken);
 assign busy   = |(fdc_busy & mounted);
 assign present = enable;

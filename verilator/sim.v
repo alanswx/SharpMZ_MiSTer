@@ -33,6 +33,7 @@ module top(
    input         ioctl_rd,
    input  [24:0] ioctl_addr,
    input  [7:0]  ioctl_dout,
+   output        ioctl_wait /*verilator public_flat*/,   // hold the download (tape data buffer in DDR3 busy)
    output [7:0]  ioctl_din,
 
    input  [10:0] ps2_key,
@@ -90,6 +91,13 @@ module top(
    output        fdd_wr,
    input         fdd_ack,
    output [7:0]  fdd_buff_din,
+   input         fdd2_mounted,
+   input         fdd_b_unit2,    // drive B answers as unit 2 (OSD Drive B Unit: 3rd)   // floppy drive B (S2); shares fdd_size / fdd_readonly with drive A
+   output [31:0] fdd2_lba,
+   output        fdd2_rd,
+   output        fdd2_wr,
+   input         fdd2_ack,
+   output [7:0]  fdd2_buff_din,
    input  [1:0]  fdc_mode,
    // Quick Disk (hps_io S3); shares sd_buff_*.
    input         qd_mounted,
@@ -132,6 +140,9 @@ module top(
    wire        tape_wr;
    wire [7:0]  tape_dout;
    wire        tape_mounted;
+   wire        tape_rd, tape_b_busy;
+   wire [7:0]  tape_b_dout;
+   wire        tape_data_region;
 
    tape_image tape(
       .clk(clk_sys), .reset(reset | warm_reset),
@@ -139,7 +150,8 @@ module top(
       .sd_lba(sd_lba), .sd_rd(sd_rd), .sd_wr(sd_wr), .sd_ack(sd_ack),
       .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(sd_buff_din), .sd_buff_wr(sd_buff_wr),
       .rewind(tape_rewind), .host_busy(ioctl_download), .cmt_status(cmt_status),
-      .active(tape_active), .bus_addr(tape_addr), .bus_wr(tape_wr), .bus_dout(tape_dout), .bus_din(din32[7:0]),
+      .active(tape_active), .bus_addr(tape_addr), .bus_wr(tape_wr), .bus_dout(tape_dout),
+      .bus_din(tape_data_region ? tape_b_dout : din32[7:0]), .bus_busy(tape_b_busy), .bus_rd(tape_rd),
       .mounted(tape_mounted), .tape_full(tape_full), .record_no(tape_record)
    );
 
@@ -147,6 +159,50 @@ module top(
    wire        mz_wr   = ioctl_download ? ioctl_wr   : tape_active & tape_wr;     // as sharpmz.sv: downloads first
    wire [24:0] mz_addr = ioctl_download ? ioctl_addr : tape_active ? tape_addr : 25'h1000000;
    wire [7:0]  mz_dout = ioctl_download ? ioctl_dout : tape_dout;
+
+   // Tape data buffer in DDR3, as sharpmz.sv, with a behavioural DDR3 below.
+   assign tape_data_region = (mz_addr[24:16] == 9'h041);
+   assign ioctl_wait = ioctl_download & tape_b_busy;
+   wire [15:0] tapedata_addr;
+   wire [7:0]  tapedata_wdata, tapedata_rdata;
+   wire        tapedata_we, tapedata_ready;
+   wire        ddr_busy, ddr_rd, ddr_we, ddr_dout_ready;
+   wire [28:0] ddr_addr;
+   wire [63:0] ddr_din, ddr_dout;
+   wire [7:0]  ddr_be, ddr_burst;
+   tape_ddr tddr(
+      .clk(clk_sys), .reset(reset),
+      .a_addr(tapedata_addr), .a_we(tapedata_we), .a_din(tapedata_wdata), .a_dout(tapedata_rdata), .a_ready(tapedata_ready),
+      .b_addr(mz_addr[15:0]), .b_we(mz_wr & tape_data_region),
+      .b_rd(~ioctl_download & tape_active & tape_rd & tape_data_region),
+      .b_din(mz_dout), .b_dout(tape_b_dout), .b_busy(tape_b_busy),
+      .DDRAM_CLK(), .DDRAM_BUSY(ddr_busy), .DDRAM_BURSTCNT(ddr_burst), .DDRAM_ADDR(ddr_addr), .DDRAM_DOUT(ddr_dout),
+      .DDRAM_DOUT_READY(ddr_dout_ready), .DDRAM_RD(ddr_rd), .DDRAM_DIN(ddr_din), .DDRAM_BE(ddr_be), .DDRAM_WE(ddr_we));
+
+   // DDR3 model: 64 KB at the tape buffer's address; BUSY now and then, reads answered 6-21 clocks later.
+   reg  [63:0] ddr_mem[0:8191];
+   reg  [15:0] ddr_lfsr = 16'hACE1;
+   reg   [4:0] ddr_wait = 0;
+   reg         ddr_pend = 0, ddr_rdy = 0;
+   reg  [12:0] ddr_raddr;
+   reg  [63:0] ddr_q;
+   assign ddr_busy       = ddr_lfsr[0] & ddr_lfsr[3];               // a quarter of the clocks
+   assign ddr_dout       = ddr_q;
+   assign ddr_dout_ready = ddr_rdy;
+   integer k;
+   always @(posedge clk_sys) begin
+      ddr_lfsr <= {ddr_lfsr[14:0], ddr_lfsr[15] ^ ddr_lfsr[13] ^ ddr_lfsr[12] ^ ddr_lfsr[10]};
+      ddr_rdy  <= 0;
+      if (!ddr_busy && ddr_we)
+         for (k = 0; k < 8; k = k + 1) if (ddr_be[k]) ddr_mem[ddr_addr[12:0]][k*8 +: 8] <= ddr_din[k*8 +: 8];
+      if (!ddr_busy && ddr_rd && !ddr_pend) begin
+         ddr_pend <= 1; ddr_raddr <= ddr_addr[12:0]; ddr_wait <= 5'd6 + {1'b0, ddr_lfsr[7:4]};
+      end
+      else if (ddr_pend) begin
+         if (ddr_wait != 0) ddr_wait <= ddr_wait - 1'd1;
+         else begin ddr_q <= ddr_mem[ddr_raddr]; ddr_rdy <= 1; ddr_pend <= 0; end
+      end
+   end
    wire        clksys_out, clkiop_unused;
 
    wire [7:0]  ext_io_addr, ext_io_dout, ext_io_din;
@@ -178,11 +234,11 @@ module top(
 
    mz_fdc fdc(
       .clk_sys(clk_sys), .reset(reset | warm_reset), .ce_cpu(ext_ce_cpu),
-      .model_ok(cfg_model[2] == 1'b1), .mode(fdc_mode), .crc_report(1'b0),                          // MZ-700, MZ-800, MZ-80B, MZ-2000
+      .model_ok(cfg_model[2] == 1'b1), .mode(fdc_mode), .crc_report(1'b0), .b_unit2(fdd_b_unit2),                          // MZ-700, MZ-800, MZ-80B, MZ-2000
       .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),
       .io_din(fdc_io_din), .io_oe(fdc_io_oe), .int_n(ext_int_n),
-      .img_mounted({1'b0, fdd_mounted}), .img_readonly(fdd_readonly), .img_size(fdd_size),
-      .sd_lba(fdc_lba), .sd_rd(fdc_rd), .sd_wr(fdc_wr), .sd_ack({1'b0, fdd_ack}),
+      .img_mounted({fdd2_mounted, fdd_mounted}), .img_readonly(fdd_readonly), .img_size(fdd_size),
+      .sd_lba(fdc_lba), .sd_rd(fdc_rd), .sd_wr(fdc_wr), .sd_ack({fdd2_ack, fdd_ack}),
       .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(fdc_buff_din), .sd_buff_wr(sd_buff_wr),
       .busy(fdd_busy), .present(fdc_present)
    );
@@ -190,6 +246,10 @@ module top(
    assign fdd_rd = fdc_rd[0];
    assign fdd_wr = fdc_wr[0];
    assign fdd_buff_din = fdc_buff_din[0];
+   assign fdd2_lba = fdc_lba[1];
+   assign fdd2_rd = fdc_rd[1];
+   assign fdd2_wr = fdc_wr[1];
+   assign fdd2_buff_din = fdc_buff_din[1];
 
    sharpmz core(
       .CLKMASTER      (clk_sys),
@@ -200,6 +260,11 @@ module top(
       .JOY1           (6'd0),
       .JOY_1X03       (joy_1x03),
       .RAMDISK_EN     (ramdisk_en),
+      .TAPEDATA_ADDR  (tapedata_addr),
+      .TAPEDATA_DOUT  (tapedata_wdata),
+      .TAPEDATA_WE    (tapedata_we),
+      .TAPEDATA_DIN   (tapedata_rdata),
+      .TAPEDATA_READY (tapedata_ready),
       .PRN_EN         (prn_en),
       .PRN_RDA        (prn_rda),
       .PRN_DATA       (prn_data),

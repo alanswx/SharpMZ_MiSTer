@@ -65,6 +65,8 @@ module tape_image
 	output reg        bus_wr,
 	output reg  [7:0] bus_dout,
 	input       [7:0] bus_din,
+	input             bus_busy,        // The CMT data buffer (DDR3) is busy: hold writes, read data not ready yet.
+	output            bus_rd,          // Reading bus_addr (S_CORE_RD), for the DDR3 buffer.
 
 	// Status for the OSD/LEDs.
 	output reg        mounted,
@@ -115,6 +117,7 @@ typedef enum logic [5:0] {
 } state_t;
 
 state_t state, ret, ret2;
+assign  bus_rd = (state == S_CORE_RD) || (state == S_CORE_RD_WAIT);
 
 reg [31:0] size;           // Image size in bytes (images up to 4 GB).
 reg        readonly;
@@ -305,7 +308,7 @@ always @(posedge clk) begin
 			img_off <= rpos + cnt; ret <= S_LOAD_HDR_WR; state <= S_IMG_RD;
 		end
 	end
-	S_LOAD_HDR_WR: begin
+	S_LOAD_HDR_WR: if (!bus_busy) begin
 		bus_addr <= CMT_HDR + cnt[6:0];
 		bus_dout <= img_byte;
 		bus_wr   <= 1;
@@ -320,7 +323,7 @@ always @(posedge clk) begin
 			img_off <= rpos + 32'd128 + cnt; ret <= S_LOAD_DATA_WR; state <= S_IMG_RD;
 		end
 	end
-	S_LOAD_DATA_WR: begin
+	S_LOAD_DATA_WR: if (!bus_busy) begin
 		bus_addr <= CMT_DATA + cnt[15:0];
 		bus_dout <= img_byte;
 		bus_wr   <= 1;
@@ -441,7 +444,7 @@ always @(posedge clk) begin
 		state    <= S_CORE_RD_WAIT;
 	end
 	S_CORE_RD_WAIT: begin
-		if (wait_cnt != 0) wait_cnt <= wait_cnt - 1'd1;
+		if (wait_cnt != 0 || bus_busy) begin if (wait_cnt != 0) wait_cnt <= wait_cnt - 1'd1; end
 		else begin
 			core_byte <= bus_din;
 			state     <= ret2;
