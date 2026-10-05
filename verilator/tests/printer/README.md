@@ -7,6 +7,7 @@ the core's printer bridge (`rtl/mz_printer.sv`, OSD Printer: UART).
 |---|---|---|
 | `prntest.mzf` | `make_prntest.py` | MZ-700/800 machine code that prints two text lines through the port (sim test `prn_mz700`, `prn_mz800`). |
 | `hello_world_mz800.prn` | MZ-800 BASIC 1Z-016: `PRINT/P "HELLO WORLD"` | `HELLO WORLD` CR. Plain text. |
+| `pen_test_mz800.prn` | MZ-800 BASIC 1Z-016: `PTEST`, `PRINT/P "PEN TEST DONE"` | `04` (pen test: the plotter draws a square in each of its four colours by itself), then a text line. |
 | `plotter_demo_mz800.prn` | MZ-800 BASIC 1Z-016, the program below | Text, then MZ-1P16 / MZ-1P01 plotter graphics, then text: 544 bytes. |
 
 Both `.prn` files were captured with mz800emu's printer capture (`--printer`, headless), MZ-800 with BASIC 1Z-016
@@ -46,3 +47,7 @@ What the plotter receives (MZ-700 owner's manual, appendix A.6 "Color Plotter-Pr
 In the demo: `02`, `C0`, four `D` lines (the square), `C1`, `M 220,-120` and about 40 `D` points (the circle),
 `C2`, `M`, `X0,-20, 10`, `M`, `X1, 24, 10` (two axes), `C3`, `M 20,-280`, `PMISTER`, `H`, `0A 03 01` (back to text),
 `DONE`.
+
+The plotter's own self-test (PAPER FEED held at power-on; mz800emu's plotter window, "Run drawing self-test") is
+drawn by the plotter's 8050 firmware from its ROM: nothing crosses the printer port, so there is no stream for it.
+`PTEST` (code 04) is the computer-side pen test.
