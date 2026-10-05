@@ -54,6 +54,8 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--printer FILE` | Printer connected (OSD Printer: UART); the UART line is decoded into FILE. `--printer-baud N` (9600). Feed FILE to `mister_printerd -d - -m sharpmz` (plotter) or `-m epson` for a PDF. |
 | `--joy0 N` | Hold joystick 1 with MiSTer bits N (decimal; 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2) all run. |
 | `--warm-reset N` | Press the OSD Reset at frame N (repeatable). |
+| `--load-rom F:FILE[@ADDR]` | OSD Load System ROM at frame F: FILE written to the system ROM from hex offset ADDR (default 0, the MZ-80K 40-column monitor). No reset; add `--warm-reset`. |
+| `--fast-tape-at F:STEP` | Change the Fast Tape step at frame F, e.g. load a BASIC fast and then a program at real speed. |
 | `--mz800-mode 700\|800` | The MZ-800 rear switch (default 700, as mz800emu). |
 | `--turbo N`, `--vmode` | CPU speed step; video mode. |
 | `--trace-cpu FILE` | PC of every opcode fetch; `--trace-from`/`--trace-to` limit the frames. |

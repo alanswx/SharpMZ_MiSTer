@@ -80,6 +80,7 @@ struct Options {
     uint32_t    joy0 = 0;                // joystick 1, MiSTer bits (5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right)
     std::set<uint32_t> warm_resets;
     std::map<uint32_t, int> fast_tape_at;   // --fast-tape-at FRAME:STEP
+    std::multimap<uint32_t, std::pair<std::string, uint32_t>> rom_loads;   // --load-rom FRAME:FILE[@ADDR]
     bool        fdd_readonly = false;
     std::string fdd_b;                       // --fdd-b: drive B image
     bool        fdd_b_hd = false;
@@ -113,6 +114,8 @@ static void usage()
 "  --tape-image FILE      mount an MZT/MZF image; saves are written back into it\n"
 "  --warm-reset N        OSD Reset (warm reset) at frame N (repeatable)\n"
 "  --fast-tape-at F:N     change the Fast Tape step to N at frame F (repeatable)\n"
+"  --load-rom F:FILE[@A]  OSD Load System ROM at frame F: FILE to system ROM offset A (hex, default 0 =\n"
+"                         MZ-80K 40-column monitor); no reset, add --warm-reset (repeatable)\n"
 "  --ramdisk              MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk)\n"
 "  --joy0 BITS            joystick 1 held all run (MiSTer bits: 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
@@ -168,6 +171,13 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--mz800-mode") o.mz800_700 = next() == "700";
         else if (a == "--turbo") o.turbo = (int)parse_num(next());
         else if (a == "--fast-tape") o.fast_tape = (int)parse_num(next());
+        else if (a == "--load-rom") {
+            std::string v = next(); size_t c = v.find(':');
+            if (c == std::string::npos) { fprintf(stderr, "--load-rom wants FRAME:FILE[@ADDR]\n"); exit(2); }
+            std::string f = v.substr(c + 1); uint32_t addr = 0; size_t at = f.rfind('@');
+            if (at != std::string::npos) { addr = (uint32_t)std::stoul(f.substr(at + 1), nullptr, 16); f = f.substr(0, at); }
+            o.rom_loads.insert({(uint32_t)std::stoul(v.substr(0, c)), {f, addr}});
+        }
         else if (a == "--fast-tape-at") {
             std::string v = next(); size_t c = v.find(':');
             if (c == std::string::npos) { fprintf(stderr, "--fast-tape-at wants FRAME:STEP\n"); exit(2); }
@@ -335,6 +345,7 @@ private:
     void write_config();
     void ioctl_write(uint32_t addr, uint8_t data);
     bool load_mzf(bool direct);
+    void load_rom(const std::string &path, uint32_t addr);
     void schedule_typing();
     void print_ascii();
     void dump_memory();
@@ -668,6 +679,8 @@ void Sim::on_frame_end()
     }
 
     top->tape_rewind = opt.tape_rewinds.count(frame) ? 1 : 0;   // Held for one frame.
+    auto rl = opt.rom_loads.equal_range(frame);
+    for (auto it = rl.first; it != rl.second; ++it) load_rom(it->second.first, it->second.second);
     if (opt.fast_tape_at.count(frame))
         top->cfg_cmt = (uint8_t)((top->cfg_cmt & ~7) | fast_tape_code(opt.fast_tape_at.at(frame)));
     if (opt.warm_resets.count(frame)) { top->warm_reset = 1; for (int i = 0; i < 64; i++) clock(); top->warm_reset = 0; }
@@ -703,6 +716,20 @@ void Sim::write_config()
     top->prn_baud     = opt.printer_baud;
     top->joy0         = opt.joy0;
     top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape
+}
+
+// OSD ROM and RAM > Load System ROM: the file goes to download address 0x000000 + offset (sharpmz.sv passes the
+// address through), i.e. the 128 KB system ROM, whose first 4 KB is the MZ-80K 40-column monitor. No reset.
+void Sim::load_rom(const std::string &path, uint32_t addr)
+{
+    std::ifstream f(path, std::ios::binary);
+    std::vector<uint8_t> d((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    if (d.empty()) { fprintf(stderr, "cannot read ROM '%s'\n", path.c_str()); exit_code = 2; return; }
+    if (!opt.quiet) fprintf(stderr, "[sim] loading ROM '%s' (%zu bytes) at %06X, frame %u\n", path.c_str(), d.size(), addr, frame);
+    top->ioctl_download = 1;
+    for (size_t i = 0; i < d.size(); i++) ioctl_write(addr + (uint32_t)i, d[i]);
+    top->ioctl_download = 0;
+    for (int i = 0; i < 64; i++) clock();
 }
 
 // Same address mapping as sharpmz.sv (mz_ioctl_addr_map).

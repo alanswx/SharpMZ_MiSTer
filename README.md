@@ -94,6 +94,25 @@ Writes go back to the image; mount a copy if you want to keep the original.
 | User ROM / FDC ROM | Map the user ROM (E800) or FDC ROM (F000) for the current model. |
 | Load System ROM / RAM / Keymap / CGROM | Replace the built-in combined monitor ROM, the initial RAM image, the keymaps or the character generator ROM. The files use the same layout as `rtl/software/roms/combined_*.rom`. |
 
+**Alternative monitor ROMs.** Load System ROM writes the file from the start of the core's 128 KB system ROM
+(`rtl/software/roms/combined_mrom.rom`), through the normal MiSTer file download. The first 4 KB of that ROM is the
+MZ-80K's 40-column monitor, so a 4 KB MZ-80K monitor (for example `80ktc.rom`, which starts "System Monitor") can be
+loaded as it is:
+
+1. Machine: MZ-80K, Display: 40 columns.
+2. ROM and RAM > Load System ROM, pick the `.rom` file.
+3. Press Reset (OSD Reset). The CPU keeps running the old monitor until the reset, so loading alone seems to do
+   nothing.
+
+The new monitor stays until the core is loaded again: the ROM is block RAM set up from the RBF, and Reset doesn't
+restore it. To go back to SP-1002, reload the core (or load a copy of `combined_mrom.rom`). Loading a monitor again
+after that works the same way. It only replaces the 40-column monitor: with an 80-column display the MZ-80K uses
+the copy at 0x1000.
+
+For other models, or the 80-column monitor, make a full image with the monitor at that model's offset and load it
+instead: `tools/make_monitor_rom.py mz80c monitor.rom out.rom [--80col]` (MZ-80K, 80C, 1200, 80A and 700; the
+offsets are listed in the script).
+
 ### Printer
 
 | Option | Description |
