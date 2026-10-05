@@ -41,6 +41,7 @@ In order; each result is checked on mister.local later.
 9. [x] Printer (OSD Printer: UART, `rtl/mz_printer.sv`): MZ-700 FE/FF and MZ-800/1500 PIO, byte taken on the RDP rising edge, RDA echoes RDP (busy while the 512-byte queue is full), sent 8N1 at Main's UART speed. In the sim, prntest.mzf (MZ-700 and MZ-800) and MZ-700 BASIC `LIST/P` print; `mister_printerd -m epson` turns the capture into a PDF with the text. To try on hardware with the daemon.
    - [ ] MZ-700 BASIC `PRINT/P "..."` typed after `LIST/P` didn't come out in the sim (typing timing?); check.
    - [ ] Sharp character set: lowercase and graphics codes are sent as Sharp codes; convert to ASCII for the Epson model (core option, or a `sharp` model in the daemon).
+   - [ ] Daemon test streams in `verilator/tests/printer/` (hello world, plotter demo, captured from MZ-800 BASIC with mz800emu `--printer`). With `-m epson` the lines overprint: Sharp printers take CR as a new line, so a Sharp text model needs CR = CR LF.
    - [ ] MZ-1P01 / MZ-1P16 plotter: a daemon model drawing its commands (MZ-700 owner's manual A.6: text mode codes 01-1D; graphic mode D, J, M, R, C, S, Q, P, X, H, I, L) as vectors into the PDF. The core already sends the bytes.
 10. [x] Tester pack `out/SharpMZ-tester-pack-20261004.zip`: newest core, Knight Lore / Exolon tapes, Youkai, the triage fixes (Base Zero, Revers, MZ-700-mode black), printer test.
 
