@@ -62,7 +62,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--trace-io FILE` | Every I/O write: frame, PC, port, data. |
 | `--wav FILE` | Audio at 48 kHz, as `sharpmz.sv` mixes it. |
 | `--dump-mem A:L:FILE` | Main RAM at exit (hex address and length). |
-| `--verbose` | Tape status, record FSM and pulse widths. |
+| `--verbose` | Tape status and deck lines (`[cmt]`), record FSM and pulse widths, the tape transmitter's block type and state (`[xmit]`), MZ-800 mode changes, sound. |
 
 ## Tests
 

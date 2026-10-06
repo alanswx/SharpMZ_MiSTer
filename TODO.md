@@ -90,6 +90,8 @@ Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lor
 - [ ] MZ-80K/80A floppy interface ROMs and the SA-6510 boot disk (`software/idealine/`).
 - [ ] MZ-80B: GRAM and 40/80 column switching with real software; SAVE and APSS.
 - [x] MZ-80K/80C/1200/80A keys: cursor keys, Backspace/Delete/Insert and Home/End go to the machine's UP/DOWN, RIGHT/LEFT, INST/DEL and CLR/HOME keys, with SHIFT where the monitor's key table needs it (SA-1510: unshifted UP; SP-1002: unshifted DOWN); MZ-80A/1200 keypad to its keypad (`tools/fix_keymap.py`). Tests kb_mz80k, kb_mz80a. The MZ-80A reads SHIFT late: a tap shorter than about 80 ms gives the unshifted key.
+- [x] Dezeni Land (MZ-1500, Hudson): a tester saw "IPL is loading" hang; that screen is the MZ-80B/2000 IPL (wrong model). On the MZ-1500 (C at the IPL menu) Tape 1 loads, then N + Return at the QD question, and the title screen comes up (sim).
+- [x] Alternative MZ-80K monitor ROM (a tester's 80ktc.rom): Load System ROM puts it over the 40-column monitor; it shows after an OSD Reset and stays until the core is reloaded. README section, `tools/make_monitor_rom.py` for the other models, sim `--load-rom`.
 - [ ] MZ-80K: 3-D MAZE loads and runs but the screen looks garbled; check whether that's the program.
 
 ### Core and polish
@@ -101,9 +103,11 @@ Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lor
 - [ ] Optional 64 MHz clock for the MZ-80K/80A/80B family, so their clock enables are exact (±1 clk_sys jitter now).
 - [x] Unit testbenches for `cmt.vhd` and the i8254 (`make test-cmt`, `make test-i8254`).
 - [x] WAV to MZF converter: `tools/wav2mzf.py` (WAV, or FLAC etc. through ffmpeg; either polarity; header and body copies). Decodes the No-Intro MZ-700 "BASIC" and "Applications" recordings.
-- [ ] Release RBF `releases/SharpMZ_YYYYMMDD.rbf` after hardware testing.
+- [x] Tester build `releases/SharpMZ_20261006.rbf` (Load Direct start, MZ-800 palette reset, alternative monitor ROMs, MZ-80B/2000 tape fix). From now on each tested build goes in `releases/` with its date.
+- [ ] Hardware check of the newer features, only tested in the sim so far: Load Direct: Start Program (all models), printer to the MiSTer UART and the daemon's plotter model, 1.44 MB disks and Drive B unit 2, MZ-800 joystick (Knight Lore, Exolon), Puckn Boy after MZ-1Z002 BASIC at real tape speed, MZ-80B/2000 APSS with real software.
+- [ ] Final release RBF after that hardware testing.
 - [ ] Later: v2 machine options (RAM size, GRAM, MZ-1R25), and removing `support/sharpmz/` from Main_MiSTer.
-- [ ] MZ-2500/2520: researched in `docs/mz2500.md` (new video controller, MMU, YM2203, RTC, kanji ROMs; needs SDRAM; best as a separate core or second top level sharing the common RTL; about 4-6 months part-time).
+- [x] MZ-2500/2520: researched in `docs/mz2500.md`; now its own project, https://github.com/alanswx/SharpMZ2500_MiSTer (`~/dev2/SharpMZ2500_MiSTer`: skeleton core, Verilator sim, docs, phased TODO).
 
 ## Known issues
 - Changing the model doesn't reset MZ-800 characters redefined through C000; the IPL restores the font on the next boot.

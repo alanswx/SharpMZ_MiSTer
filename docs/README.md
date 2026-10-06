@@ -92,6 +92,10 @@ This menu controls the hardware CMT unit and has the following choices:
   after the boot; see the top-level README.)
 - Queue Tape
 
+  (Standard core: there is no queue. The Tape Image slot replaces it: mount an `.mzt` with several programs; the next
+  one is loaded each time the machine stops the tape, and the MZ-80B/2000 APSS controls move between programs. See the
+  top-level README.)
+
   A real cassette has 1 or more programs stored on it sequentially. The emulation cache only stores 1 full program so this is a mechanism to line up multiple programs and they will 
   be fed into the emulation cache as it becomes empty, thus simulating a real cassette. Selecting this option presents you with a directory listing of all MZF files. Choose one per 
   selection and it will be added to the Queue. The programs queued will be displayed on the menu.
