@@ -631,6 +631,12 @@ void Sim::clock()
         fprintf(stderr, "[cmt] frame %u debug %08X\n", frame, dm);
         dbg_last = dm;
     }
+    static uint8_t rs_last = 0xFF;
+    if (opt.verbose && top->dbg_tape_rs != rs_last) {   // transmitter: header (type 0) or data (1), and its state
+        fprintf(stderr, "[xmit] frame %u cpu %llu type %d state %d\n", frame, (unsigned long long)cpu_cycles,
+                top->dbg_tape_rs >> 4, top->dbg_tape_rs & 15);
+        rs_last = top->dbg_tape_rs;
+    }
     static uint8_t ctrl_last = 0xFF;
     if (opt.verbose && top->dbg_cmt_ctrl != ctrl_last) {
         uint8_t c = top->dbg_cmt_ctrl;   // CMT_BUS_IN, mctrl_pkg.vhd

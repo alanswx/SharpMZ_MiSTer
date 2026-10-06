@@ -1330,6 +1330,16 @@ process( RST, CLKBUS(CKMASTER), XMIT_RAM_LOAD, XMIT_RAM_TYPE ) begin
                  XMIT_RAM_STATE                         <= 1;
                  XMIT_LOAD_2                            <= '0';
     
+            -- Tape stopped: abandon the block, as the padding process does. A block the MZ stops part way (the IPL
+            -- stops the deck after the first copy of the data, during the backup copy) used to run on to its end and
+            -- share the pulse encoder with the next record's gap: after MZ-2000 BASIC loaded from the IPL, the rest of
+            -- its 23 KB backup copy came out mixed into Puckn Boy's leader and the header arrived ~97 s late.
+            elsif XMIT_RAM_DONE = '0' and PLAYING = "000" then
+                XMIT_RAM_DONE                           <= '1';
+                XMIT_LOAD_2                             <= '0';
+                XMIT_BIT_2                              <= '0';
+                XMIT_RAM_STATE                          <= 0;
+
             -- If the DONE signal is low, then run the actual process, raising DONE when complete.
             elsif XMIT_RAM_DONE = '0' then
     

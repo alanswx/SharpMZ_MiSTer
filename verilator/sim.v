@@ -117,6 +117,7 @@ module top(
    output [13:0] cmt_status /*verilator public_flat*/,
    output [7:0]  dbg_cmt_ctrl /*verilator public_flat*/,
    output [31:0] dbg_cmt_debug /*verilator public_flat*/,
+   output [4:0]  dbg_tape_rs /*verilator public_flat*/,   // {XMIT_RAM_TYPE, TAPE_READ_STATE} of the CMT transmitter
    output [31:0] dbg_rcv /*verilator public_flat*/,
    output [31:0] dbg_rcv_sum /*verilator public_flat*/,
    output        dbg_pc1 /*verilator public_flat*/,
@@ -339,6 +340,7 @@ module top(
    assign cpu_pc = core.cpu0.u0.pc;
    assign cpu_ce = core.clkgen0.ckencpui;
    assign cpu_m1_n = core.cpu0.u0.m1_n;
+   assign dbg_tape_rs = {core.tape0.xmit_ram_type, core.tape0.tape_read_state};
    assign dbg_io_wr = ~core.t80_iorq_n & ~core.t80_wr_n;
    mz800_border bdr(.clk(clk_sys), .ce_pix(ce_pix), .enable(1'b1), .hblank(VGA_HB), .vblank(VGA_VB), .bcol(4'd1),
                     .r_in(8'd0), .g_in(8'd0), .b_in(8'd0), .r_out(), .g_out(), .b_out(), .hblank_out(bdr_hb), .vblank_out(bdr_vb));

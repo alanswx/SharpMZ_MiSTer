@@ -52,14 +52,14 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | ------ | ----------- |
 | Load Tape to CMT | Put an `.mzf` on the virtual tape. Start it from the machine as normal (`L` or `LOAD` in the monitor, `LOAD` in BASIC). |
 | Load Direct to RAM | Copy the program straight into memory at its load address and start it (see Load Direct below). |
-| Tape Image | Mount an `.mzt`/`.mzf` as the cassette. The first program is ready to play; when the machine stops the tape after reading one program, the next one is loaded, so multi-part programs work. Programs saved with SAVE are appended to the image. |
+| Tape Image | The cassette itself, and the replacement for the old core's tape queue. Mount an `.mzt` (several programs back to back) or `.mzf`. The first program is ready to play; when the machine stops the tape after reading one program, the next one is loaded, so multi-part programs and loaders work. On the MZ-80B/2000 the APSS deck controls work on it: fast forward/rewind to the next/previous program, eject rewinds to the start. Programs saved with SAVE are appended to the image. |
 | Rewind Tape Image | Go back to the first program on the mounted image. |
 | Tape Buttons | Auto (play or record as the machine needs), Off, Play, Record. |
 | Fast Tape | Run the CPU (and the tape) faster while the tape is moving, 2x to 32x (capped like CPU Speed: 16x and 32x are both the fastest on the MZ-700/800/1500). Default and Off are real speed. |
 | Sharp ASCII Name | Convert tape file names between Sharp display codes and ASCII on save and/or load. |
 | Audio Source | The 8253 sound, or the tape signal. |
 | Tape Sound | Mix the tape signal in quietly while the tape is playing or recording, as the machines' own tape monitor would (Audio Source stays on the sound). |
-| Load Direct | Start Program (default): after Load Direct to RAM the machine boots for about 1.5 s, then the core puts back what the load wrote to 10F0-11FF (the boot uses that area), sets the memory map and jumps to the exec address with SP at 10F0, as after a tape load. Only machine-code files (MZF type 01) are started; BASIC programs and data just reset. Reset Only: just reset, then start it yourself with `J` and the exec address in the monitor. The MZ-80B and MZ-2000 always reset only. |
+| Load Direct | Start Program (default): after Load Direct to RAM the machine boots for about 1.5 s, then the core puts back what the load wrote to 10F0-11FF (the boot uses that area), sets the memory map and jumps to the exec address with SP at 10F0, as after a tape load. Only machine-code files (MZF type 01) are started; BASIC programs and data just reset. Reset Only: just reset, then start it yourself with `J` and the exec address in the monitor; the MZF header is in RAM at 10F0 as after a tape load (load address at 10F0+20, exec at 10F0+22, low byte first). The MZ-80B and MZ-2000 always reset only. |
 
 **Saving programs.** MiSTer can't grow a mounted file, so saving needs a tape image with spare room. Make a blank one with `tools/make_blank_tape.py` (default 1 MB, zero-filled), mount it as the Tape Image, and SAVE as usual (for example `S120012FF1200` then a file name in the MZ-700 monitor). Each program is appended after the last one. If the image is read-only or full, the save is skipped.
 

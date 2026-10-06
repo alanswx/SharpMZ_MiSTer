@@ -49,6 +49,9 @@ The author's v2 VideoController (`rtl/vc/VideoController.vhd`), changed as follo
 ## Tape
 
 - `rtl/cmt.vhd` plays and records MZF records.
+- A record plays as gap, tape mark, block (header or data), 256 short pulses, the block again (backup copy). The MZ
+  stops the deck once it has the first copy; on a stop the padding and block transmitters both give up their
+  sequence, so the next PLAY starts clean (the block transmitter used to run on to the end of its copy).
 - `rtl/tape_image.sv` feeds it from an MZT/MZF image on slot S0. It loads the next record when the machine stops the tape, and appends records the machine saves (the image must have spare room, e.g. from `tools/make_blank_tape.py`).
 - The MZ-700 and MZ-800 use the same pulse timings: short/long 676/1300 T-states, sampled 988 T-states after the edge.
 - The tape data buffer is in DDR3 (`rtl/tape_ddr.sv`, byte address 0x30000000), freeing block RAM for the 1.44 MB
