@@ -25,6 +25,7 @@ It matches mz800emu:
 | gfxwm | 320x200, 16 colours | EXOR, OR, RESET, REPLACE, PSET |
 | gfxwm640 | 640x200, 4 colours | the same write modes |
 | gfxrw | 320x200, 4 colours | RF single-plane read and colour search |
+| gfxrw16 | 320x200, 16 colours | colour search with the RF frame bit 0 and 1 (all four planes compared) |
 | gfxscr | 320x200 | full screen hardware scroll, CPU writes while scrolled |
 | gfxscr640 | 640x200 | scroll window (SSA/SEA/SW) |
 

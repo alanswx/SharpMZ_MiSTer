@@ -15,7 +15,11 @@
 --                  latched while interrupts are disabled and requested once they are enabled
 --                  (MZ-1500 BASIC sets up its music timer that way), and writing the I/O or
 --                  interrupt mask takes the inputs as they are, without a request. Not implemented: the handshake modes 0-2 (strobe/ready)
---                  and the daisy chain; RETI is not decoded, a request is served by the acknowledge.
+--                  and the daisy chain beyond this PIO. RETI (ED 4D on two opcode fetches) is decoded:
+--                  an acknowledged port is in service until the RETI and, as on the Z80 PIO (and in mz800emu),
+--                  neither it nor the lower priority port B requests meanwhile; a condition becoming true in service
+--                  stays pending. Antiriad's vblank handler runs longer than a frame and re-enables interrupts before
+--                  its RETI: without this it re-entered itself for ever.
 --
 -- Copyright:       (c) 2026 SharpMZ MiSTer contributors
 --
@@ -40,6 +44,8 @@ entity mz800_pio is
         WR_n                 : in  std_logic;
         IORQ_n               : in  std_logic;
         M1_n                 : in  std_logic;
+        RD_n_CPU             : in  std_logic := '1';                         -- CPU RD (opcode fetches, for RETI).
+        CPU_DIN              : in  std_logic_vector(7 downto 0) := (others => '1'); -- What the CPU reads.
         DI                   : in  std_logic_vector(7 downto 0);
         DO                   : out std_logic_vector(7 downto 0);             -- Register read data or the vector.
         VECTOR_OE            : out std_logic;                                -- Driving the vector (interrupt acknowledge).
@@ -76,6 +82,10 @@ architecture rtl of mz800_pio is
     signal INTA_LAST         : std_logic;
     signal INTA_PORT         : std_logic;                                    -- Port being acknowledged (0 A, 1 B).
     signal PIN               : byte2;
+    signal IUS               : bit2;                                         -- In service: acknowledged, no RETI yet.
+    signal OP_M1             : std_logic;                                    -- In an opcode fetch.
+    signal OP_DATA           : std_logic_vector(7 downto 0);                 -- Byte of the current opcode fetch.
+    signal OP_LAST           : std_logic_vector(7 downto 0);                 -- Byte of the previous opcode fetch.
 begin
     PIN(0)                   <= PA_IN;
     PA_OUT                   <= OUTREG(0);
@@ -118,7 +128,11 @@ begin
                     COND_LAST(p)     <= '0';
                     PEND(p)          <= '0';
                     SNAP(p)          <= '0';
+                    IUS(p)           <= '0';
                 end loop;
+                OP_M1                <= '0';
+                OP_DATA              <= x"00";
+                OP_LAST              <= x"00";
                 WR_LAST_n            <= '1';
                 INTA_LAST            <= '0';
                 INTA_PORT            <= '0';
@@ -140,7 +154,21 @@ begin
                     if REQ(0) = '1' then INTA_PORT <= '0'; else INTA_PORT <= '1'; end if;
                 end if;
                 if INTA = '0' and INTA_LAST = '1' then
-                    if INTA_PORT = '0' then PEND(0) <= '0'; else PEND(1) <= '0'; end if;
+                    if INTA_PORT = '0' then PEND(0) <= '0'; IUS(0) <= '1'; else PEND(1) <= '0'; IUS(1) <= '1'; end if;
+                end if;
+
+                -- RETI (ED 4D): the opcode byte is taken while RD is low in an M1 memory read; at the end of the M1
+                -- the previous and this byte are checked. It ends the service of the highest priority port in service.
+                OP_M1                <= '0';
+                if M1_n = '0' and IORQ_n = '1' and RD_n_CPU = '0' then
+                    OP_DATA          <= CPU_DIN;
+                    OP_M1            <= '1';
+                end if;
+                if OP_M1 = '1' and not (M1_n = '0' and IORQ_n = '1' and RD_n_CPU = '0') then
+                    OP_LAST          <= OP_DATA;
+                    if OP_LAST = x"ED" and OP_DATA = x"4D" then
+                        if IUS(0) = '1' then IUS(0) <= '0'; elsif IUS(1) = '1' then IUS(1) <= '0'; end if;
+                    end if;
                 end if;
 
                 -- Register writes.
@@ -180,8 +208,8 @@ begin
         end if;
     end process;
 
-    REQ(0)                   <= PEND(0) and IE(0);
-    REQ(1)                   <= PEND(1) and IE(1);
+    REQ(0)                   <= PEND(0) and IE(0) and not IUS(0);
+    REQ(1)                   <= PEND(1) and IE(1) and not IUS(0) and not IUS(1);
     INT_n                    <= '0' when REQ(0) = '1' or REQ(1) = '1' else '1';
     VECTOR_OE                <= '1' when INTA = '1' and (REQ(0) = '1' or REQ(1) = '1') else '0';
     DO                       <= VECT(0) when INTA = '1' and REQ(0) = '1' else

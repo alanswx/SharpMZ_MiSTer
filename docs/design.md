@@ -63,7 +63,8 @@ to 10F0-11FF, lets the machine boot for 1.5 s (the IPL/monitor set up the 8255, 
 as their work area), writes the kept bytes back over the download bus, then puts a short program on the CPU's data bus
 for its next memory reads, starting at an opcode fetch: `NOP, DI`, the bank switches (MZ-800: `IN A,(E1)` to take
 the CG ROM and VRAM out and `OUT (E3),A` for the ROM at E000, the map mz800emu's start leaves; with E0-E4:
-`OUT (E0),A` when it loads below 1000), `LD SP,10F0`, `JP exec`. This follows mz800emu's `mzarch_bootstrap_run_mzf`. The MZ-80B/2000
+`OUT (E0),A` when it loads below 1000), `LD SP,10F0`, `JP exec`, from the first opcode fetch after the next start of
+vblank (a fixed phase against the display interrupts, as mz800emu starts at a frame boundary). This follows mz800emu's `mzarch_bootstrap_run_mzf`. The MZ-80B/2000
 only reset.
 
 ## MZ-800
@@ -120,7 +121,7 @@ The MZ-800 is a branch of `mz80c.vhd` selected by `CONFIG(MZ800)` (the `M8_*` si
 
 The MZ-1R25 VRAM expansion is enabled, as in mz800emu. The write rules follow mz800emu's `vramctrl`: SINGLE/EXOR/OR/RESET write the selected planes the resolution has, and only REPLACE and PSET use the frame bit.
 
-**Z80 PIO** (`mz800_pio.vhd`). Bit-mode interrupts with the IM 2 vector on the acknowledge. PA4 = /CTC0, PA5 = /VBLN. CP/M runs its keyboard and clock from the vertical blank interrupt.
+**Z80 PIO** (`mz800_pio.vhd`). Bit-mode interrupts with the IM 2 vector on the acknowledge. PA4 = /CTC0, PA5 = /VBLN. CP/M runs its keyboard and clock from the vertical blank interrupt. An acknowledged port stays in service until the CPU fetches RETI (ED 4D; the PIO sees the CPU's input bus): meanwhile it and the lower priority port B don't request, and a condition that becomes true stays pending, as on the Z80 PIO and in mz800emu.
 
 **PSG.** `sn76489_audio.vhd` (Matthew Hagerty) on the fixed 3.547 MHz enable, mixed with the 8253 into 16-bit audio.
 

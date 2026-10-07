@@ -14,7 +14,8 @@
 //    2. The machine boots normally for WAIT_CLKS (about 1.5 s): the ROM sets up the 8255, 8253, PIO,
 //       video and its own work area, as a real cold start.
 //    3. Those bytes are written back through the core download bus.
-//    4. From the next opcode fetch the CPU's memory reads are fed a short program:
+//    4. From the first opcode fetch after the next start of vertical blanking, the CPU's memory reads are fed a
+//       short program:
 //         NOP, DI,
 //         MZ-800 (either mode): IN A,(E1) (CG ROM and VRAM out: 1000-1FFF and 8000-BFFF DRAM),
 //                               OUT (E3),A (ROM at E000), as mz800emu's start leaves the map,
@@ -34,6 +35,7 @@ module direct_start #(parameter CLK_HZ = 70937600)
 	input             enable,          // model supports it (not MZ-80B/2000) and the OSD option is on
 	input             is_mz800,        // MZ-800 (either position of the rear switch)
 	input             has_e0,          // the E0-E4 bank ports exist (MZ-700/800/1500)
+	input             vblank,          // the program starts at the start of vertical blanking
 
 	// The core download bus as the direct load drives it.
 	input             dl_active,       // a direct load is in progress
@@ -70,9 +72,10 @@ wire        in_win = dl_addr[24:16] == BASE[24:16] && cpu_a >= LO && cpu_a <= HI
 reg  [15:0] fstrt = 0, fexec = 0;
 reg   [7:0] ftype = 0;
 reg         dl_active_d = 0;
+reg         vblank_d = 0;
 
 reg  [2:0] state = 0;
-localparam S_IDLE = 0, S_LOAD = 1, S_WAIT = 2, S_RESTORE = 3, S_INJECT = 4;
+localparam S_IDLE = 0, S_LOAD = 1, S_WAIT = 2, S_RESTORE = 3, S_INJECT = 4, S_SYNC = 5;
 reg [31:0] cnt = 0;
 reg  [8:0] idx = 0;
 reg  [1:0] pace = 0;
@@ -139,8 +142,7 @@ always @(posedge clk) begin
 					pidx    <= 0;
 					started <= 0;
 					reading <= 0;
-					inj_arm <= 1;
-					state   <= S_INJECT;
+					state   <= S_SYNC;
 				end
 				else begin
 					if (kept[idx]) begin
@@ -152,6 +154,13 @@ always @(posedge clk) begin
 				end
 			end
 		end
+	// Start at the start of vertical blanking, as mz800emu's direct load starts at a frame boundary: the program
+	// then runs in the same phase against the display interrupts. Antiriad (Eng) plays a note per vblank interrupt
+	// in a handler that runs about two frames; whether the title escapes to its credits depends on where a note ends
+	// against the next vblank, so a start at an arbitrary raster point could miss it for ever.
+	S_SYNC:
+		if (dl_active) state <= S_LOAD;
+		else if (vblank & ~vblank_d) begin inj_arm <= 1; state <= S_INJECT; end
 	S_INJECT:
 		if (dl_active) begin inj_arm <= 0; state <= S_LOAD; end
 		else if (inj_go) begin
@@ -168,6 +177,8 @@ always @(posedge clk) begin
 		end
 	default: state <= S_IDLE;
 	endcase
+
+	vblank_d <= vblank;
 
 	// Keep what the load writes to 10F0-11FF; a new load starts afresh (its first write can come with dl_active).
 	dl_active_d <= dl_active;

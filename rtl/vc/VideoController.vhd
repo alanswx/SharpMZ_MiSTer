@@ -3198,8 +3198,11 @@ begin
                 -- Colour match mode. Match the data stored in GRAM planes against that given in the GRF register, setting 1 if a match, 0 otherwise.
                 else
                     GD_CPURDDATA          <= (others => '0');
+                    -- In 16 colours (both frames) the display mode decides and the RF frame bit is ignored, as in mz800emu:
+                    -- Abu Simbel clears VRAM with LDIR in 16-colour mode with RF=8C (frame bit 0); comparing only planes
+                    -- I/II returned FF and filled VRAM with stripes.
                     -- Frame A 320x200
-                    if    GD_RD_FRAME_A = '1'  and GD_DMD_320X200 = '1' then 
+                    if    GD_RD_FRAME_A = '1'  and GD_DMD_320X200 = '1' and GD_DMD_FRAME_AB = '0' then 
 
                         GD_CPURDDATA      <= ((GD_SRC_DATA(GD_320_PLANE_I_BIT7) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT7) xnor GD_RD_PLANE_II)) &
                                              ((GD_SRC_DATA(GD_320_PLANE_I_BIT6) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT6) xnor GD_RD_PLANE_II)) &
@@ -3211,7 +3214,7 @@ begin
                                              ((GD_SRC_DATA(GD_320_PLANE_I_BIT0) xnor GD_RD_PLANE_I) and (GD_SRC_DATA(GD_320_PLANE_II_BIT0) xnor GD_RD_PLANE_II));
 
                     -- Frame B 320x200
-                    elsif GD_RD_FRAME_B = '1'  and GD_DMD_320X200 = '1' then 
+                    elsif GD_RD_FRAME_B = '1'  and GD_DMD_320X200 = '1' and GD_DMD_FRAME_AB = '0' then 
 
                         GD_CPURDDATA      <= ((GD_SRC_DATA(GD_320_PLANE_IV_BIT7) xnor GD_RD_PLANE_IV) and (GD_SRC_DATA(GD_320_PLANE_III_BIT7) xnor GD_RD_PLANE_III)) &
                                              ((GD_SRC_DATA(GD_320_PLANE_IV_BIT6) xnor GD_RD_PLANE_IV) and (GD_SRC_DATA(GD_320_PLANE_III_BIT6) xnor GD_RD_PLANE_III)) &
@@ -3235,7 +3238,7 @@ begin
                                              ((GD_SRC_DATA(GD_320_PLANE_IV_BIT0) xnor GD_RD_PLANE_IV) and (GD_SRC_DATA(GD_320_PLANE_III_BIT0) xnor GD_RD_PLANE_III) and (GD_SRC_DATA(GD_320_PLANE_II_BIT0) xnor GD_RD_PLANE_II) and (GD_SRC_DATA(GD_320_PLANE_I_BIT0) xnor GD_RD_PLANE_I));
 
                     -- Frame A 640x200
-                    elsif GD_RD_FRAME_A = '1'  and GD_DMD_640X200 = '1' then
+                    elsif GD_RD_FRAME_A = '1'  and GD_DMD_640X200 = '1' and GD_DMD_FRAME_AB = '0' then
 
                         GD_CPURDDATA      <= (GD_SRC_DATA(GD_640_PLANE_I_BIT7) xnor GD_RD_PLANE_I) &
                                              (GD_SRC_DATA(GD_640_PLANE_I_BIT6) xnor GD_RD_PLANE_I) &
@@ -3247,7 +3250,7 @@ begin
                                              (GD_SRC_DATA(GD_640_PLANE_I_BIT0) xnor GD_RD_PLANE_I);
 
                     -- Frame B 640x200
-                    elsif GD_RD_FRAME_B = '1'  and GD_DMD_640X200 = '1' and CONFIG(OPT_MZ1R25) = '1' then
+                    elsif GD_RD_FRAME_B = '1'  and GD_DMD_640X200 = '1' and GD_DMD_FRAME_AB = '0' and CONFIG(OPT_MZ1R25) = '1' then
 
                         GD_CPURDDATA      <= (GD_SRC_DATA(GD_640_PLANE_III_BIT7) xnor GD_RD_PLANE_III) &
                                              (GD_SRC_DATA(GD_640_PLANE_III_BIT6) xnor GD_RD_PLANE_III) &

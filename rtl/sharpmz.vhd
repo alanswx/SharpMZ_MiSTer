@@ -576,6 +576,7 @@ component mz80c
           T80_A16            : in  std_logic_vector(15 downto 0);
           T80_DI             : out std_logic_vector(7 downto 0);
           T80_DO             : in  std_logic_vector(7 downto 0);
+          CPU_DIN            : in  std_logic_vector(7 downto 0) := (others => '1');
 
           -- Chip selects to common resources.
           CS_ROM_n           : out std_logic;
@@ -1015,6 +1016,7 @@ begin
             T80_A16          => T80_A16,
             T80_DI           => MZ80C_DI,
             T80_DO           => T80_DO,
+            CPU_DIN          => T80_DI,                                  -- CPU data in, for the PIO's RETI decode.
 
             -- Chip selects to common resources.
             CS_ROM_n         => MZ80C_CS_ROM_n,

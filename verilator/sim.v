@@ -170,7 +170,7 @@ module top(
    wire [7:0]  ds_inj_data;
    direct_start #(.CLK_HZ(70937600 / `SIM_CLK_DIV)) dstart(
       .clk(clk_sys), .reset(reset), .enable(direct_start_en & (cfg_model[2:1] != 2'b11)),
-      .is_mz800(cfg_model[2:0] == 3'd5), .has_e0(cfg_model[2]),
+      .is_mz800(cfg_model[2:0] == 3'd5), .has_e0(cfg_model[2]), .vblank(VGA_VB),
       .dl_active(ioctl_download & ioctl_direct), .dl_wr(mz_wr), .dl_addr(mz_addr), .dl_data(mz_dout),
       .bus_active(ds_bus_active), .bus_wr(ds_bus_wr), .bus_addr(ds_bus_addr), .bus_dout(ds_bus_dout),
       .m1_n(ds_m1_n), .mreq_n(ds_mreq_n), .rd_n(ds_rd_n), .inj_go(ds_inj_go), .inj_data(ds_inj_data));

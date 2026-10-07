@@ -11,6 +11,8 @@ VRAM address mapping, pixel order and colour mapping all show up in the picture.
   gfxwm.mzf     DMD=02  fill all planes, then EXOR / OR / RESET / REPLACE / PSET on 40-line bands
   gfxwm640.mzf  DMD=06  the same write modes at 640x200, 4 colours
   gfxrw.mzf     DMD=00  RF reads: copy plane II to plane I, and a colour search into plane II
+  gfxrw16.mzf   DMD=02  16 colours: colour searches with the RF frame bit 0 and 1 (the display mode decides, as in
+                        mz800emu; Abu Simbel clears VRAM this way with RF=8C)
   gfxscr.mzf    DMD=00  full screen hardware scroll (SOF 8 lines), then CPU writes into the scrolled VRAM
   gfxscr640.mzf DMD=06  hardware scroll of a window (SSA/SEA/SW) by 3 lines at 640x200
   gfxscr640b.mzf DMD=06 full screen scroll with a large offset (SOF 3C0, needs SOF2) and writes before and after
@@ -90,6 +92,11 @@ rw = header(0x00) + fill(0x01, 'hxl', 0x8000, 8000) + fill(0x02, 'l', 0x8000, 80
 rw += copy(0x02, 0x01, 0x8000, 0x8000 + 150 * 40, 50 * 40)      # plane II rows 0-49 -> plane I rows 150-199
 rw += copy(0x83, 0x02, 0x8000, 0x8000 + 100 * 40, 50 * 40)      # search colour 3 in rows 0-49 -> plane II rows 100-149
 mzf('gfxrw', bytes(rw + [0x18, 0xFE]))
+rw16 = header(0x02) + fill(0x01, 'hxl', 0x8000, 8000) + fill(0x02, 'l', 0x8000, 8000) \
+    + fill(0x04, 'hr', 0x8000, 8000) + fill(0x08, 'nl', 0x8000, 8000)
+rw16 += copy(0x8C, 0x01, 0x8000, 0x8000 + 100 * 40, 50 * 40)   # search colour C (frame bit 0) -> plane I rows 100-149
+rw16 += copy(0x93, 0x02, 0x8000, 0x8000 + 150 * 40, 50 * 40)   # search colour 3 (frame bit 1) -> plane II rows 150-199
+mzf('gfxrw16', bytes(rw16 + [0x18, 0xFE]))
 
 
 def crtc(regs):

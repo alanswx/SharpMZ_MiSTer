@@ -95,6 +95,7 @@ entity mz80c is
           T80_A16            : in  std_logic_vector(15 downto 0);
           T80_DI             : out std_logic_vector(7 downto 0);
           T80_DO             : in  std_logic_vector(7 downto 0);
+          CPU_DIN            : in  std_logic_vector(7 downto 0) := (others => '1'); -- What the CPU reads (opcodes: the PIO decodes RETI).
 
           -- Chip selects to common resources.
           CS_ROM_n           : out std_logic;                            -- ROM Select
@@ -478,6 +479,8 @@ begin
             WR_n             => T80_WR_n,
             IORQ_n           => T80_IORQ_n,
             M1_n             => T80_M1_n,
+            RD_n_CPU         => T80_RD_n,
+            CPU_DIN          => CPU_DIN,
             DI               => T80_DO,
             DO               => M8_PIO_DO,
             VECTOR_OE        => M8_PIO_VOE,

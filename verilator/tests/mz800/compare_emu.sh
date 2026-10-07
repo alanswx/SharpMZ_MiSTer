@@ -4,7 +4,7 @@
 cd "$(dirname "$0")/../.."
 E=../refs/mz800emu/build/build-mz800emu/mz800emu
 OUT=out/modes
-TESTS=${TESTS:-gfx640 gfx640h gfx320h gfx320b gfx320x gfxwm gfxwm640 gfxrw gfxscr gfxscr640 gfxscr640b}
+TESTS=${TESTS:-gfx640 gfx640h gfx320h gfx320b gfx320x gfxwm gfxwm640 gfxrw gfxrw16 gfxscr gfxscr640 gfxscr640b}
 for t in $TESTS; do
     mkdir -p $OUT/emu_$t $OUT/sim_$t
     $E --headless --model mz800 --type 160:M --mzf tests/mz800/$t.mzf --mzf-direct --mzf-direct-frame 200 \

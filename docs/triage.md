@@ -51,7 +51,7 @@ counters now power up in mode 0 with OUT low and idle until a count is written, 
 | Differ only by timing, animation, border, palette shade | 8 |
 | Core bug, fixed | 10 (black drawn grey in MZ-700 mode) |
 | Header area wiped by the direct-load reset; fixed by Load Direct: Start Program (see below) | 12 |
-| Cause not known yet | 2 (Abu Simbel Profanation, Antiriad (Eng)); Space Guerilla fixed with the 12, Planetoids by the palette reset |
+| Cause not known yet | 0: Space Guerilla fixed with the 12, Planetoids by the palette reset, Abu Simbel by the 16-colour search read; Antiriad (Eng) is an mz800emu artefact (below) |
 | Both blank, no usable reference, or not runnable this way | 8 |
 
 **Fixed: black drawn as grey on the MZ-800 in MZ-700 mode.** The palette index for 700 mode was `1111 & '1' & GRB`,
@@ -75,8 +75,22 @@ MZ-800 Border option is off in the sim).
 **Fixed (2026-10-05): MZ-800 palette at reset.** Planetoids v3.1 sets only palette 0 (`OUT (F0),00`) and draws
 with colours 1-3. `VideoController.vhd` reset all four palette registers to 0, so it drew black on black. They now
 reset to mz800emu's power-on values (`gdg_init`: 9, F, 9, F) and Planetoids shows its instructions screen as in
-mz800emu. Abu Simbel (top line shows every other character of "ABUSIMBEL COPYRIGHT DINAMIC SOFT", white bars at
-the edges) and Antiriad (Eng) (noise band where the credits should be) are unchanged; both look like scrolling
-text, next to check.
+mz800emu. 
+**Fixed (2026-10-06): colour search reads in 16-colour mode.** Abu Simbel clears VRAM by writing 00 to 8000 and
+copying it on with LDIR, reading through RF=8C (search for colour 1100, frame bit 0) in 320x200 16-colour mode.
+mz800emu compares all four planes when the display is in 16 colours, whatever the RF frame bit; the core compared
+planes I/II only, so every read matched and returned FF, which filled VRAM with stripes and wiped every other title
+character. `VideoController.vhd` now takes the 16-colour compare first; new test `gfxrw16` (matches mz800emu).
+
+**Antiriad (Eng): an mz800emu artefact, not a core bug.** Its music plays a note per /VBLN interrupt (Z80 PIO port
+A bit 5, IM 2) in a handler that runs about two frames and re-enables interrupts before its RETI; the title
+reaches its credits only when a note ends just before a vblank. The handler's keyboard check strobes row 10
+(OUT D0,0A). On the MZ-800 the row decoder selects nothing for 10-15, so PB reads FF (the core). mz800emu maps
+rows 10-15 to `keyboard_matrix[10]`, one past its 10-entry array ("TODO: overit na skutecnem HW"), reads a non-FF
+byte and takes a shorter path: about 640 T-states less per note, which moves the note ends against vblank so
+that one escapes at frame 127. Needs a look on a real MZ-800. Two changes came out of this, both matching the
+real chips and mz800emu: the MZ-800 Z80 PIO now keeps an acknowledged port in service until RETI (a port in
+service and port B don't request; an edge in service stays pending), and Load Direct starts the program at the
+start of vblank (a fixed phase, as mz800emu's start at a frame boundary).
 
 The reviews are in `verilator/out/triage/<model>/review.md` (not in git; rerun the script to rebuild them).

@@ -456,6 +456,7 @@ wire  [7:0] mz_ioctl_dout = hps_ioctl_download ? hps_ioctl_dout : ds_bus_active 
 
 // Load Direct starts the program: after the machine has booted, the bytes the load put in 10F0-11FF are written
 // back and the CPU is fed DI, the bank switches the program needs, LD SP,10F0 and JP exec (rtl/direct_start.sv).
+wire vblank_emu;                                    // core video vblank (declared here: direct_start uses it)
 direct_start #(.CLK_HZ(70937600)) direct_start
 (
 	.clk(clk_sys),
@@ -463,6 +464,7 @@ direct_start #(.CLK_HZ(70937600)) direct_start
 	.enable(~status[49] & (cfg_model[2:1] != 2'b11)),   // not the MZ-80B / MZ-2000
 	.is_mz800(cfg_model == 3'd5),
 	.has_e0(cfg_model[2]),
+	.vblank(vblank_emu),
 	.dl_active(direct_load_active),
 	.dl_wr(mz_ioctl_wr),
 	.dl_addr(mz_ioctl_addr),
@@ -562,7 +564,6 @@ wire [7:0] R_emu;
 wire [7:0] G_emu;
 wire [7:0] B_emu;
 wire hblank_emu;
-wire vblank_emu;
 wire hsync_emu;
 wire vsync_emu;
 wire [3:0] mz800_bcol;
