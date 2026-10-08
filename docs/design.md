@@ -49,6 +49,9 @@ The author's v2 VideoController (`rtl/vc/VideoController.vhd`), changed as follo
 ## Tape
 
 - `rtl/cmt.vhd` plays and records MZF records.
+- PLAY_READY goes up half a second after the last write to the CMT buffer and down when the machine has finished a
+  record (PLAY_READY_CLR, taken on its rising edge: the tape image refills the buffer right away and those writes
+  must restart the timer).
 - A record plays as gap, tape mark, block (header or data), 256 short pulses, the block again (backup copy). The MZ
   stops the deck once it has the first copy; on a stop the padding and block transmitters both give up their
   sequence, so the next PLAY starts clean (the block transmitter used to run on to the end of its copy).

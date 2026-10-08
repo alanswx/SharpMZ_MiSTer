@@ -3,10 +3,11 @@
 
 Each test is an MGL that loads the core with its own <setname>, so it gets its own config file
 (<setname>_v5.CFG) holding the OSD settings (model etc.). The MGL mounts the tape/disk images
-and resets; this script then types keys through mrext's remote API (keyboard-raw) and takes
+and resets; this script then types keys through a uinput keyboard (tools/mister_keys.py on the SD card) and takes
 screenshots with Main's `screenshot` command, then copies them back.
 
-Needs: root ssh to the MiSTer, mrext remote running (port 8182). The software comes from the
+Needs: root ssh to the MiSTer (python3 and /dev/uinput there: tools/mister_keys.py is copied to /tmp and run as a
+virtual keyboard; it is kept on the SD card at /media/fat/tools/mister_keys.py). The software comes from the
 repository's gitignored folders (software/, verilator test programs) and is copied to
 games/SharpMZ/HWTest on the MiSTer; disk images are copied fresh for each run because the core
 writes back to them.
@@ -238,6 +239,37 @@ test('K08', 'MZ80B', 'MZ-80B tape: Puckn Boy (stays at "IPL is loading" on the M
      opts=[FAST_TAPE(5)], reset=True, steps=[('wait', 45), ('shot', 'a'), ('type', ' '), ('wait', 5), ('type', 'S'), ('wait', 10),
                                              ('shot', 'b')])
 
+# Load Direct: Start Program (default): the core boots, restores 10F0-11FF and jumps to exec (rtl/direct_start.sv).
+YB = os.path.join(SW, 'Year-Based Collection of Games for the Sharp MZ-80K Line of Home Computers v1.0')
+def yb(year, machine, name):
+    return f'{YB}/{year}/{machine}/{name}'
+for name, model, desc, src, wait in [
+        ('L01', 'MZ800', 'Load Direct starts Jumpin\' Jack (exec 1150, inside the MZF header)', yb(1988, 'MZ-800', "Jumpin' Jack v01 (1988)(Wermouska Software).mzf"), 12),
+        ('L02', 'MZ800', 'Load Direct starts The Way of the Exploding Fist (loads and runs at 10F0)', yb(1987, 'MZ-800', 'Way of the Exploding Fist, The (1987)(Michal Kreidl Software).mzf'), 12),
+        ('L03', 'MZ800', "Load Direct starts Solomon's Key (exec 1108)", yb(1989, 'MZ-800', "Solomon's Key (1989)(DS Software).mzf"), 12),
+        ('L04', 'MZ800', 'Abu Simbel Profanation: title text whole, no stripes (16-colour colour search)', yb(1985, 'MZ-800', 'Abu Simbel Profanation (1985)(Dinamic Software).mzf'), 12),
+        ('L05', 'MZ800', 'Planetoids v3.1: instructions screen (palette reset)', yb('19xx', 'MZ-800', 'Planetoids v3.1 (19xx)(Sharp Club Brno).mzf'), 12),
+        ('L06', 'MZ800', 'Antiriad (Eng): credits or the noise band? (mz800emu reaches the credits only through a bug)', yb(1986, 'MZ-800', 'Sacred Armour of Antiriad, The (Eng)(1986)(Proton Software).mzf'), 20),
+        ('L07', 'MZ700', 'Load Direct on the MZ-700: Base Zero', yb(1983, 'MZ-700', 'Base Zero (1983).mzf'), 12),
+        ('L08', 'MZ80K', 'Load Direct on the MZ-80K: Galactic Attack', yb(1980, 'MZ-80K', 'Galactic Attack (1980)(Cromwell Computing).mzf'), 8),
+        ('L09', 'MZ80A', 'Load Direct on the MZ-80A: Super Fire', yb(1980, 'MZ-80A', 'Super Fire (1980).mzf'), 8)]:
+    test(name, model, desc, files=[('f', 2, src)], steps=[('wait', wait), ('shot', 'run')])
+# Puckn Boy after MZ-1Z002 BASIC from one tape image (the CMT used to keep sending BASIC's backup copy).
+test('L10', 'MZ2000', 'MZ-2000: MZ-1Z002 BASIC from the IPL, then MON, L: Puckn Boy loads and starts',
+     files=[('s', 0, os.path.join(ROOT, 'verilator/out/pb2/t.mzt'))], opts=[FAST_TAPE(5)], reset=True,
+     steps=[('wait', 30), ('shot', 'basic'), ('type', 'MON\n'), ('wait', 3), ('type', 'L\n'), ('wait', 3), ('type', '\n'),
+            ('wait', 40), ('shot', 'pucknboy')])
+# Dezeni Land (MZ-1500): C at the IPL menu, Tape 1 loads, N + Return at the Quick Disk question, title screen.
+test('L11', 'MZ1500', 'MZ-1500: Dezeni Land Tape 1 from a tape image (C), N at the QD question, title',
+     files=[('s', 0, f'{SW}/mz1500/Dezeni Land (1984)(Hudson)(Tape 1).mzt')], opts=[FAST_TAPE(5)], reset=True,
+     steps=[('wait', 12), ('shot', 'menu'), ('type', 'C'), ('wait', 60), ('shot', 'qd'), ('type', 'N\n'), ('wait', 8), ('shot', 'title')])
+# Tape Image order (first to last, as the old core's tape queue): BASIC 1Z-013B is record 1 (L in the monitor), a
+# BASIC program record 2 (LOAD in BASIC), LIST shows it.
+test('L12', 'MZ700', 'MZ-700 Tape Image order: L loads BASIC 1Z-013B (record 1), LOAD the BASIC program (record 2)',
+     files=[('s', 0, 'gen:basic_mzt')], opts=[FAST_TAPE(5)], reset=True,
+     steps=[('wait', 4), ('type', 'L\n'), ('wait', 30), ('shot', 'basic'), ('type', 'LOAD\n'), ('wait', 15),
+            ('type', 'LIST\n'), ('wait', 3), ('shot', 'list')])
+
 # Scandoubler (OSD Display > Scandoubler Fx; also MiSTer.ini forced_scandoubler): the doubled 31 kHz picture.
 SDFX = lambda v: (44, 3, v)                # 0 None, 1 HQ2x, 2-4 CRT 25/50/75%
 test('V01', 'MZ700', 'Scandoubler CRT 50%: MZ-700 monitor', opts=[SDFX(3)], steps=[('wait', 6), ('shot', 'boot')])
@@ -265,10 +297,9 @@ def sh(cmd, **kw):
 class Mister:
     def __init__(self, host):
         self.host = host
-        self.ip = socket.getaddrinfo(host, None, socket.AF_INET)[0][4][0]
 
     def ssh(self, cmd, capture=False):
-        r = subprocess.run(['ssh', f'root@{self.host}', cmd], check=True, capture_output=capture, text=True)
+        r = subprocess.run(['ssh', self.host if '@' in self.host or self.host == 'mister' else f'root@{self.host}', cmd], check=True, capture_output=capture, text=True)
         return r.stdout if capture else None
 
     def put(self, local, remote):
@@ -277,14 +308,52 @@ class Mister:
     def cmd(self, c):
         self.ssh(f'echo "{c}" > /dev/MiSTer_cmd')
 
+    KEYS_TOOL = f'{FAT}/tools/mister_keys.py'
+
+    def start_keys(self):
+        """Copy tools/mister_keys.py to the SD card (/media/fat/tools) and start its uinput keyboard daemon."""
+        self.ssh(f'mkdir -p {FAT}/tools')
+        self.put(os.path.join(ROOT, 'tools/mister_keys.py'), self.KEYS_TOOL)
+        self.ssh(f'python3 {self.KEYS_TOOL} start')
+
     def key(self, code):
-        req = urllib.request.Request(f'http://{self.ip}:8182/api/controls/keyboard-raw/{code}', method='POST')
-        urllib.request.urlopen(req, timeout=5).read()
+        self.ssh(f'python3 {self.KEYS_TOOL} key {code}')
 
     def type(self, text):
-        for c in text.upper():
-            self.key(KEYS[c])
-            time.sleep(0.15)
+        codes = ' '.join(str(KEYS[c]) for c in text.upper())
+        self.ssh(f'python3 {self.KEYS_TOOL} key {codes}')
+        time.sleep(0.2 * len(text))
+
+
+MENU = f'{FAT}/_SharpMZ Tests'      # a folder starting with _ shows in the MiSTer main menu
+
+
+AUTOTYPE = f'{FAT}/tools/autotype'
+
+
+def steps_file(t):
+    """The test's steps for mister_keys.py watch: waits, keys (Sharp layout codes from KEYS) and screenshots."""
+    out = [f'wait {4 + 2 * len(t["files"]) + (2 if t["reset"] else 0)}']
+    for op, arg in t['steps']:
+        if op == 'wait':
+            out.append(f'wait {arg}')
+        elif op == 'type':
+            out.append('key ' + ' '.join(str(KEYS[c]) for c in arg.upper()))
+        elif op == 'shot':
+            out.append(f'shot {arg}')
+    return '\n'.join(out) + '\n'
+
+
+def menu_name(t):
+    """File name for the menu: test number, description, then the keys to type (an MGL can't type)."""
+    keys = [arg.replace('\n', ' Ret') for op, arg in t['steps'] if op == 'type']
+    name = f'{t["name"]} {t["desc"]}'
+    name = ''.join(c if c.isalnum() or c in " -+.,'()&" else ' ' for c in name)
+    name = ' '.join(name.split())[:70].rstrip(' ,.-')
+    if keys:
+        hint = ', then '.join(k.strip() for k in keys)[:40]
+        name += ' (type ' + ''.join(' ' if c in '\\/:*?"<>|' else c for c in hint).strip() + ')'
+    return name + '.mgl'
 
 
 def mgl(rbf, t, remote_files):
@@ -301,14 +370,19 @@ def mgl(rbf, t, remote_files):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--host', default='mister.local')
+    ap.add_argument('--host', default='mister', help='ssh host (an ~/.ssh/config alias works)')
     ap.add_argument('--rbf', default=os.path.join(ROOT, 'output_files/sharpmz.rbf'))
     ap.add_argument('--only')
     ap.add_argument('--out', default=os.path.join(ROOT, 'out/mister'))
     ap.add_argument('--no-deploy', action='store_true', help='use the RBF already on the MiSTer')
+    ap.add_argument('--menu', action='store_true',
+                    help=f'only deploy: put each test as an MGL in "{MENU}" (MiSTer main menu) to run by hand')
     a = ap.parse_args()
     tests = [t for t in T if not a.only or t['name'] in a.only.split(',')]
     m = Mister(a.host)
+    m.start_keys()
+    if not a.menu:                # this script types the keys itself: the menu autotype watcher would type them too
+        m.ssh(f'python3 {Mister.KEYS_TOOL} watch-stop')
     stage = os.path.join(a.out, 'stage')
     os.makedirs(stage, exist_ok=True)
 
@@ -329,6 +403,10 @@ def main():
                 mzt = src[3:]
                 src = os.path.join(stage, f'{t["name"]}_{len(remote)}.qdf')
                 sh(f'python3 "{ROOT}/tools/mzf2qdf.py" "{src}" "{mzt}" > /dev/null')
+            if src == 'gen:basic_mzt':    # BASIC 1Z-013B, then a BASIC program, back to back
+                src = os.path.join(stage, 'basic_rps.mzt')
+                open(src, 'wb').write(open(yb('BASIC', 'MZ-700', 'BASIC 1Z-013B.mzf'), 'rb').read() +
+                                      open(yb('19xx', 'MZ-700', 'Rock Paper Scissors (19xx).mzf'), 'rb').read())
             if src == 'gen:qd_blank':     # unformatted Quick Disk
                 src = os.path.join(stage, 'qd_blank.qdf')
                 sh(f'python3 "{ROOT}/tools/make_blank_qd.py" "{src}" > /dev/null')
@@ -349,6 +427,24 @@ def main():
         path = os.path.join(stage, f'{t["name"]}.mgl')
         open(path, 'w').write(mgl(f'_Computer/{rbf_name}', t, remote))
         m.put(path, f'{HW}/mgl/{t["name"]}.mgl')
+
+    if a.menu:
+        stage_menu = os.path.join(stage, 'menu')
+        os.makedirs(stage_menu, exist_ok=True)
+        m.ssh(f'mkdir -p "{MENU}" {AUTOTYPE} && rm -f "{MENU}"/*.mgl')
+        for t in tests:
+            name = menu_name(t)
+            local = os.path.join(stage_menu, name)
+            sh(f'cp "{os.path.join(stage, t["name"] + ".mgl")}" "{local}"')
+            m.put(local, f'{MENU}/{name}')
+            steps = os.path.join(stage_menu, t['name'] + '.steps')
+            open(steps, 'w').write(steps_file(t))
+            m.put(steps, f'{AUTOTYPE}/{t["name"]}.steps')
+            print(f'   {name}')
+        m.ssh(f'python3 {Mister.KEYS_TOOL} watch-start')
+        print(f'{len(tests)} tests in {MENU} (MiSTer main menu); the autotype watcher is running: a test picked '
+              f'there types its keys and saves its screenshots in /media/fat/screenshots.')
+        return
 
     results = []
     for t in tests:

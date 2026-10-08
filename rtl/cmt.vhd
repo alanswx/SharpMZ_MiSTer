@@ -129,6 +129,7 @@ signal CMT_BUS_OUTi          :     std_logic_vector(CMT_BUS_OUT_WIDTH);      -- 
 signal BUTTONS_LAST          :     std_logic_vector(1 downto 0);             -- Virtual buttons last sample, used to detect changes.
 constant PLAY_READY_CLKS     :     natural := CLK_SYS_HZ / 2;              -- Quiet time after the last tape buffer write before PLAY_READY.
 signal PLAY_READY_SET_CNT    :     integer range 0 to PLAY_READY_CLKS := 0; -- Timer from the last cache upload to PLAY_READY being set.
+signal PLAY_READY_CLR_LAST   :     std_logic;                                -- PLAY_READY_CLR a clock ago (edge detect).
 signal PLAY_READY_CLR_CNT    :     unsigned(21 downto 0);                    -- 2 second timer from motor being stopped to PLAY_READY being cleared.
 signal PLAY_READY            :     std_logic;                                -- Cache loaded, playback ready to commence.
 signal PLAY_READY_CLR        :     std_logic;                                -- Clear PLAY_READY signal.
@@ -580,6 +581,7 @@ begin
         if RST = '1' then
             PLAY_READY                              <= '0';
             PLAY_READY_SET_CNT                      <= 0;
+            PLAY_READY_CLR_LAST                     <= '0';
             RECORD_READY                            <= '0';
             RECORD_READY_SEQ                        <= "00";
 
@@ -589,8 +591,12 @@ begin
             RECORD_READY_SEQ(0)                     <= RECORD_READY_SEQ(1);
             RECORD_READY_SEQ(1)                     <= RECORD_READY_SET;
 
-            -- If the external clear is triggered, reset ready signal.
-            if PLAY_READY_CLR = '1' then
+            -- If the external clear is triggered, reset ready signal. Only its rising edge: PLAY_READY_CLR stays high
+            -- for 64K CPU clocks, and the tape image loads the next record as soon as PLAY_READY drops, so a short
+            -- record (a 1.3 KB BASIC program after BASIC itself) was written entirely inside that window, every write
+            -- was overridden by the clear, the quiet timer never started and the record never became ready.
+            PLAY_READY_CLR_LAST                     <= PLAY_READY_CLR;
+            if PLAY_READY_CLR = '1' and PLAY_READY_CLR_LAST = '0' then
                 PLAY_READY                          <= '0';
                 PLAY_READY_SET_CNT                  <= 0;
 

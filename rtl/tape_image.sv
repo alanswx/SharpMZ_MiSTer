@@ -162,6 +162,11 @@ always @(posedge clk) begin
 	// An OSD tape download replaces whatever this module put in the CMT buffer.
 	if (host_busy) loaded <= 0;
 
+`ifdef TAPE_IMAGE_DEBUG
+	if (cmt_status[PLAY_READY] != cmt_last[PLAY_READY])
+		$display("tape_image: PLAY_READY %b loaded %b state %0d mounted %b host_busy %b status %04x",
+		         cmt_status[PLAY_READY], loaded, state, mounted, host_busy, cmt_status);
+`endif
 	// Latch events; they are serviced from S_IDLE.
 	if (mounted & ~host_busy) begin
 		if ((rewind & ~rewind_last) | (cmt_status[APSS_EJECT] & ~cmt_last[APSS_EJECT])) pending_rewind <= 1;

@@ -39,6 +39,9 @@
 #   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
 #   tape_image    load ramtest from an MZT through the tape image slot (fast tape)
+#   tape_basic    MZ-700: one tape image with BASIC 1Z-013B then a 1.3 KB BASIC program: L, LOAD, LIST shows its last
+#                 line (a short next record used to be written inside the CMT's PLAY_READY clear and never played).
+#                 Skipped without the year-based collection (../software) and with QUICK=1.
 #
 # Tests run in parallel; each writes to out/test/<name>.log. Set QUICK=1 to skip
 # the tape test (it takes several minutes).
@@ -174,6 +177,13 @@ if [ -z "$QUICK" ]; then
           --stop-at-frame 700 --ascii-end --quiet > "$OUT/tape_image.txt" 2> "$OUT/tape_image.log" ) &
     pids+=($!); names+=("tape_image")
 fi
+YB="../software/Year-Based Collection of Games for the Sharp MZ-80K Line of Home Computers v1.0"
+if [ -z "${QUICK:-}" ] && [ -f "$YB/BASIC/MZ-700/BASIC 1Z-013B.mzf" ]; then
+    cat "$YB/BASIC/MZ-700/BASIC 1Z-013B.mzf" "$YB/19xx/MZ-700/Rock Paper Scissors (19xx).mzf" > "$OUT/tape_basic.mzt"
+    ( $BIN --model mz700 --fast-tape 5 --tape-image "$OUT/tape_basic.mzt" --type '100:L\n' --type '2200:LOAD\n' \
+          --type '2700:LIST\n' --stop-at-frame 2900 --ascii-end --quiet > "$OUT/tape_basic.txt" 2> "$OUT/tape_basic.log" ) &
+    pids+=($!); names+=("tape_basic")
+fi
 if [ -z "${QUICK:-}" ]; then
     for t in "tape_mz80b|mz80b|../software/mz80b/SB-5520.mzt" \
              "tape_mz2000|mz2000|../software/mz2200/Gang Man (1983)(Hudson Soft)(Fumihiko Itagaki) [CT].mzt"; do
@@ -216,6 +226,13 @@ for n in "${names[@]}"; do
             else
                 echo "FAIL $n"; cat "$OUT/$n.txt"; fail=1
             fi ;;
+        tape_basic)
+            if grep -q "410 PRINT" "$OUT/tape_basic.txt"; then
+                echo "PASS $n"
+            else
+                echo "FAIL $n"; tail -5 "$OUT/tape_basic.txt"; fail=1
+            fi
+            ;;
         tape_image|tape_mz800)
             if grep -q "RAM TESTER" "$OUT/tape_image.txt"; then
                 echo "PASS $n"
