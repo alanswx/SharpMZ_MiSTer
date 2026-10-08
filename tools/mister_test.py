@@ -15,7 +15,7 @@ writes back to them.
 usage: mister_test.py [--host mister.local] [--rbf output_files/sharpmz.rbf] [--only T03,T08]
                       [--out out/mister] [--no-deploy]
 """
-import argparse, datetime, os, socket, subprocess, sys, time, urllib.request
+import argparse, datetime, hashlib, json, os, socket, subprocess, sys, time, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SW = os.path.join(ROOT, 'software')
@@ -226,13 +226,13 @@ test('T31', 'MZ800', 'MZ-800 border on: a program sets the border to light red (
 test('T30', 'MZ800', 'MZ-800 border on: CP/M 4.1', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], opts=[(43, 1, 1)], reset=True,
      steps=[('wait', 15), ('shot', 'boot')])
 
-# More MZ-2000 tapes (software/mz2200): the IPL loads them from the tape image (fast tape 16x).
+# More MZ-2000 tapes (software/mz2200): the IPL loads them from the tape image (fast tape 32x).
 for n, f in enumerate(['Explorer (1989)(Micom Basic)(Taka Yamashita) [CT].mzt', 'Flicky Mz-2200_Loader.mzt',
                        'Itasandrias (1983)(Hudson Soft)(Fumihiko Itagaki) [CT].mzt',
                        'Piranha-Kun no Isshukan (1983)(Enix)(Atsushi Shirai) [CT].mzt',
                        'Project A (1984)(Pony Canyon)(Tatsuji Otsuka) [CT].mzt', 'Puckn Boy.mzt',
                        'Super Doors (1983)(Hudson Soft)(TNT) [CT].mzt']):
-    test(f'K{n + 1:02d}', 'MZ2000', f'MZ-2000 tape: {f}', files=[('s', 0, f'{SW}/mz2200/{f}')], opts=[FAST_TAPE(5)], reset=True,
+    test(f'K{n + 1:02d}', 'MZ2000', f'MZ-2000 tape: {f}', files=[('s', 0, f'{SW}/mz2200/{f}')], opts=[FAST_TAPE(6)], reset=True,
          steps=[('wait', 45), ('shot', 'a'), ('wait', 45), ('shot', 'b'), ('wait', 120), ('shot', 'c')])
 
 test('K08', 'MZ80B', 'MZ-80B tape: Puckn Boy (stays at "IPL is loading" on the MZ-2000)', files=[('s', 0, f'{SW}/mz2200/Puckn Boy.mzt')],
@@ -294,16 +294,58 @@ def sh(cmd, **kw):
     return subprocess.run(cmd, shell=True, check=True, **kw)
 
 
+REFS = os.path.join(ROOT, 'tools/mister_refs.json')   # md5 of each screenshot from a good run (--update-refs)
+# One ssh connection for the whole run (each step was a new connection, about half a second).
+SSH_OPTS = ['-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/mister_test_%r@%h:%p', '-o', 'ControlPersist=120']
+
+
+def md5(path):
+    return hashlib.md5(open(path, 'rb').read()).hexdigest()
+
+
 class Mister:
     def __init__(self, host):
         self.host = host
+        self.target = host if '@' in host or host == 'mister' else f'root@{host}'
+        self.remote_md5 = {}
 
     def ssh(self, cmd, capture=False):
-        r = subprocess.run(['ssh', self.host if '@' in self.host or self.host == 'mister' else f'root@{self.host}', cmd], check=True, capture_output=capture, text=True)
+        r = subprocess.run(['ssh'] + SSH_OPTS + [self.target, cmd], check=True, capture_output=capture, text=True)
         return r.stdout if capture else None
 
     def put(self, local, remote):
-        sh(f'scp -q "{local}" "root@{self.host}:{remote}"')
+        """Copy a file, unless the MiSTer already has it (md5 from scan())."""
+        if self.remote_md5.get(remote) == md5(local):
+            return
+        subprocess.run(['scp', '-q'] + SSH_OPTS + [local, f'{self.target}:{remote}'], check=True)
+        self.remote_md5[remote] = md5(local)
+
+    def scan(self, *dirs):
+        """md5 of the files already in these directories on the MiSTer, so put() can skip unchanged ones."""
+        out = self.ssh('md5sum ' + ' '.join(f'"{d}"/* "{d}"/*/* 2>/dev/null' for d in dirs) + ' || true', True)
+        for line in out.splitlines():
+            h, _, path = line.partition('  ')
+            if path:
+                self.remote_md5[path] = h
+
+    def screen_md5(self, name='_poll.png'):
+        """Take a screenshot and return its md5 (the PNG is the same for the same picture)."""
+        self.cmd(f'screenshot {name}')
+        time.sleep(0.8)
+        out = self.ssh(f'md5sum {FAT}/screenshots/{name} 2>/dev/null; rm -f {FAT}/screenshots/{name}', True)
+        return out.split()[0] if out else ''
+
+    def wait_for(self, seconds, ref):
+        """Wait up to SECONDS; with reference md5s (a blinking cursor gives two), return when the screen matches one."""
+        end = time.time() + seconds
+        if not ref:
+            time.sleep(seconds)
+            return
+        time.sleep(min(2, seconds))
+        while time.time() < end:
+            if self.screen_md5() in ref:
+                return
+            time.sleep(min(2, max(0, end - time.time())))
 
     def cmd(self, c):
         self.ssh(f'echo "{c}" > /dev/MiSTer_cmd')
@@ -324,6 +366,10 @@ class Mister:
         self.ssh(f'python3 {self.KEYS_TOOL} key {codes}')
         time.sleep(0.2 * len(text))
 
+
+# --quick: one or two tests per model and feature (about 15 minutes).
+QUICK = {'T01', 'T02', 'T03', 'T04', 'T05', 'T06', 'T07', 'T08', 'T09', 'T13', 'T21', 'T22', 'T25', 'T26',
+         'W01', 'L01', 'L04', 'L05', 'L07', 'L08', 'L09', 'L10', 'L12', 'V01'}
 
 MENU = f'{FAT}/_SharpMZ Tests'      # a folder starting with _ shows in the MiSTer main menu
 
@@ -373,12 +419,18 @@ def main():
     ap.add_argument('--host', default='mister', help='ssh host (an ~/.ssh/config alias works)')
     ap.add_argument('--rbf', default=os.path.join(ROOT, 'output_files/sharpmz.rbf'))
     ap.add_argument('--only')
+    ap.add_argument('--quick', action='store_true', help='a short set: one or two tests per model and feature')
+    ap.add_argument('--update-refs', action='store_true',
+                    help='after the run, keep each screenshot\'s md5 in tools/mister_refs.json (only from a good run)')
+    ap.add_argument('--no-refs', action='store_true', help='fixed waits, ignoring tools/mister_refs.json')
     ap.add_argument('--out', default=os.path.join(ROOT, 'out/mister'))
     ap.add_argument('--no-deploy', action='store_true', help='use the RBF already on the MiSTer')
     ap.add_argument('--menu', action='store_true',
                     help=f'only deploy: put each test as an MGL in "{MENU}" (MiSTer main menu) to run by hand')
     a = ap.parse_args()
     tests = [t for t in T if not a.only or t['name'] in a.only.split(',')]
+    if a.quick:
+        tests = [t for t in tests if t['name'] in QUICK]
     m = Mister(a.host)
     m.start_keys()
     if not a.menu:                # this script types the keys itself: the menu autotype watcher would type them too
@@ -393,6 +445,7 @@ def main():
     else:
         rbf_name = m.ssh(f'cd {FAT}/_Computer && ls SharpMZ-std_*.rbf | sort | tail -1', True).strip()[:-4]
 
+    m.scan(f'{HW}/files', f'{HW}/disks', f'{HW}/mgl', f'{FAT}/config')
     for t in tests:
         remote = []
         for kind, index, src in t['files'] + [l[:3] for l in t['late']]:
@@ -421,6 +474,7 @@ def main():
             m.ssh(f'mkdir -p "{os.path.dirname(dst)}"')
             m.put(src, dst)
             remote.append(dst)
+        t['remote'] = remote              # this test's files on the MiSTer (for 'fetch')
         cfg = os.path.join(stage, f'{t["name"]}{CFG_VER}.CFG')
         open(cfg, 'wb').write(status_bytes(t['model'], t['opts']))
         m.put(cfg, f'{FAT}/config/{t["name"]}{CFG_VER}.CFG')
@@ -446,6 +500,7 @@ def main():
               f'there types its keys and saves its screenshots in /media/fat/screenshots.')
         return
 
+    refs = json.load(open(REFS)) if os.path.exists(REFS) else {}
     results = []
     for t in tests:
         print(f'{t["name"]} {t["model"]}: {t["desc"]}', flush=True)
@@ -453,14 +508,19 @@ def main():
         m.cmd(f'load_core {HW}/mgl/{t["name"]}.mgl')
         time.sleep(4 + 2 * len(t['files']) + (2 if t['reset'] else 0))
         shots = []
-        for op, arg in t['steps']:
+        steps = t['steps']
+        for i, (op, arg) in enumerate(steps):
             if op == 'wait':
-                time.sleep(arg)
+                # A wait right before a screenshot ends when the screen matches that screenshot from a good run.
+                nxt = steps[i + 1] if i + 1 < len(steps) else None
+                ref = refs.get(f'{t["name"]}_{nxt[1]}') if nxt and nxt[0] == 'shot' and not a.no_refs else None
+                ref = [ref] if isinstance(ref, str) else ref
+                m.wait_for(arg, ref)
             elif op == 'type':
                 m.type(arg)
             elif op == 'fetch':           # copy a mounted image back (after the core wrote to it); list a Quick Disk's blocks
-                local = os.path.join(a.out, f'{t["name"]}_{os.path.basename(remote[arg])}')
-                sh(f'scp -q "root@{a.host}:{remote[arg]}" "{local}"')
+                local = os.path.join(a.out, f'{t["name"]}_{os.path.basename(t["remote"][arg])}')
+                subprocess.run(['scp', '-q'] + SSH_OPTS + [f'{m.target}:{t["remote"][arg]}', local], check=True)
                 if local.lower().endswith('.qdf'):
                     subprocess.run(['python3', os.path.join(ROOT, 'tools/qdinfo.py'), local])
                 else:
@@ -472,10 +532,19 @@ def main():
         d = os.path.join(a.out, 'shots')
         os.makedirs(d, exist_ok=True)
         for s in shots:
-            r = subprocess.run(f'scp -q "root@{a.host}:{FAT}/screenshots/{s}" "{d}/{s}"', shell=True)
+            r = subprocess.run(['scp', '-q'] + SSH_OPTS + [f'{m.target}:{FAT}/screenshots/{s}', f'{d}/{s}'])
             results.append((t['name'], t['desc'], s, r.returncode == 0))
+            if a.update_refs and r.returncode == 0:   # add this picture to the known ones (keep up to 4 variants)
+                known = refs.get(s[:-4], [])
+                known = [known] if isinstance(known, str) else known
+                h = md5(f'{d}/{s}')
+                if h not in known:
+                    refs[s[:-4]] = (known + [h])[-4:]
             print(f'   {s}: {"ok" if r.returncode == 0 else "MISSING"}', flush=True)
 
+    if a.update_refs:
+        json.dump(refs, open(REFS, 'w'), indent=1, sort_keys=True)
+        print(f'{len(refs)} reference screenshots in {REFS}')
     with open(os.path.join(a.out, 'index.html'), 'w') as f:
         f.write('<!doctype html><meta charset="utf-8"><title>SharpMZ hardware tests</title>'
                 '<style>body{font:14px sans-serif;background:#222;color:#ddd}img{width:480px;image-rendering:pixelated}'
