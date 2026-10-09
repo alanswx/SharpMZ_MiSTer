@@ -270,6 +270,16 @@ test('L12', 'MZ700', 'MZ-700 Tape Image order: L loads BASIC 1Z-013B (record 1),
      steps=[('wait', 4), ('type', 'L\n'), ('wait', 30), ('shot', 'basic'), ('type', 'LOAD\n'), ('wait', 15),
             ('type', 'LIST\n'), ('wait', 3), ('shot', 'list')])
 
+# Printer: the core's UART pins are the MiSTer's /dev/ttyS1, so what the machine prints is captured there (9600 8N1,
+# no daemon needed) and compared with the simulation's bytes (verilator/tests/expected/prn_*.txt).
+PRN = os.path.join(ROOT, 'verilator/tests/printer')
+test('P01', 'MZ700', 'Printer (UART): prntest prints two lines; the bytes on /dev/ttyS1 match the sim (prn_mz700)',
+     files=[('f', 2, f'{PRN}/prntest.mzf')], opts=[(47, 1, 1)],
+     steps=[('capture', 'start'), ('wait', 10), ('capture', 'prn_mz700'), ('shot', 'done')])
+test('P02', 'MZ700', 'Printer Charset ASCII: Sharp lowercase and bare CRs arrive as ASCII with CR LF (prn_ascii_mz700)',
+     files=[('f', 2, f'{PRN}/prnsharp.mzf')], opts=[(47, 1, 1), (50, 1, 1)],
+     steps=[('capture', 'start'), ('wait', 10), ('capture', 'prn_ascii_mz700'), ('shot', 'done')])
+
 # 3-D Maze: two different programs. The MZ-80K one (Knights TV) runs under SP-5025; mz-archive's Tests/3-D MAZE.MZF is
 # the MZ-80A one (SA-5510), which looked garbled when run on the MZ-80K.
 for name, model, interp, prog in [
@@ -547,6 +557,9 @@ def main():
     for t in tests:
         print(f'{t["name"]} {t["model"]}: {t["desc"]}', flush=True)
         m.ssh(f'rm -f {FAT}/screenshots/{t["name"]}_*.png')
+        if ('capture', 'start') in t['steps']:   # listen on the UART before the core (and the program) starts
+            m.ssh('killall cat 2>/dev/null; stty -F /dev/ttyS1 9600 raw -echo; '
+                  '(nohup cat /dev/ttyS1 > /tmp/prn_capture.bin 2>/dev/null &); true')
         m.cmd(f'load_core {HW}/mgl/{t["name"]}.mgl')
         time.sleep(4 + 2 * len(t['files']) + (2 if t['reset'] else 0))
         shots = []
@@ -567,6 +580,15 @@ def main():
                     subprocess.run(['python3', os.path.join(ROOT, 'tools/qdinfo.py'), local])
                 else:
                     print(f'   fetched {local}')
+            elif op == 'capture':           # printer UART: 'start' listens on /dev/ttyS1, then compare with the sim
+                if arg == 'start':
+                    pass                  # started before load_core (see above)
+                else:
+                    got = m.ssh('killall cat 2>/dev/null; xxd -p /tmp/prn_capture.bin', True).replace('\n', '')
+                    want = open(os.path.join(ROOT, f'verilator/tests/expected/{arg}.txt')).read().replace('\n', '')
+                    ok = got == want
+                    print(f'   printer bytes {"match" if ok else "DIFFER"} {arg}' + ('' if ok else f'\n     got  {got}\n     want {want}'))
+                    results.append((t['name'], f'printer bytes vs {arg}: {"match" if ok else "DIFFER"}', '', ok))
             elif op == 'shot':
                 m.cmd(f'screenshot {t["name"]}_{arg}.png')
                 time.sleep(1.5)
@@ -592,6 +614,9 @@ def main():
                 '<style>body{font:14px sans-serif;background:#222;color:#ddd}img{width:480px;image-rendering:pixelated}'
                 'div{display:inline-block;margin:8px;vertical-align:top;width:480px}</style>\n')
         for name, desc, s, ok in results:
+            if not s:                                     # a check without a picture (printer bytes)
+                f.write(f'<div><b>{name}</b><br>{desc}</div>\n')
+                continue
             f.write(f'<div><b>{s}</b><br>{desc}<br>' + (f'<img src="shots/{s}">' if ok else 'missing') + '</div>\n')
     print(f'{a.out}/index.html')
 
