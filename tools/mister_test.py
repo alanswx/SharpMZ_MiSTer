@@ -217,6 +217,12 @@ test('W03', 'MZ800', 'MZ-800 floppy write: CP/M 4.1 SAVE 1 TEST.COM', files=[('s
      steps=[('wait', 15), ('type', 'SAVE 1 TEST.COM\n'), ('wait', 6), ('type', 'DIR\n'), ('wait', 4), ('shot', 'dir'),
             ('fetch', 0)])
 
+# MZ-800 joystick through a virtual Xbox 360 pad (tools/mister_keys.py joy): right + B held (MiSTer's SNES layout: the core's first button is the east button, Xbox B; Xbox A gives fire 2, D7), tests/mz800/joytest.mzf
+# reads F0/F1 with the 8255 strobes and prints them; the sim (joy_mz800, --joy0 17) gives E7 FF E7 FF.
+test('J01', 'MZ800', 'MZ-800 joystick: right + fire 1 held on a virtual pad, joytest prints E7 FF E7 FF',
+     files=[('s', 0, f'{TESTS}/joytest.mzf')], opts=[FAST_TAPE(4)], reset=True,
+     steps=[('joy', 'right b'), ('wait', 6), ('type', 'C'), ('wait', 20), ('shot', 'joy'), ('joy', '')])
+
 # 1.44 MB disk as CP/M 4.1's drive C: (OSD Floppy > Drive B Unit: 3rd = unit 2), a blank CP/M (E5) image in drive B:
 # DIR C:, SAVE a file there, DIR C: again; the image is fetched back.
 test('F01', 'MZ800', 'MZ-800 CP/M 4.1: 1.44 MB disk as drive C: (Drive B unit 2): DIR, SAVE, DIR',
@@ -595,6 +601,8 @@ def main():
                     subprocess.run(['python3', os.path.join(ROOT, 'tools/qdinfo.py'), local])
                 else:
                     print(f'   fetched {local}')
+            elif op == 'joy':               # hold these pad buttons (empty: release)
+                m.ssh(f'python3 {Mister.KEYS_TOOL} joy {arg}')
             elif op == 'capture':           # printer UART: 'start' listens on /dev/ttyS1, then compare with the sim
                 if arg == 'start':
                     pass                  # started before load_core (see above)

@@ -8,6 +8,8 @@
   mister_keys.py type TEXT          type TEXT (US layout; \\n = Return; {F12} {ESC} {UP} ... = named keys)
   mister_keys.py key CODE [CODE..]  Linux key codes; a negative code is typed with SHIFT held; w500 waits 500 ms
   mister_keys.py serve [FIFO]       run the daemon in the foreground (what start runs)
+  mister_keys.py joy STATE..        virtual gamepad (an Xbox 360 pad to Main, so it is mapped without setup): hold
+                                    up/down/left/right/a/b/x/y/start/select until the next joy line; "joy" alone releases
   mister_keys.py watch [DIR]        autotype: when Main loads a core or MGL whose name (/tmp/CORENAME, an MGL's
                                     setname) has DIR/<name>.steps, play it (default DIR /media/fat/tools/autotype)
   mister_keys.py watch-start|watch-stop   run the watcher in the background / stop it
@@ -158,6 +160,69 @@ def bg_pid(pidfile):
         return 0
 
 
+# Virtual gamepad: an Xbox 360 controller (045e:028e) for Main's gamecontrollerdb mapping. D-pad as hat axes, A/B/X/Y,
+# start, select. The daemon behind 'joy' keeps the device so Main sees one pad for the session.
+JOY_FIFO = '/tmp/mister_joy'
+JOY_PID = '/tmp/mister_joy.pid'
+EV_ABS, ABS_HAT0X, ABS_HAT0Y = 3, 0x10, 0x11
+UI_SET_ABSBIT = 0x40045567
+JOY_BTN = {'a': 304, 'b': 305, 'x': 307, 'y': 308, 'select': 314, 'start': 315}
+
+
+def open_joy():
+    fd = os.open('/dev/uinput', os.O_WRONLY | os.O_NONBLOCK)
+    fcntl.ioctl(fd, UI_SET_EVBIT, EV_KEY)
+    fcntl.ioctl(fd, UI_SET_EVBIT, EV_ABS)
+    for b in JOY_BTN.values():
+        fcntl.ioctl(fd, UI_SET_KEYBIT, b)
+    for ax in (ABS_HAT0X, ABS_HAT0Y):
+        fcntl.ioctl(fd, UI_SET_ABSBIT, ax)
+    absmax, absmin = [0] * 64, [0] * 64
+    for ax in (ABS_HAT0X, ABS_HAT0Y):
+        absmax[ax], absmin[ax] = 1, -1
+    os.write(fd, struct.pack('80sHHHHi', b'Microsoft X-Box 360 pad', 0x03, 0x045e, 0x028e, 0x0114, 0) +
+             struct.pack('64i', *absmax) + struct.pack('64i', *absmin) + struct.pack('64i', *[0] * 64) +
+             struct.pack('64i', *[0] * 64))
+    fcntl.ioctl(fd, UI_DEV_CREATE)
+    time.sleep(1.0)
+    return fd
+
+
+def joy_serve(path):
+    if not os.path.exists(path):
+        os.mkfifo(path)
+    with open(JOY_PID, 'w') as f:
+        f.write(str(os.getpid()))
+    fd = open_joy()
+    held = set()
+    while True:
+        with open(path) as f:
+            for line in f:
+                want = set(line.split())
+                for b, code in JOY_BTN.items():
+                    if (b in want) != (b in held):
+                        emit(fd, EV_KEY, code, 1 if b in want else 0)
+                hx = (1 if 'right' in want else 0) - (1 if 'left' in want else 0)
+                hy = (1 if 'down' in want else 0) - (1 if 'up' in want else 0)
+                emit(fd, EV_ABS, ABS_HAT0X, hx)
+                emit(fd, EV_ABS, ABS_HAT0Y, hy)
+                emit(fd, EV_SYN, SYN_REPORT, 0)
+                held = want
+
+
+def joy_send(states):
+    if not bg_pid(JOY_PID):
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), 'joy-serve'], stdout=subprocess.DEVNULL,
+                         stderr=open('/tmp/mister_joy.log', 'w'), start_new_session=True)
+        for _ in range(30):
+            if bg_pid(JOY_PID) and os.path.exists(JOY_FIFO):
+                time.sleep(1.5)
+                break
+            time.sleep(0.1)
+    with open(JOY_FIFO, 'w') as f:
+        f.write(' '.join(states) + '\n')
+
+
 def running():
     try:
         pid = int(open(PIDFILE).read())
@@ -225,6 +290,10 @@ if __name__ == '__main__':
         pid = bg_pid(WATCH_PID)
         if pid:
             os.kill(pid, signal.SIGTERM)
+    elif a[0] == 'joy':
+        joy_send(a[1:])
+    elif a[0] == 'joy-serve':
+        joy_serve(JOY_FIFO)
     elif a[0] == 'type':
         send(text_codes(' '.join(a[1:])))
     elif a[0] == 'key':
