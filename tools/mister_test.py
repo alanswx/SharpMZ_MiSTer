@@ -280,6 +280,11 @@ test('P02', 'MZ700', 'Printer Charset ASCII: Sharp lowercase and bare CRs arrive
      files=[('f', 2, f'{PRN}/prnsharp.mzf')], opts=[(47, 1, 1), (50, 1, 1)],
      steps=[('capture', 'start'), ('wait', 10), ('capture', 'prn_ascii_mz700'), ('shot', 'done')])
 
+test('P03', 'MZ700', 'MZ-700 BASIC: LIST/P, then PRINT/P "HELLO" (the sim seemed to drop the PRINT/P)',
+     files=[('f', 2, yb('BASIC', 'MZ-700', 'BASIC 1Z-013B.mzf'))], opts=[(47, 1, 1)],
+     steps=[('capture', 'start'), ('wait', 6), ('type', '10 REM TEST\n'), ('wait', 1), ('type', 'LIST/P\n'), ('wait', 4),
+            ('type', 'PRINT/P "HELLO"\n'), ('wait', 4), ('shot', 'screen'), ('capture', 'show')])
+
 # 3-D Maze: two different programs. The MZ-80K one (Knights TV) runs under SP-5025; mz-archive's Tests/3-D MAZE.MZF is
 # the MZ-80A one (SA-5510), which looked garbled when run on the MZ-80K.
 for name, model, interp, prog in [
@@ -583,6 +588,10 @@ def main():
             elif op == 'capture':           # printer UART: 'start' listens on /dev/ttyS1, then compare with the sim
                 if arg == 'start':
                     pass                  # started before load_core (see above)
+                elif arg == 'show':     # print what arrived (no reference)
+                    got = m.ssh('killall cat 2>/dev/null; cat /tmp/prn_capture.bin', True)
+                    print('   printer bytes: ' + repr(got))
+                    results.append((t['name'], 'printer bytes: ' + repr(got)[:200], '', True))
                 else:
                     got = m.ssh('killall cat 2>/dev/null; xxd -p /tmp/prn_capture.bin', True).replace('\n', '')
                     want = open(os.path.join(ROOT, f'verilator/tests/expected/{arg}.txt')).read().replace('\n', '')
