@@ -129,6 +129,7 @@ signal CMT_BUS_OUTi          :     std_logic_vector(CMT_BUS_OUT_WIDTH);      -- 
 signal BUTTONS_LAST          :     std_logic_vector(1 downto 0);             -- Virtual buttons last sample, used to detect changes.
 constant PLAY_READY_CLKS     :     natural := CLK_SYS_HZ / 2;              -- Quiet time after the last tape buffer write before PLAY_READY.
 signal PLAY_READY_SET_CNT    :     integer range 0 to PLAY_READY_CLKS := 0; -- Timer from the last cache upload to PLAY_READY being set.
+signal PLAY_READY_PLAYL      :     std_logic;                                -- PLAY_READY a CPU clock ago (read FSM).
 signal PLAY_READY_CLR_LAST   :     std_logic;                                -- PLAY_READY_CLR a clock ago (edge detect).
 signal PLAY_READY_CLR_CNT    :     unsigned(21 downto 0);                    -- 2 second timer from motor being stopped to PLAY_READY being cleared.
 signal PLAY_READY            :     std_logic;                                -- Cache loaded, playback ready to commence.
@@ -1077,6 +1078,7 @@ begin
             PLAY_READY_CLR_CNT                      <= (others => '0');
             TAPE_READ_STATE                         <=  0;
             TAPE_READ_SEQ                           <= "000";
+            PLAY_READY_PLAYL                        <= '0';
             XMIT_PADDING_LOAD                       <= '0';
             XMIT_RAM_LOAD                           <= '0';
             XMIT_RAM_TYPE                           <= '0';
@@ -1084,6 +1086,8 @@ begin
         elsif CLKBUS(CKMASTER)'event and CLKBUS(CKMASTER) = '1' then
 
             if CLKBUS(CKENCPU) = '1' then
+
+                PLAY_READY_PLAYL                    <= PLAY_READY;
 
                 -- 2 second after the tape motor goes off clear the PLAY_READY signal, indicating cache tape is no
                 -- longer in use.
@@ -1268,11 +1272,23 @@ begin
                                 if XMIT_RAM_TYPE = '0' then
                                     XMIT_RAM_TYPE       <= '1';
                                     TAPE_READ_STATE     <= 0;
+                                else
+                                    -- The record is finished with the motor still on: release it as a motor stop would
+                                    -- (PLAY_READY drops after the timer and the tape image loads the next record).
+                                    PLAY_READY_CLR_CNT  <= to_unsigned(1, 22);
                                 end if;
         
                             -- Clear the Play Ready strobe and wait at this state until external actions reset the state.
+                            -- If the tape keeps running past the finished record (BASIC's LOAD "NAME" reading on to the
+                            -- next header), the next record follows as on a real tape: when the tape image has put it in
+                            -- the buffer (PLAY_READY up again), play it from its gap.
                             when 15 =>
-                                TAPE_READ_STATE         <= 15;
+                                if PLAY_READY = '1' and PLAY_READY_PLAYL = '0' then
+                                    TAPE_READ_STATE     <= 0;
+                                    XMIT_RAM_TYPE       <= '0';
+                                else
+                                    TAPE_READ_STATE     <= 15;
+                                end if;
                         end case;
                 end if;
             end if;

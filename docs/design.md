@@ -52,7 +52,9 @@ The author's v2 VideoController (`rtl/vc/VideoController.vhd`), changed as follo
 - PLAY_READY goes up half a second after the last write to the CMT buffer and down when the machine has finished a
   record (PLAY_READY_CLR, taken on its rising edge: the tape image refills the buffer right away and those writes
   must restart the timer).
-- A record plays as gap, tape mark, block (header or data), 256 short pulses, the block again (backup copy). The MZ
+- A record plays as gap, tape mark, block (header or data), 256 short pulses, the block again (backup copy).
+  If the machine leaves the motor on past the end of a record (a search for a named program), the record is
+  released as on a motor stop and the next one, once the tape image has loaded it, follows from its gap. The MZ
   stops the deck once it has the first copy; on a stop the padding and block transmitters both give up their
   sequence, so the next PLAY starts clean (the block transmitter used to run on to the end of its copy).
 - `rtl/tape_image.sv` feeds it from an MZT/MZF image on slot S0. It loads the next record when the machine stops the tape, and appends records the machine saves (the image must have spare room, e.g. from `tools/make_blank_tape.py`).

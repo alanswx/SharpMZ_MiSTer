@@ -217,6 +217,12 @@ test('W03', 'MZ800', 'MZ-800 floppy write: CP/M 4.1 SAVE 1 TEST.COM', files=[('s
      steps=[('wait', 15), ('type', 'SAVE 1 TEST.COM\n'), ('wait', 6), ('type', 'DIR\n'), ('wait', 4), ('shot', 'dir'),
             ('fetch', 0)])
 
+# MZ-2000 tape search: one tape image with MZ-1Z002 BASIC, Piranha-kun and Explorer; LOAD "EXPLORER" in BASIC passes
+# over Piranha-kun's record (the deck's APSS seek) and loads Explorer.
+test('K09', 'MZ2000', 'MZ-2000 BASIC LOAD "EXPLORER" finds the third program on the tape image (skips Piranha-kun)',
+     files=[('s', 0, 'gen:mz2000_search')], opts=[FAST_TAPE(6)], reset=True,
+     steps=[('wait', 25), ('shot', 'basic'), ('type', 'LOAD "EXPLORER"\n'), ('wait', 40), ('shot', 'loaded')])
+
 # MZ-800 joystick through a virtual Xbox 360 pad (tools/mister_keys.py joy): right + B held (MiSTer's SNES layout: the core's first button is the east button, Xbox B; Xbox A gives fire 2, D7), tests/mz800/joytest.mzf
 # reads F0/F1 with the 8255 strobes and prints them; the sim (joy_mz800, --joy0 17) gives E7 FF E7 FF.
 test('J01', 'MZ800', 'MZ-800 joystick: right + fire 1 held on a virtual pad, joytest prints E7 FF E7 FF',
@@ -526,6 +532,16 @@ def main():
                 mzt = src[3:]
                 src = os.path.join(stage, f'{t["name"]}_{len(remote)}.qdf')
                 sh(f'python3 "{ROOT}/tools/mzf2qdf.py" "{src}" "{mzt}" > /dev/null')
+            if src == 'gen:mz2000_search':  # MZ-1Z002 BASIC (an MZF around the ROM dump), Piranha-kun, Explorer
+                src = os.path.join(stage, 'mz2000_search.mzt')
+                b = open(f'{SW}/rom-candidates/emuz2000_tf/emuz2000/MZ-1Z002.dat', 'rb').read()
+                h = bytearray(128); h[0] = 1; n = b'MZ-1Z002\r'; h[1:1 + len(n)] = n
+                for k in range(1 + len(n), 18):
+                    h[k] = 0x0D
+                h[18:20] = len(b).to_bytes(2, 'little')
+                open(src, 'wb').write(bytes(h) + b +
+                                      open(f'{SW}/mz2200/Piranha-Kun no Isshukan (1983)(Enix)(Atsushi Shirai) [CT].mzt', 'rb').read() +
+                                      open(f'{SW}/mz2200/Explorer (1989)(Micom Basic)(Taka Yamashita) [CT].mzt', 'rb').read())
             if src == 'gen:blank144':     # blank CP/M 1.44 MB disk (tools/make_blank_dsk.py)
                 src = os.path.join(stage, 'blank144.dsk')
                 sh(f'python3 "{ROOT}/tools/make_blank_dsk.py" "{src}" 1440 > /dev/null')
