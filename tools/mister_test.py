@@ -217,6 +217,13 @@ test('W03', 'MZ800', 'MZ-800 floppy write: CP/M 4.1 SAVE 1 TEST.COM', files=[('s
      steps=[('wait', 15), ('type', 'SAVE 1 TEST.COM\n'), ('wait', 6), ('type', 'DIR\n'), ('wait', 4), ('shot', 'dir'),
             ('fetch', 0)])
 
+# 1.44 MB disk as CP/M 4.1's drive C: (OSD Floppy > Drive B Unit: 3rd = unit 2), a blank CP/M (E5) image in drive B:
+# DIR C:, SAVE a file there, DIR C: again; the image is fetched back.
+test('F01', 'MZ800', 'MZ-800 CP/M 4.1: 1.44 MB disk as drive C: (Drive B unit 2): DIR, SAVE, DIR',
+     files=[('s', 1, f'{DSK}/CPMv41 System.dsk'), ('s', 2, 'gen:blank144')], opts=[(48, 1, 1)], reset=True,
+     steps=[('wait', 15), ('type', 'DIR C:\n'), ('wait', 6), ('shot', 'dir_empty'), ('type', 'SAVE 1 C:TEST.COM\n'),
+            ('wait', 6), ('type', 'DIR C:\n'), ('wait', 6), ('shot', 'dir_saved'), ('fetch', 1)])
+
 # MZ-800 border (OSD Display > MZ-800 Border): Cybernoid and CP/M 4.1 with the border shown.
 test('T29', 'MZ800', 'MZ-800 border on: Cybernoid', files=[('s', 0, f'{GAMES800}/Cyberno.mzf')], opts=[FAST_TAPE(6), (43, 1, 1)],
      reset=True, steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 45), ('shot', 'a')])
@@ -513,6 +520,9 @@ def main():
                 mzt = src[3:]
                 src = os.path.join(stage, f'{t["name"]}_{len(remote)}.qdf')
                 sh(f'python3 "{ROOT}/tools/mzf2qdf.py" "{src}" "{mzt}" > /dev/null')
+            if src == 'gen:blank144':     # blank CP/M 1.44 MB disk (tools/make_blank_dsk.py)
+                src = os.path.join(stage, 'blank144.dsk')
+                sh(f'python3 "{ROOT}/tools/make_blank_dsk.py" "{src}" 1440 > /dev/null')
             if src == 'gen:basic_mzt':    # BASIC 1Z-013B, then a BASIC program, back to back
                 src = os.path.join(stage, 'basic_rps.mzt')
                 open(src, 'wb').write(open(yb('BASIC', 'MZ-700', 'BASIC 1Z-013B.mzf'), 'rb').read() +

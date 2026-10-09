@@ -126,7 +126,7 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
 * MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border). Joysticks work in Knight Lore and Exolon in simulation; the RAM disk is new. Load Direct starts the program as mz800emu's direct load does, so programs that start in or read their MZF header at 10F0 (Exploding Fist, Jumpin' Jack, Solomon's Key) work (`docs/triage.md`).
-* Floppy: the MZ-80K/80A floppy interface isn't implemented. 1.44 MB images read and write at the controller level (simulation, `fdd_hd`); CP/M 4.1's HD drive C: still to be confirmed. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
+* Floppy: the MZ-80K/80A floppy interface isn't implemented. 1.44 MB images work as CP/M 4.1's HD drive C: (Drive B Unit: 3rd), read and write, on hardware. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). They don't run from tape; `tools/mzf2qdf.py OUT.qdf SIDE.mzt` makes a Quick Disk of each side (answer `Y` to "SET PROGRAM QD ?" after swapping in side B). `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.
