@@ -44,6 +44,7 @@ module top(
    input         ramdisk_en,     // MZ-800 64 KB RAM disk
    input         prn_en,         // printer (OSD Printer: UART)
    input  [31:0] prn_baud,       // uart_speed from Main
+   input         prn_ascii,      // OSD Printer Charset: ASCII
    output        prn_txd /*verilator public_flat*/,
 
    // Machine configuration, as sharpmz.sv derives it from the OSD status bits.
@@ -350,7 +351,7 @@ module top(
    wire       prn_rda, prn_stb;
    wire [7:0] prn_data;
    mz_printer #(.CLK_HZ(70937600 / `SIM_CLK_DIV)) prn(
-      .clk(clk_sys), .reset(reset), .enable(prn_en), .rdp(prn_stb), .data(prn_data), .rda(prn_rda),
+      .clk(clk_sys), .reset(reset), .enable(prn_en), .ascii(prn_ascii), .rdp(prn_stb), .data(prn_data), .rda(prn_rda),
       .uart_speed(prn_baud), .txd(prn_txd), .count());
    assign dbg_snd_en = core.mz80hw.sound_enable;        // 8253 GATE0 (E008 bit 0)
    assign dbg_snd    = core.mz80hw.sound_pulse_x2;      // 8253 OUT0

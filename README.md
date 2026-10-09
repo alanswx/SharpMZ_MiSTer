@@ -118,8 +118,9 @@ offsets are listed in the script).
 | Option | Description |
 | ------ | ----------- |
 | Printer | None, or UART: what the machine prints goes out of the MiSTer UART (8N1, at the speed set in Main's UART menu, 9600 by default) for the printer daemon [mister_printerd](https://github.com/alanswx/printeremulation), which makes a PDF (Epson model). Set the UART connection to Printer in Main's UART menu. |
+| Printer Charset | Sharp (default): bytes go out as the machine sends them, for the daemon's Sharp model (MZ-1P16 plotter-printer). ASCII: Sharp lowercase and symbols are converted to ASCII, graphics characters to spaces, and a bare CR (what BASIC's `PRINT/P` sends) gets an LF after it, for the Epson model and other ASCII printers. |
 
-The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B data, PA7 strobe, PA0 ready), with the handshake of the MZ-800 Technical Reference Manual and MZ-700 BASIC (`rtl/mz_printer.sv`). BASIC's `LIST/P` and `PRINT/P` print. The MZ-731's 4-colour plotter is driven through the same port, so its commands (`MODE GR`, `LINE`, `PCOLOR`) are sent too, but the daemon doesn't draw them yet. With the option off the port behaves as before (no printer: the MZ-700 BASIC times out, the MZ-800 PIO reads ready).
+The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B data, PA7 strobe, PA0 ready), with the handshake of the MZ-800 Technical Reference Manual and MZ-700 BASIC (`rtl/mz_printer.sv`). BASIC's `LIST/P` and `PRINT/P` print. The MZ-731's 4-colour plotter is driven through the same port, so its commands (`MODE GR`, `LINE`, `PCOLOR`) are sent too; the daemon's `sharpmz` model draws them (it is picked automatically for this core). With the option off the port behaves as before (no printer: the MZ-700 BASIC times out, the MZ-800 PIO reads ready).
 
 ## Known Issues
 

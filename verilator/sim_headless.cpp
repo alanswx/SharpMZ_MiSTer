@@ -65,6 +65,7 @@ struct Options {
     std::vector<MemDump> memdumps;
     std::string printer;                     // --printer FILE: bytes the printer port sends out of the UART
     uint32_t    printer_baud = 9600;
+    bool        printer_ascii = false;       // --printer-ascii: OSD Printer Charset: ASCII
     std::map<uint32_t, std::string> qd_swaps;   // frame -> Quick Disk image to mount then (side B etc.)
     std::string trace_file;
     std::string wav_file;
@@ -122,6 +123,7 @@ static void usage()
 "  --qd-swap FRAME:FILE   mount another Quick Disk image at FRAME (side B); repeatable\n"
 "  --printer FILE         printer connected (OSD Printer: UART); the UART line is decoded into FILE\n"
 "  --printer-baud N       UART speed (default 9600)\n"
+"  --printer-ascii        OSD Printer Charset: ASCII (Sharp codes converted, CR followed by LF)\n"
 "  --fdd FILE             Extended DSK image in floppy drive A (MZ-700/800); --fdd-readonly\n"
 "  --fdd-b FILE           image in floppy drive B; --fdd-b-hd makes it unit 2 (CP/M 4.1 HD drive C:)\n"
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
@@ -229,6 +231,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--qd-readonly") o.qd_readonly = true;
         else if (a == "--printer") o.printer = next();
         else if (a == "--printer-baud") o.printer_baud = parse_num(next());
+        else if (a == "--printer-ascii") o.printer_ascii = true;
         else if (a == "--qd-swap") {
             std::string v = next();
             size_t c = v.find(':');
@@ -720,6 +723,7 @@ void Sim::write_config()
     top->direct_start_en = opt.direct_start;
     top->prn_en       = opt.printer.empty() ? 0 : 1;
     top->prn_baud     = opt.printer_baud;
+    top->prn_ascii    = opt.printer_ascii;
     top->joy0         = opt.joy0;
     top->cfg_cmt      = (uint8_t)((3 << 3) | fast_tape_code(opt.fast_tape)); // buttons auto, fast tape
 }

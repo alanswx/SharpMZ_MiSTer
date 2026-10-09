@@ -24,6 +24,8 @@
 #   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
 #   fdd_hd        MZ-800: 1.44 MB image on unit 2 (--fdd-b-hd); a sector 1.45 MB into the image written and read
 #                 back by tests/fdd/fdhd.mzf (status bytes, count, data). Skipped without ../software/dsk/_Vzor144.dsk.
+#   prn_ascii_mz700  tests/printer/prnsharp.mzf prints lowercase in Sharp codes with bare CRs; with --printer-ascii
+#                 (OSD Printer Charset: ASCII) the UART carries plain ASCII and CR LF
 #   prn_mz700/800 tests/printer/prntest.mzf prints through the printer port; the bytes decoded from the UART match
 #   joy_mz800     MZ-800: tests/mz800/joytest.mzf strobes the 8255 with 07, EF (PA4 low: joystick 1) and FF and reads F0/F1
 #                 with right + fire 1 held (--joy0 17): E7 FF E7 FF
@@ -96,6 +98,10 @@ pids+=($!); names+=("ipl_mz1500")
       --stop-at-frame 220 --printer "$OUT/prn_mz700.bin" --quiet > /dev/null 2> "$OUT/prn_mz700.log"; \
   xxd -p "$OUT/prn_mz700.bin" > "$OUT/prn_mz700.txt" ) &
 pids+=($!); names+=("prn_mz700")
+( $BIN --model mz700 --mzf tests/printer/prnsharp.mzf --mzf-direct --mzf-direct-frame 20 --type '100:J2000\n' \
+      --stop-at-frame 220 --printer "$OUT/prn_ascii_mz700.bin" --printer-ascii --quiet > /dev/null 2> "$OUT/prn_ascii_mz700.log"; \
+  xxd -p "$OUT/prn_ascii_mz700.bin" > "$OUT/prn_ascii_mz700.txt" ) &
+pids+=($!); names+=("prn_ascii_mz700")
 ( $BIN --model mz800 --mzf tests/printer/prntest.mzf --mzf-direct --mzf-direct-frame 20 --type '200:M' \
       --type '280:J2000\n' --stop-at-frame 400 --printer "$OUT/prn_mz800.bin" --quiet > /dev/null 2> "$OUT/prn_mz800.log"; \
   xxd -p "$OUT/prn_mz800.bin" > "$OUT/prn_mz800.txt" ) &

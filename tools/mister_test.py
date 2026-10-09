@@ -270,6 +270,16 @@ test('L12', 'MZ700', 'MZ-700 Tape Image order: L loads BASIC 1Z-013B (record 1),
      steps=[('wait', 4), ('type', 'L\n'), ('wait', 30), ('shot', 'basic'), ('type', 'LOAD\n'), ('wait', 15),
             ('type', 'LIST\n'), ('wait', 3), ('shot', 'list')])
 
+# 3-D Maze: two different programs. The MZ-80K one (Knights TV) runs under SP-5025; mz-archive's Tests/3-D MAZE.MZF is
+# the MZ-80A one (SA-5510), which looked garbled when run on the MZ-80K.
+for name, model, interp, prog in [
+        ('M01', 'MZ80K', yb('BASIC', 'MZ-80K', 'BASIC SP-5025ext.mzf'), yb('19xx', 'MZ-80K', '3D-Maze (19xx)(Knights TV & Computers).mzf')),
+        ('M02', 'MZ80A', yb('BASIC', 'MZ-80A', 'BASIC SA-5510.mzf'), yb('19xx', 'MZ-80A', '3-D Maze (19xx).mzf'))]:
+    test(name, model, f'{model} 3-D Maze under its own BASIC (Load Direct BASIC, tape image program, LOAD, RUN)',
+         files=[('f', 2, interp), ('s', 0, prog)], opts=[FAST_TAPE(6)],
+         steps=[('wait', 6), ('type', 'LOAD\n'), ('wait', 25), ('shot', 'load'), ('type', 'RUN\n'), ('wait', 15), ('shot', 'run'),
+                ('wait', 15), ('shot', 'later')])
+
 # Scandoubler (OSD Display > Scandoubler Fx; also MiSTer.ini forced_scandoubler): the doubled 31 kHz picture.
 SDFX = lambda v: (44, 3, v)                # 0 None, 1 HQ2x, 2-4 CRT 25/50/75%
 test('V01', 'MZ700', 'Scandoubler CRT 50%: MZ-700 monitor', opts=[SDFX(3)], steps=[('wait', 6), ('shot', 'boot')])
@@ -367,6 +377,36 @@ class Mister:
         time.sleep(0.2 * len(text))
 
 
+# --basic N: BASIC program triage. The interpreter is loaded with Load Direct (it starts at once), the program is
+# the tape image; LOAD, RUN, screenshots. A seeded random sample of N programs per model (type 05 for the MZ-700,
+# type 02 in the MZ-80K and MZ-80A folders) from the year-based collection.
+BASIC_FOR = {'MZ700': ('X7', 'MZ-700', 0x05, yb('BASIC', 'MZ-700', 'BASIC 1Z-013B.mzf')),
+             'MZ80K': ('XK', 'MZ-80K', 0x02, yb('BASIC', 'MZ-80K', 'BASIC SP-5025ext.mzf')),
+             'MZ80A': ('XA', 'MZ-80A', 0x02, yb('BASIC', 'MZ-80A', 'BASIC SA-5510.mzf'))}
+
+
+def basic_tests(n, seed=1):
+    import random
+    rng = random.Random(seed)
+    out = []
+    for model, (prefix, folder, typ, interp) in BASIC_FOR.items():
+        progs = []
+        for root, _, fs in os.walk(YB):
+            if os.path.basename(root) != folder or '/BASIC/' in root + '/':
+                continue
+            for f in fs:
+                p = os.path.join(root, f)
+                if f.lower().endswith('.mzf') and open(p, 'rb').read(1) == bytes([typ]):
+                    progs.append(p)
+        progs.sort()
+        for i, p in enumerate(rng.sample(progs, min(n, len(progs)))):
+            out.append(dict(name=f'{prefix}{i + 1:02d}', model=model, desc=f'{folder} BASIC: {os.path.basename(p)[:-4]}',
+                            files=[('f', 2, interp), ('s', 0, p)], opts=[FAST_TAPE(6)], reset=False, late=[],
+                            steps=[('wait', 6), ('type', 'LOAD\n'), ('wait', 25), ('shot', 'load'), ('type', 'RUN\n'),
+                                   ('wait', 10), ('shot', 'run'), ('wait', 20), ('shot', 'later')]))
+    return out
+
+
 # --quick: one or two tests per model and feature (about 15 minutes).
 QUICK = {'T01', 'T02', 'T03', 'T04', 'T05', 'T06', 'T07', 'T08', 'T09', 'T13', 'T21', 'T22', 'T25', 'T26',
          'W01', 'L01', 'L04', 'L05', 'L07', 'L08', 'L09', 'L10', 'L12', 'V01'}
@@ -420,6 +460,7 @@ def main():
     ap.add_argument('--rbf', default=os.path.join(ROOT, 'output_files/sharpmz.rbf'))
     ap.add_argument('--only')
     ap.add_argument('--quick', action='store_true', help='a short set: one or two tests per model and feature')
+    ap.add_argument('--basic', type=int, metavar='N', help='BASIC triage instead: N random BASIC programs per model')
     ap.add_argument('--update-refs', action='store_true',
                     help='after the run, keep each screenshot\'s md5 in tools/mister_refs.json (only from a good run)')
     ap.add_argument('--no-refs', action='store_true', help='fixed waits, ignoring tools/mister_refs.json')
@@ -428,7 +469,8 @@ def main():
     ap.add_argument('--menu', action='store_true',
                     help=f'only deploy: put each test as an MGL in "{MENU}" (MiSTer main menu) to run by hand')
     a = ap.parse_args()
-    tests = [t for t in T if not a.only or t['name'] in a.only.split(',')]
+    pool = basic_tests(a.basic) if a.basic else T
+    tests = [t for t in pool if not a.only or t['name'] in a.only.split(',')]
     if a.quick:
         tests = [t for t in tests if t['name'] in QUICK]
     m = Mister(a.host)
