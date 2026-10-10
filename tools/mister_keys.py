@@ -6,7 +6,8 @@
   mister_keys.py stop               stop it
   mister_keys.py status             running or not
   mister_keys.py type TEXT          type TEXT (US layout; \\n = Return; {F12} {ESC} {UP} ... = named keys)
-  mister_keys.py key CODE [CODE..]  Linux key codes; a negative code is typed with SHIFT held; w500 waits 500 ms
+  mister_keys.py key CODE [CODE..]  Linux key codes; a negative code is typed with SHIFT held; w500 waits 500 ms;
+                                    A+B+C holds the keys together (29+56+100 = LCtrl+LAlt+RAlt, Main's reset)
   mister_keys.py serve [FIFO]       run the daemon in the foreground (what start runs)
   mister_keys.py joy STATE..        virtual gamepad (an Xbox 360 pad to Main, so it is mapped without setup): hold
                                     up/down/left/right/a/b/x/y/start/select until the next joy line; "joy" alone releases
@@ -32,7 +33,7 @@ WATCH_PID = '/tmp/mister_keys_watch.pid'
 STEPS_DIR = '/media/fat/tools/autotype'
 UI_SET_EVBIT, UI_SET_KEYBIT, UI_DEV_CREATE = 0x40045564, 0x40045565, 0x5501
 EV_SYN, EV_KEY, SYN_REPORT, KEY_LEFTSHIFT = 0, 1, 0, 42
-PRESS, GAP = 0.06, 0.08          # seconds a key is held, and between keys
+PRESS, GAP = 0.12, 0.08          # seconds a key is held (the MZ-1500 IPL debounce misses 60 ms presses), and between keys
 
 # US layout: character -> key code (negative: with SHIFT).
 CHARS = {'\n': 28, '\t': 15, ' ': 57, '-': 12, '=': 13, '[': 26, ']': 27, '\\': 43, ';': 39, "'": 40, '`': 41,
@@ -98,6 +99,15 @@ def serve(path):
                 for item in line.split():
                     if item.startswith('w'):
                         time.sleep(int(item[1:]) / 1000)
+                    elif '+' in item:                     # chord: press all, hold, release (29+56+100 = MiSTer reset)
+                        codes = [int(c) for c in item.split('+')]
+                        for c in codes:
+                            press(fd, c, True)
+                            time.sleep(0.03)
+                        time.sleep(0.3)
+                        for c in reversed(codes):
+                            press(fd, c, False)
+                        time.sleep(GAP)
                     else:
                         tap(fd, int(item))
 

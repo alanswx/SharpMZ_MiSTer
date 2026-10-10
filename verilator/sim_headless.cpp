@@ -53,6 +53,7 @@ struct Options {
     std::string mzf;
     bool     mzf_direct = false;
     uint32_t mzf_direct_frame = 0;
+    uint32_t mzf_frame = 0;                  // --mzf-frame N: Load Tape to CMT at frame N (as an MGL does, after boot)
     std::vector<TypeCmd> types;
     uint32_t type_press = 3, type_release = 3;
     std::set<uint32_t> screenshots;
@@ -109,6 +110,7 @@ static void usage()
 "  --mzf FILE             put an MZF in the tape buffer (Load Tape to CMT)\n"
 "  --mzf-direct           load it straight to RAM instead (Load Direct to RAM)\n"
 "  --mzf-direct-frame N   frame to do the direct load at (default 0)\n"
+"  --mzf-frame N          frame for Load Tape to CMT (default 0, before the boot)\n"
 "  --direct-start         after a direct load, boot, restore 10F0-11FF and jump to the exec address\n"
 "                         (OSD Load Direct: Start Program; off here so the tests that type J still work)\n"
 "Tape image (the OSD Tape Image slot):\n"
@@ -191,6 +193,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--mzf") o.mzf = next();
         else if (a == "--mzf-direct") o.mzf_direct = true;
         else if (a == "--mzf-direct-frame") o.mzf_direct_frame = parse_num(next());
+        else if (a == "--mzf-frame") o.mzf_frame = parse_num(next());
         else if (a == "--run-mzf") { o.mzf = next(); o.mzf_direct = true; }
         else if (a == "--type") {
             std::string v = next();
@@ -678,6 +681,7 @@ void Sim::on_frame_end()
     for (auto it = range.first; it != range.second; ++it) ps2_queue.push_back(it->second);
 
     if (!opt.mzf.empty() && opt.mzf_direct && frame == opt.mzf_direct_frame && frame != 0) load_mzf(true);
+    if (!opt.mzf.empty() && !opt.mzf_direct && frame == opt.mzf_frame && frame != 0) load_mzf(false);
 
     auto sw = opt.qd_swaps.find(frame);
     if (sw != opt.qd_swaps.end()) {
@@ -692,7 +696,7 @@ void Sim::on_frame_end()
     for (auto it = rl.first; it != rl.second; ++it) load_rom(it->second.first, it->second.second);
     if (opt.fast_tape_at.count(frame))
         top->cfg_cmt = (uint8_t)((top->cfg_cmt & ~7) | fast_tape_code(opt.fast_tape_at.at(frame)));
-    if (opt.warm_resets.count(frame)) { top->warm_reset = 1; for (int i = 0; i < 64; i++) clock(); top->warm_reset = 0; }
+    if (opt.warm_resets.count(frame)) { top->warm_reset = 1; clock(); top->warm_reset = 0; }   // one clock, about what Main gives a T[0] (status bit set, then cleared)
 }
 
 void Sim::ioctl_write(uint32_t addr, uint8_t data)
@@ -912,7 +916,7 @@ int Sim::run()
     auto range = ps2_schedule.equal_range(0);
     for (auto it = range.first; it != range.second; ++it) ps2_queue.push_back(it->second);
 
-    if (!opt.mzf.empty() && (!opt.mzf_direct || opt.mzf_direct_frame == 0))
+    if (!opt.mzf.empty() && (opt.mzf_direct ? opt.mzf_direct_frame == 0 : opt.mzf_frame == 0))
         if (!load_mzf(opt.mzf_direct)) return exit_code;
     if (!opt.tape_image.empty()) { mount_tape(); if (exit_code) return exit_code; }
     if (!opt.fdd.empty()) { mount_fdd(); if (exit_code) return exit_code; }

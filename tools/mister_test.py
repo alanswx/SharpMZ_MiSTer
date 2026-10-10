@@ -304,6 +304,20 @@ test('P03', 'MZ700', 'MZ-700 BASIC: LIST/P, then PRINT/P "HELLO" (the sim seemed
      steps=[('capture', 'start'), ('wait', 6), ('type', '10 REM TEST\n'), ('wait', 1), ('type', 'LIST/P\n'), ('wait', 4),
             ('type', 'PRINT/P "HELLO"\n'), ('wait', 4), ('shot', 'screen'), ('capture', 'show')])
 
+# MZ-1500 tester reports. Zulpoko Daisakusen is a BASIC program, not a standalone game: its header says type 02, which
+# MZ-5Z001 (either copy, software/mz1500 or the collection's BASIC/MZ-1500) rejects as an illegal filemode, probably a Quick
+# Disk file type kept in a tape conversion. As type 05 it loads, and stops at "Illegal data error in 150", the same in
+# mz1500emu, so the file needs another BASIC or is damaged; the core matches the emulator. Maze Land (Enix) loads three ways.
+test('Z01', 'MZ1500', 'MZ-1500: MZ-5Z001 then Zulpoko as type 05 AUTO RUN: "Illegal data error in 150", as mz1500emu',
+     files=[('s', 0, 'gen:zulpoko')], opts=[FAST_TAPE(6)], reset=True,
+     steps=[('wait', 6), ('type', 'C'), ('wait', 60), ('shot', 'run')])
+test('Z02', 'MZ1500', 'MZ-1500: Maze Land by Load Tape to CMT, C at the IPL',
+     files=[('f', 1, yb(1983, 'MZ-1500', 'Maze Land (1983)(Enix).mzf'))], opts=[FAST_TAPE(6)],
+     steps=[('wait', 12), ('shot', 'menu'), ('type', 'C'), ('wait', 5), ('shot', 'loading'), ('wait', 30), ('shot', 'run')])
+test('Z03', 'MZ1500', 'MZ-1500: Maze Land by Load Direct to RAM (starts by itself)',
+     files=[('f', 2, yb(1983, 'MZ-1500', 'Maze Land (1983)(Enix).mzf'))],
+     steps=[('wait', 12), ('shot', 'run')])
+
 # 3-D Maze: two different programs. The MZ-80K one (Knights TV) runs under SP-5025; mz-archive's Tests/3-D MAZE.MZF is
 # the MZ-80A one (SA-5510), which looked garbled when run on the MZ-80K.
 for name, model, interp, prog in [
@@ -532,6 +546,13 @@ def main():
                 mzt = src[3:]
                 src = os.path.join(stage, f'{t["name"]}_{len(remote)}.qdf')
                 sh(f'python3 "{ROOT}/tools/mzf2qdf.py" "{src}" "{mzt}" > /dev/null')
+            if src == 'gen:zulpoko':      # MZ-5Z001 then Zulpoko (see Z01) as type 05 named AUTO RUN, so BASIC's boot loads it
+                src = os.path.join(stage, 'zulpoko.mzt')
+                b = open(f'{SW}/mz1500/5Z001.mzt', 'rb').read()
+                b = b[:128 + (b[18] | b[19] << 8)]                 # the BASIC record only
+                z = bytearray(open(yb(1987, 'MZ-1500', 'Zulpoko Daisakusen (1987)(TAS).mzt'), 'rb').read())
+                z[0] = 5; z[1:18] = b'AUTO RUN\r' + bytes(8)
+                open(src, 'wb').write(b + z)
             if src == 'gen:mz2000_search':  # MZ-1Z002 BASIC (an MZF around the ROM dump), Piranha-kun, Explorer
                 src = os.path.join(stage, 'mz2000_search.mzt')
                 b = open(f'{SW}/rom-candidates/emuz2000_tf/emuz2000/MZ-1Z002.dat', 'rb').read()

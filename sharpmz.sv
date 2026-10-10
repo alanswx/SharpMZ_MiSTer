@@ -134,10 +134,12 @@ localparam CONF_STR =
 	"P4F5,ROMBIN,Load Keymap,0x200000;",
 	"P4F6,ROMBIN,Load CGROM,0x500000;",
 	"-;",
-	"J1,Fire 1,Fire 2;",
-	"jn,A,B;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
+	// The joystick entries go after every menu entry: placed before Reset they broke the OSD's Reset and
+	// Reset and close OSD (testers: "you press reset and nothing happens").
+	"J1,Fire 1,Fire 2;",
+	"jn,A,B;",
 	"v,5;",
 	"V,v",`BUILD_DATE
 };
@@ -518,7 +520,14 @@ tape_ddr tape_ddr
 /////////////////  RESET  /////////////////////////
 
 wire reset = RESET | ~pll_locked;
-wire warm_reset = status[0] | buttons[1] | direct_load_active | (direct_load_reset_ctr != 0);
+// OSD Reset (status[0]) is a pulse of a few microseconds (Main sets the bit and clears it at once); stretch any reset
+// request to about 1 ms of clk_sys, so the core's asynchronously loaded reset one-shot (mctrl.vhd) gets a clean edge.
+reg  [16:0] reset_stretch = 0;
+always @(posedge clk_sys) begin
+	if (status[0] | buttons[1]) reset_stretch <= 17'h1FFFF;
+	else if (reset_stretch != 0) reset_stretch <= reset_stretch - 1'd1;
+end
+wire warm_reset = status[0] | buttons[1] | (reset_stretch != 0) | direct_load_active | (direct_load_reset_ctr != 0);
 
 ////////////////  Machine  ////////////////////////
 

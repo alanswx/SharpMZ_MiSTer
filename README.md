@@ -130,6 +130,8 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). They don't run from tape; `tools/mzf2qdf.py OUT.qdf SIDE.mzt` makes a Quick Disk of each side (answer `Y` to "SET PROGRAM QD ?" after swapping in side B). `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.
+* Reset: OSD Reset (or Reset and close OSD), the MiSTer's USER button and LCtrl+LAlt+RAlt reset the machine; the physical reset button reloads it from cold. Before 2026-10-09 the OSD Reset entries did nothing.
+* MZ-1500 BASIC programs need MZ-5Z001 BASIC loaded first. Some tape images in the year-based collection say file type 02, which MZ-5Z001 rejects ("Illegal filemode"); Zulpoko Daisakusen is one, and it fails the same way in mz1500emu.
 * Tape recordings (the No-Intro "Waveform" sets, `.wav`/`.flac`) convert to MZF with `tools/wav2mzf.py RECORDING [OUTDIR]` (standard Sharp format only, not turbo loaders).
 
 ## Design Summary

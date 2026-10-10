@@ -356,6 +356,17 @@ module top(
    assign dbg_snd_en = core.mz80hw.sound_enable;        // 8253 GATE0 (E008 bit 0)
    assign dbg_snd    = core.mz80hw.sound_pulse_x2;      // 8253 OUT0
    assign dbg_memwr  = ~core.t80_mreq_n & ~core.t80_wr_n;
+`ifdef KEYDBG
+   // Keyboard debug: every change of what the CPU reads from E001 (8255 PB, the key data) with the row (E000 write).
+   reg [7:0] kd_last = 8'hAA, kd_row = 0;
+   always @(posedge clk_sys) begin
+      if (~core.t80_mreq_n & ~core.t80_wr_n & core.t80_a16 == 16'hE000) kd_row <= core.t80_do;
+      if (~core.t80_mreq_n & ~core.t80_rd_n & core.t80_a16 == 16'hE001 && core.t80_di != kd_last) begin
+         $display("keydbg: row %02x reads %02x", kd_row, core.t80_di);
+         kd_last <= core.t80_di;
+      end
+   end
+`endif
    assign dbg_addr   = core.t80_a16;
    assign dbg_wdata  = core.t80_do;
    assign dbg_cse    = {core.mz80hw.cs_e_ni, core.mz80hw.cs_e2_n};
