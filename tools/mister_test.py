@@ -34,7 +34,8 @@ MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5
 
 def status_bytes(model, opts=()):
     """16-byte CFG: status bit n is byte n/8, bit n%8. opts: (low_bit, width, value)."""
-    st = MODEL[model] << 35 | 1 << 51 | 1 << 21  # Keyboard Layout: Sharp (KEYS below types by position); Fast Tape: Off
+    st = MODEL[model] << 35 | 1 << 51 | 1 << 21 | 1 << 55   # Keyboard Layout: Sharp (KEYS below types by position);
+                                                 # Fast Tape: Off; Tape Messages: Off (the overlay would change screenshots)
                                                  # (the core's default is now Fastest; the tests' waits were made at real speed)
     for lo, width, val in opts:
         st = st & ~(((1 << width) - 1) << lo) | (val & ((1 << width) - 1)) << lo
@@ -236,6 +237,17 @@ for n, game in (('L14', 'Exolon'), ('L15', 'Knight Lore')):     # a loading scre
     test(n, 'MZ800', f'Tape Image Start Direct: {game} (screen loader starts, loads the game from the tape)',
          files=[('s', 0, f'{PACK800}/{game}.mzt')], opts=[FAST_TAPE(6), (52, 1, 1)], reset=True,
          steps=[('wait', 6), ('shot', 'loader'), ('wait', 30), ('shot', 'game')])
+
+# OSD Tape Messages: the overlay names the record the tape image is at (TAPE 1/2 S-BASIC on mounting, TAPE 2/2 R.P.S.
+# once BASIC is in and the tape has stopped).
+test('L16', 'MZ700', 'Tape Messages overlay: after L loads BASIC, TAPE 2/2 R.P.S. at the bottom for 3 s',
+     files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6), (55, 1, 0)], reset=True,
+     steps=[('type', 'L\n')] + [s for k in range(24) for s in (('wait', 0.3), ('shot', f'{k:02d}'))])
+
+# MZ-80A floppy: the interface ROM (F000, banks 1Ah-1Bh) boots SA-6510 Disk BASIC: F at the monitor, Return for drive 1.
+test('F02', 'MZ80A', 'MZ-80A floppy: F, Return boots SA-6510 Disk BASIC from drive A',
+     files=[('s', 1, f'{SW}/idealine/mz-80a/SA-6510bootdisk/SA-6510.DSK')], reset=True,
+     steps=[('wait', 4), ('type', 'F\n'), ('wait', 2), ('type', '\n'), ('wait', 12), ('shot', 'basic')])
 
 # OSD Keyboard Layout: PC. Every punctuation key, typed as on a US PC keyboard, shows its own character
 # (characters the model doesn't have type nothing; tools/keymap_measure.py --verify checks the same in the sim).

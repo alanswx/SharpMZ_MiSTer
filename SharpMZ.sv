@@ -104,6 +104,7 @@ localparam CONF_STR =
 	"P2O[54:53],Tape Sound,Off,Mix,Only;",
 	"P2O[49],Load Direct Start,Program,Reset Only;",
 	"P2O[52],Tape Image Start,Tape,Direct;",
+	"P2O[55],Tape Messages,On,Off;",
 	"-;",
 	"P3,Display;",
 	"P3O[8:7],Display Type,Default,Mono 80x25,Colour 40x25,Colour 80x25;",
@@ -128,9 +129,10 @@ localparam CONF_STR =
 	"P4,ROM and RAM;",
 	"P4O[28],User ROM,Off,On;",
 	"P4O[29],FDC ROM,Off,On;",
-	"P4F3,ROMBIN,Load System ROM,0x000000;",
-	"P4F4,ROMBIN,Load System RAM,0x100000;",
-	"P4F6,ROMBIN,Load CGROM,0x500000;",
+	// System ROM and CGROM are remembered: Main loads the last one chosen at every core start (also boot.rom).
+	"P4FC3,ROMBIN,Load System ROM;",
+	"P4F4,ROMBIN,Load System RAM;",
+	"P4FC6,ROMBIN,Load CGROM;",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
@@ -191,6 +193,10 @@ wire        sd_buff_wr;
 
 wire        tape_active;
 wire        tape_ram_load;                          // tape_image: Tape Image Start: Direct, first record going to RAM
+wire        tape_msg;                               // tape_image -> tape_osd: what the tape did
+wire  [1:0] tape_msg_kind;
+wire  [7:0] tape_rec_total;
+wire[127:0] tape_rec_name;
 wire        warm_reset_user;                        // the resets that also reset the tape engine (below)
 reg         tape_ram_load_d = 0;
 wire        ds_bus_active, ds_bus_wr, ds_inj_go;   // Load Direct start (direct_start, below)
@@ -324,7 +330,7 @@ wire [1:0] cfg_tape_buttons = mz_tape_buttons(status[25:24]);
 wire [2:0] cfg_fast_tape = mz_fast_tape(status[23:21]);
 wire [7:0] cfg_userrom = (status[28] | cfg_mz1500) ? (8'd1 << cfg_model) : 8'd0;  // MZ-1500: E800-EFFF is always ROM
 wire       fdc_present;
-wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & cfg_model == 3'b100)) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700: the MZ-1E05 ROM comes with the interface (the MZ-1500 has its own F000 ROM)
+wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & (cfg_model == 3'b100 | cfg_model == 3'b011))) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700 / MZ-80A: the interface brings its ROM at F000 (MZ-1E05 / the MZ-80A interface ROM; the MZ-1500 has its own F000 ROM)
 
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, status[18], 1'b0, 1'b0, 1'b0, cfg_display};  // video and graphics always on  // PCG is software controlled (E010-E012).
@@ -345,10 +351,15 @@ wire [7:0] cfg_reg9_fdcrom  = cfg_fdcrom;
 
 localparam [5:0] FILE_TAPE_CMT    = 6'd1;
 localparam [5:0] FILE_TAPE_DIRECT = 6'd2;
+localparam [5:0] FILE_SYSROM      = 6'd3;      // combined monitor ROM image, at 0x000000 (also index 0: boot.rom)
+localparam [5:0] FILE_SYSRAM      = 6'd4;      // RAM image, at 0x100000
+localparam [5:0] FILE_CGROM       = 6'd6;      // character generator ROM image, at 0x500000
+wire        rom_slot;                          // the download is a ROM image (below)
 localparam [24:0] IOCTL_SYSRAM_BASE = 25'h0100000;
 
 reg hps_ioctl_download_d = 0;
 reg [5:0] active_file_slot = 0;
+assign rom_slot = active_file_slot == FILE_SYSROM || active_file_slot == FILE_CGROM || active_file_slot == 6'd0;
 reg [15:0] mzf_size = 0;
 reg [15:0] mzf_load_addr = 0;
 reg [7:0] direct_load_reset_ctr = 0;
@@ -363,7 +374,7 @@ always @(posedge clk_sys) begin
 	end
 
 	tape_ram_load_d <= tape_ram_load;
-	if((hps_ioctl_download_d && !hps_ioctl_download && active_file_slot == FILE_TAPE_DIRECT) ||
+	if((hps_ioctl_download_d && !hps_ioctl_download && (active_file_slot == FILE_TAPE_DIRECT || rom_slot)) ||
 	   (tape_ram_load_d && !tape_ram_load)) begin
 		direct_load_reset_ctr <= 8'd64;
 	end
@@ -383,6 +394,9 @@ always @(posedge clk_sys) begin
 end
 
 wire        direct_load_active = hps_ioctl_download && active_file_slot == FILE_TAPE_DIRECT;
+// ROM images (Load System ROM / CGROM, boot.rom): the machine is held while they load, then reset as after a direct
+// load, so it starts on the new ROM (Main reloads the remembered ones at every core start, with the CPU running).
+wire        rom_load_active = hps_ioctl_download && rom_slot;
 wire [26:0] mzf_direct_end = 27'd128 + {11'd0, mzf_size};
 wire        mzf_direct_wr_valid = active_file_slot != FILE_TAPE_DIRECT ||
                                   hps_ioctl_addr < 27'd128 ||
@@ -402,6 +416,11 @@ function automatic [24:0] mz_ioctl_addr_map(
 			FILE_TAPE_DIRECT:
 				mz_ioctl_addr_map = (addr < 27'd128) ? (IOCTL_SYSRAM_BASE + 25'h0010F0 + addr[24:0])
 				                                      : (IOCTL_SYSRAM_BASE + {9'd0, load_addr} + (addr[24:0] - 25'd128));
+			// Main gives every file address 0 (a CONF_STR address only counts in DDR), so each image goes to its region here.
+			FILE_SYSRAM:
+				mz_ioctl_addr_map = 25'h0100000 + addr[24:0];
+			FILE_CGROM:
+				mz_ioctl_addr_map = 25'h0500000 + addr[24:0];
 			default:
 				mz_ioctl_addr_map = addr[24:0];
 		endcase
@@ -457,6 +476,7 @@ tape_image tape_image
 
 	.mounted(tape_mounted),
 	.tape_full(tape_full),
+	.msg(tape_msg), .msg_kind(tape_msg_kind), .rec_total(tape_rec_total), .rec_name(tape_rec_name),
 	.record_no(tape_record)
 );
 
@@ -536,7 +556,7 @@ always @(posedge clk_sys) begin
 	if (status[0] | buttons[1]) reset_stretch <= 17'h1FFFF;
 	else if (reset_stretch != 0) reset_stretch <= reset_stretch - 1'd1;
 end
-assign warm_reset_user = status[0] | buttons[1] | (reset_stretch != 0) | direct_load_active | (direct_load_reset_ctr != 0);
+assign warm_reset_user = status[0] | buttons[1] | (reset_stretch != 0) | direct_load_active | rom_load_active | (direct_load_reset_ctr != 0);
 wire warm_reset = warm_reset_user | tape_ram_load;     // the tape image putting its first record in RAM (Tape Image Start)
 
 ////////////////  Machine  ////////////////////////
@@ -594,6 +614,7 @@ wire [7:0] main_leds;
 wire [7:0] ext_io_addr, ext_io_dout, ext_io_din;
 wire       ext_io_rd, ext_io_wr, ext_io_oe, ext_int_n, ext_ce_cpu;
 wire       fdd_busy;
+wire       fdc_wait;                                // MZ-80A floppy interface: CPU WAIT at F3FE (mz_fdc)
 wire [31:0] fdc_lba[2];
 wire [7:0]  fdc_buff_din[2];
 
@@ -602,7 +623,7 @@ mz_fdc mz_fdc
 	.clk_sys(clk_sys),
 	.reset(reset),
 	.ce_cpu(ext_ce_cpu),
-	.model_ok(cfg_model[2]),                    // MZ-700, MZ-800, MZ-80B, MZ-2000
+	.model_ok(cfg_model[2] | cfg_model == 3'b011), // MZ-700, MZ-800, MZ-80B, MZ-2000 and the MZ-80A (same FDC ports)
 	.mode(status[34:33]),
 	.crc_report(status[42]),
 	.b_unit2(status[48]),
@@ -628,6 +649,7 @@ mz_fdc mz_fdc
 	.sd_buff_wr(sd_buff_wr),
 
 	.busy(fdd_busy),
+	.wait_req(fdc_wait),
 	.present(fdc_present)
 );
 // Quick Disk (MZ-1500 built in; MZ-800 MZ-1F11 when an image is mounted) on image slot S3.
@@ -728,6 +750,7 @@ sharpmz sharp_mz
 	.EXT_IO_DIN(ext_io_din),
 	.EXT_IO_OE(ext_io_oe),
 	.EXT_INT_n(ext_int_n),
+	.EXT_FDC_WAIT(fdc_wait),
 	.EXT_CE_CPU(ext_ce_cpu),
 
 	// Machine configuration from the OSD.
@@ -774,6 +797,23 @@ mz800_border mz800_border
 	.vblank_out(vblank_brd)
 );
 
+// Tape image messages over the picture (OSD Tape Messages): where the tape is, for three seconds after it moves.
+wire [7:0] R_osd, G_osd, B_osd;
+tape_osd #(.CLK_HZ(70937600)) tape_osd
+(
+	.clk(clk_sys),
+	.ce_pix(clk_video_in),
+	.enable(~status[55]),
+	.hblank(hblank_brd), .vblank(vblank_brd),
+	.r_in(R_brd), .g_in(G_brd), .b_in(B_brd),
+	.r_out(R_osd), .g_out(G_osd), .b_out(B_osd),
+	.show(tape_msg),
+	.kind(tape_msg_kind),
+	.rec_no(tape_msg_kind == 2'd2 ? tape_rec_total - 1'd1 : tape_record),
+	.rec_total(tape_rec_total),
+	.name(tape_rec_name)
+);
+
 // Native 15 kHz video, or doubled to 31 kHz for VGA monitors (MiSTer.ini forced_scandoubler, or the OSD
 // Scandoubler Fx: HQ2x or CRT scanlines). The pixel enable is at most 17.7344 MHz, a quarter of clk_sys.
 wire [2:0] scale = status[46:44];
@@ -788,7 +828,7 @@ video_mixer #(.LINE_LENGTH(1024), .HALF_DEPTH(0), .GAMMA(1)) video_mixer
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale == 3'd1),
 	.gamma_bus(gamma_bus),
-	.R(R_brd), .G(G_brd), .B(B_brd),
+	.R(R_osd), .G(G_osd), .B(B_osd),
 	.HSync(hsync_emu), .VSync(vsync_emu),
 	.HBlank(hblank_brd), .VBlank(vblank_brd),
 	.HDMI_FREEZE(1'b0),

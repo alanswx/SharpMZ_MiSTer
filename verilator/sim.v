@@ -32,6 +32,7 @@ module top(
    input         ioctl_direct,   // the download is a direct load (OSD Load Direct to RAM)
    input         direct_start_en,// Load Direct starts the program (OSD Load Direct: Start Program)
    input         tape_direct,    // OSD Tape Image Start: Direct (the first record to RAM on mounting)
+   input         tape_msgs,      // OSD Tape Messages: On
    input         ioctl_wr,
    input         ioctl_rd,
    input  [24:0] ioctl_addr,
@@ -156,6 +157,18 @@ module top(
    // Tape Image Start: Direct, as SharpMZ.sv: the machine is held while the first record goes to RAM, then reset
    // once more (64 clocks) as after a direct load; that reset also makes the tape engine load the next record.
    wire        tape_ram_load;
+   wire        tape_msg;
+   wire [1:0]  tape_msg_kind;
+   wire [7:0]  tape_rec_total;
+   wire [127:0] tape_rec_name;
+   wire [7:0]  core_r, core_g, core_b;
+   // Tape messages over the picture, as SharpMZ.sv (on, as the OSD default). No border here, so on the core's blanking.
+   tape_osd #(.CLK_HZ(70937600 / `SIM_CLK_DIV), .FONT_FILE("../rtl/software/mif/tape_osd_font.hex"),
+              .A2D_FILE("../rtl/software/mif/tape_osd_a2d.hex")) tosd(
+      .clk(clk_sys), .ce_pix(ce_pix), .enable(tape_msgs), .hblank(VGA_HB), .vblank(VGA_VB),
+      .r_in(core_r), .g_in(core_g), .b_in(core_b), .r_out(VGA_R), .g_out(VGA_G), .b_out(VGA_B),
+      .show(tape_msg), .kind(tape_msg_kind), .rec_no(tape_msg_kind == 2'd2 ? tape_rec_total - 1'd1 : tape_record),
+      .rec_total(tape_rec_total), .name(tape_rec_name));
    reg         tape_ram_load_d = 0;
    reg  [7:0]  tape_post_ctr = 0;
    always @(posedge clk_sys) begin
@@ -174,7 +187,8 @@ module top(
       .rewind(tape_rewind), .host_busy(ioctl_download | ds_bus_active), .cmt_status(cmt_status),
       .active(tape_active), .bus_addr(tape_addr), .bus_wr(tape_wr), .bus_dout(tape_dout),
       .bus_din(tape_data_region ? tape_b_dout : din32[7:0]), .bus_busy(tape_b_busy), .bus_rd(tape_rd),
-      .mounted(tape_mounted), .tape_full(tape_full), .record_no(tape_record)
+      .mounted(tape_mounted), .tape_full(tape_full), .record_no(tape_record),
+      .msg(tape_msg), .msg_kind(tape_msg_kind), .rec_total(tape_rec_total), .rec_name(tape_rec_name)
    );
 
    // Same bus mux as SharpMZ.sv.
@@ -242,6 +256,7 @@ module top(
    wire [1:0]  fdc_rd, fdc_wr;
    wire [7:0]  fdc_buff_din[2];
    wire        fdc_present;
+   wire        fdc_wait;
    wire [7:0]  fdc_io_din, qd_io_din;
    wire        fdc_io_oe, qd_io_oe, qd_busy;
    assign ext_io_oe  = fdc_io_oe | qd_io_oe;
@@ -265,13 +280,13 @@ module top(
 
    mz_fdc fdc(
       .clk_sys(clk_sys), .reset(reset | warm_all), .ce_cpu(ext_ce_cpu),
-      .model_ok(cfg_model[2] == 1'b1), .mode(fdc_mode), .crc_report(1'b0), .b_unit2(fdd_b_unit2),                          // MZ-700, MZ-800, MZ-80B, MZ-2000
+      .model_ok(cfg_model[2] == 1'b1 || cfg_model[2:0] == 3'b011), .mode(fdc_mode), .crc_report(1'b0), .b_unit2(fdd_b_unit2),                          // MZ-700, MZ-800, MZ-80B, MZ-2000
       .io_addr(ext_io_addr), .io_rd(ext_io_rd), .io_wr(ext_io_wr), .io_dout(ext_io_dout),
       .io_din(fdc_io_din), .io_oe(fdc_io_oe), .int_n(ext_int_n),
       .img_mounted({fdd2_mounted, fdd_mounted}), .img_readonly(fdd_readonly), .img_size(fdd_size),
       .sd_lba(fdc_lba), .sd_rd(fdc_rd), .sd_wr(fdc_wr), .sd_ack({fdd2_ack, fdd_ack}),
       .sd_buff_addr(sd_buff_addr), .sd_buff_dout(sd_buff_dout), .sd_buff_din(fdc_buff_din), .sd_buff_wr(sd_buff_wr),
-      .busy(fdd_busy), .present(fdc_present)
+      .busy(fdd_busy), .wait_req(fdc_wait), .present(fdc_present)
    );
    assign fdd_lba = fdc_lba[0];
    assign fdd_rd = fdc_rd[0];
@@ -314,7 +329,8 @@ module top(
       .CFG_AUDIO      (cfg_audio),
       .CFG_CMT        (cfg_cmt),
       .CFG_USERROM    (cfg_display3[3] ? 8'h10 : 8'h00),                               // MZ-1500: E800-EFFF is always ROM
-      .CFG_FDCROM     (((fdc_present & cfg_model[2:0] == 3'b100) | cfg_display3[3]) ? 8'h10 : 8'h00),   // MZ-700 FD ROM with the interface; MZ-1500 F000 ROM
+      .CFG_FDCROM     ((fdc_present & cfg_model[2:0] == 3'b011) ? 8'h08 :                      // MZ-80A interface ROM
+                       ((fdc_present & cfg_model[2:0] == 3'b100) | cfg_display3[3]) ? 8'h10 : 8'h00),   // MZ-700 FD ROM with the interface; MZ-1500 F000 ROM
       .IOCTL_DOWNLOAD (ioctl_download),
       .IOCTL_UPLOAD   (1'b0),
       .IOCTL_CLK      (clk_sys),
@@ -330,9 +346,9 @@ module top(
       .VGA_VB_O       (VGA_VB),
       .VGA_HS_O       (VGA_HS),
       .VGA_VS_O       (VGA_VS),
-      .VGA_R_O        (VGA_R),
-      .VGA_G_O        (VGA_G),
-      .VGA_B_O        (VGA_B),
+      .VGA_R_O        (core_r),
+      .VGA_G_O        (core_g),
+      .VGA_B_O        (core_b),
       .AUDIO_L_O      (AUDIO_L),
       .AUDIO_R_O      (AUDIO_R),
       .AUDIO_PSG_O    (AUDIO_PSG),
@@ -347,6 +363,7 @@ module top(
       .EXT_IO_DIN     (ext_io_din),
       .EXT_IO_OE      (ext_io_oe),
       .EXT_INT_n      (ext_int_n),
+      .EXT_FDC_WAIT   (fdc_wait),
       .EXT_CE_CPU     (ext_ce_cpu),
       .IOCTL_DIN      (din32)
    );

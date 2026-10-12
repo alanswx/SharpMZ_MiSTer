@@ -49,6 +49,13 @@ In order; each result is checked on mister.local later.
 
 Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lore and Exolon with a real joystick; Tape Sound by ear; hardware runs of whatever 1-7 fix.
 
+### Tester report 2026-10-12 (after the first release)
+- [x] Replacement ROMs persist: Load System ROM and Load CGROM are remembered OSD files (`FC`), so Main reloads the last one at every core start, and the machine is held and reset while a ROM image loads, so it starts on it. `boot.rom` in games/SharpMZ loads too. On hardware: with 80ktc chosen once, the core starts in it ("System Monitor"). Found on the way: Load System RAM and Load CGROM wrote over the monitor ROM (Main gives every file address 0; the CONF_STR addresses only count in DDR); they now go to their own regions.
+- [x] Tape position on screen (OSD Tape Messages, on by default): `rtl/tape_osd.sv` draws a line at the bottom of the picture for 150 frames when the tape image has a record ready (`TAPE 2/5 NAME`), reaches the end, saves or is full, in the MZ-700's characters (`tools/make_osd_font.py`). MiSTer's info popups (CONF_STR `I,`) only show fixed strings, so they can't name the program. On hardware: TAPE 1/2 S-BASIC on mounting, TAPE 2/2 R.P.S. once BASIC is in (L16). The first message comes a few seconds after the core starts, when the record has loaded.
+- [x] MZ-80A floppy: its interface has the FDC at D8-DD as the MZ-700's, so mz_fdc now runs on the MZ-80A with its interface ROM at F000 (MZ80A_FDIF.rom, banks 1Ah-1Bh, `tools/patch_roms.py`). The ROM doesn't poll: its INI loop runs through an opcode fetch at F3FE (F7FE), and the interface holds the CPU in WAIT there while a command runs and no byte is ready (`mz_fdc` wait_req, `sharpmz.vhd`). `F` at the monitor, Return: SA-6510 Disk BASIC boots (sim test fdd_mz80a; hardware F02).
+- [ ] MZ-80K floppy: a different interface (ports F8-FA, motor by IN (C), DRDY/CRDY/RQM flags; ROM and source in `software/idealine/mz-80k/mz80kfdif`), so it needs its own controller model. The old core never had it either.
+- Already done in the release (the tester had an older build): OSD Reset works (fixed in 20261009b); floppies work on the MZ-700 (`J F000`), MZ-800, MZ-80B and MZ-2000 (mount, then reset).
+
 ### Next
 - [ ] Sound tests for the other models: MZ-80K/80A note table (does the MZ-80K need the counter 0 divide-by-2?), MZ-800 PSG channels and noise, MZ-80B/2000 PC2.
 - [x] Beeper vs PSG level: on the MZ-800/1500 the beeper is now one PSG channel's level, as mz800emu mixes them; full range on the models without a PSG.

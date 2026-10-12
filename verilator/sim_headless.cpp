@@ -58,6 +58,7 @@ struct Options {
     uint32_t type_press = 3, type_release = 3;
     uint32_t shift_lead = 0;                 // --shift-lead N: a shifted character presses SHIFT N frames before its key
     bool     tape_direct = false;            // --tape-direct: OSD Tape Image Start: Direct
+    bool     tape_msgs = false;              // --tape-msgs: OSD Tape Messages: On (the core's default; off here for the tests)
     bool     key_sharp = true;               // --key-layout pc|sharp (the core's default is PC; the tests type by position)
     std::set<uint32_t> screenshots;
     bool     dump_range = false;
@@ -141,6 +142,7 @@ static void usage()
 "  --type-rate P:R        frames per key press:release (default 3:3)\n"
 "Images and logs:\n"
 "  --screenshot N         PNG of frame N (repeatable)\n"
+"  --tape-msgs            OSD Tape Messages: On (the tape position over the picture; off in the sim by default)\n"
 "  --tape-direct          OSD Tape Image Start: Direct (the tape image's first record to RAM and started)\n"
 "  --key-layout pc|sharp  OSD Keyboard Layout (default sharp, by position; the core defaults to pc)\n"
 "  --shift-lead N         --type presses SHIFT N frames before a shifted character's key (default 0)\n"
@@ -219,6 +221,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--shift-lead") o.shift_lead = parse_num(next());
         else if (a == "--key-layout") o.key_sharp = next() != "pc";
         else if (a == "--tape-direct") o.tape_direct = true;
+        else if (a == "--tape-msgs") o.tape_msgs = true;
         else if (a == "--dump-frames") {
             std::string v = next();
             size_t c = v.find(':');
@@ -737,6 +740,7 @@ void Sim::write_config()
     top->ramdisk_en   = opt.ramdisk;
     top->key_sharp    = opt.key_sharp;
     top->tape_direct  = opt.tape_direct;
+    top->tape_msgs    = opt.tape_msgs;
     top->fdd_b_unit2  = opt.fdd_b_hd;
     top->direct_start_en = opt.direct_start;
     top->prn_en       = opt.printer.empty() ? 0 : 1;

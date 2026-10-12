@@ -123,6 +123,7 @@ entity sharpmz is
         EXT_IO_DIN            : in     std_logic_vector(7 downto 0);            -- Data for an external I/O read.
         EXT_IO_OE             : in     std_logic;                               -- External device answers this read.
         EXT_INT_n             : in     std_logic;                               -- External interrupt (MZ-700/800 family).
+        EXT_FDC_WAIT          : in     std_logic := '0';                        -- Floppy: a command runs and no byte is ready (MZ-80A interface WAIT).
         EXT_CE_CPU            : out    std_logic;                               -- CPU clock enable.
         --------------------                      Tape status                   ------------------------------
         CMT_STATUS            : out    std_logic_vector(13 downto 0);           -- CMT_BUS_OUT, see mctrl_pkg.vhd.
@@ -322,6 +323,7 @@ signal MZ_CE_PIXEL           :     std_logic;
 signal T80_WR_n              :     std_logic;
 signal T80_RD_n              :     std_logic;
 signal T80_WAIT_n            :     std_logic;
+signal FDC_WAIT_n            :     std_logic;
 signal T80_M1_n              :     std_logic;
 signal T80_RFSH_n            :     std_logic;
 signal T80_A16               :     std_logic_vector(15 downto 0);
@@ -1166,7 +1168,13 @@ begin
 
     -- Multiplexer -> Signals to enabled hardware.
     --
-    T80_WAIT_n               <= VIDEO_WAIT_n      when VIDEO_WAIT_n = '0'     else MZ80C_WAIT_n      when CONFIG(MZ_80C) = '1'   else MZ80B_WAIT_n;
+    -- MZ-80A floppy interface: an opcode fetch from F3FE/F7FE (its ROM's JP (IY), mirrored) waits while a command runs
+    -- and the FDC has no byte ready, which paces the ROM's INI/OUTI loops (they don't poll).
+    FDC_WAIT_n               <= '0' when CONFIG(MZ80A) = '1' and EXT_FDC_WAIT = '1' and T80_M1_n = '0' and T80_MREQ_n = '0'
+                                         and T80_A16(15 downto 11) = "11110" and T80_A16(9 downto 0) = "1111111110"
+                                    else '1';
+    T80_WAIT_n               <= '0'               when FDC_WAIT_n = '0'       else
+                                VIDEO_WAIT_n      when VIDEO_WAIT_n = '0'     else MZ80C_WAIT_n      when CONFIG(MZ_80C) = '1'   else MZ80B_WAIT_n;
     T80_INT_n                <= (MZ80C_INT_n and EXT_INT_n) when CONFIG(MZ_80C) = '1'   else MZ80B_INT_n;
     T80_NMI_n                <= MZ80C_NMI_n       when CONFIG(MZ_80C) = '1'   else MZ80B_NMI_n;
     T80_BUSRQ_n              <= MZ80C_BUSRQ_n     when CONFIG(MZ_80C) = '1'   else MZ80B_BUSRQ_n;

@@ -19,6 +19,7 @@
 #                 ../software/idealine/mz-80b/rb_DSK/DSK; frame hash. Skipped when the images aren't there.
 #   ipl_mz2000    MZ-2000: the MZ-2200 IPL reaches "IPL is looking for a program" (frame hash at 300)
 #   tape_direct   MZ-700, OSD Tape Image Start: Direct: BASIC starts from the tape image by itself, LOAD, LIST
+#   fdd_mz80a     MZ-80A: F, Return: the floppy interface ROM boots SA-6510 Disk BASIC from drive 1 (idealine.info image)
 #   tape_mz80b    MZ-80B: the IPL loads SB-5520 BASIC from a tape image (../software/mz80b) to "Ready"; frame hash.
 #   tape_mz2000   MZ-2000: the MZ-2200 IPL loads Gang Man (../software/mz2200) to its title; frame hash.
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
@@ -214,6 +215,15 @@ if [ -z "${QUICK:-}" ]; then
             pids+=($!); names+=("$n")
         fi
     done
+fi
+# MZ-80A floppy: F at the monitor runs the interface ROM, Return boots drive 1: SA-6510 Disk BASIC (the interface's
+# CPU WAIT at F3FE paces the ROM's INI loop).
+SA6510=../software/idealine/mz-80a/SA-6510bootdisk/SA-6510.DSK
+if [ -f "$SA6510" ]; then
+    cp "$SA6510" "$OUT/fdd_mz80a.dsk"
+    ( $BIN --model mz80a --fdd "$OUT/fdd_mz80a.dsk" --fdd-readonly --type '150:F\n' --type '300:\n' --stop-at-frame 700 \
+          --ascii-end --quiet > "$OUT/fdd_mz80a.txt" 2> "$OUT/fdd_mz80a.log" ) &
+    pids+=($!); names+=("fdd_mz80a")
 fi
 RB=../software/idealine/mz-80b/rb_DSK/DSK
 for t in "fdd_mz80b DISK23 900" "fdd_mz80b_cpm DISK01 1200"; do
