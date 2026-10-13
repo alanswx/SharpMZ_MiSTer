@@ -68,12 +68,17 @@ gives "Loading Error"; S starts the CMT. "Whatever the disk image I try." Our te
 BASIC mz-5z001.mzt (A216 bytes + a type 02 AUTO RUN record), Zulpoko Daisakusen and Techno City Cars (type 02, load A215).
 MZ-5Z001 rejects type 02 in the core; patched to 05, Zulpoko stops at "Illegal data error in 150", as in mz1500emu (Z01).
 But three files of the collection use 02 for MZ-5Z001 programs, so 02 may be right and something else is wrong.
-- [ ] Run the unmodified files in mz1500emu: BASIC tape (C at the IPL), then LOAD Zulpoko / TCCARS. Does the emulator
-      accept type 02? If yes, the core differs: compare the CMT header path (the type byte at 10F0, Sharp ASCII Name
-      conversion, tape_image) with a trace of BASIC's file mode check.
-- [ ] If the emulator also rejects 02: they are Quick Disk files (02 = BTX on QD) dumped to tape. Try them as Quick
-      Disks (`tools/mzf2qdf.py`) with MZ-5Z001's QD support, and document / offer a converter.
-- [ ] Techno City Cars as a second case (smaller, may not hit Zulpoko's line 150 problem).
+- [x] mz1500emu with the unmodified BASIC tape: the same "CMT:Illegal filemode error" (on the type 02 AUTO RUN record).
+      The core matches the reference: the tape images are wrong, not the core.
+- [x] As a Quick Disk (`tools/mzf2qdf.py` with MZ-5Z001 + both programs, Q at the IPL): LOAD "ZULPOKO" and LOAD "TCCARS"
+      work (no filemode error), so these are Quick Disk files (02 = BTX on QD) dumped to tape.
+- [x] But neither runs: Zulpoko stops at "Illegal data error in 150" (as in mz1500emu with the type patched to 05);
+      Techno City Cars clears the screen and ends at Ready. The dumps probably lack files the originals had on the disk
+      (PCG data, machine code), or need another BASIC. mz1500emu hung loading TCCARS from a patched tape (inconclusive).
+- [ ] Ask the tester for the original Quick Disk dumps (.qdf/.mzq) of these TAS titles.
+- [ ] Planned (not started): detect type 02 records on the MZ-1500/800 when a tape is mounted and say so: a MiSTer info
+      popup (CONF_STR `I,`, fixed text: "Quick Disk files on this tape; MZ-5Z001 can't load them from tape") and the
+      overlay naming the record (`TAPE 2/3 ZULPOKO: QD FILE`). README note on `mzf2qdf.py`. Sim and hardware tests.
 - [ ] Dark Storm - Demon Crystal III (type 01, sides A and B): C at the IPL with side A, then side B. Check it loads.
 
 **D. MZ-1500 "didn't load anything" (tester 2).** Loads then nothing happens, or the machine resets.
