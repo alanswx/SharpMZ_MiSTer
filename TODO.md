@@ -49,6 +49,58 @@ In order; each result is checked on mister.local later.
 
 Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lore and Exolon with a real joystick; Tape Sound by ear; hardware runs of whatever 1-7 fix.
 
+### Tester reports 2026-10-13 (on SharpMZ_20261012/12b)
+Confirmed fixed by testers: replacement ROMs persist, MZ-80A floppy, OSD Reset. Tester 2 suspects their own MiSTer is faulty,
+so their results need confirming here. Files from tester 3 are byte-identical to the year-based collection's copies.
+
+**A. MZ-80B / MZ-2000 floppy hangs (EeDee).** Mount a disk, reset: "IPL is Loading xxxx" flashes for ever; unmounting
+gives "Loading Error"; S starts the CMT. "Whatever the disk image I try." Our tests boot SB-6511 Disk BASIC and CP/M
+(idealine.info DSKs, T14-T18) and TF-DOS (fukui brave.d88, T23), so it depends on the images or the settings.
+- [ ] Ask which images (names, DSK or D88) and which OSD floppy settings.
+- [ ] Reproduce in the sim with those images (`--fdd`, --verbose), and on mister126 (T14/T23 still pass?).
+- [ ] Suspects: D88 variants (2D vs 2DD, 80 tracks, density flag, 1 KB sectors), Floppy Interface Auto with a late mount,
+      drive B unit, 80B/2000 IPL expecting the disk at reset. Fix, and add the failing images as tests.
+
+**B. Tape Image is hard to follow (EeDee).** Already improved in 20261012b by Tape Messages (TAPE n/total NAME).
+- [ ] Check with EeDee once on 12b; consider a README walkthrough (mount, C/L, how records advance, Rewind).
+
+**C. MZ-1500 BASIC: "CMT: Illegal filemode error" at the end of loading BASIC; then LOAD fails (tester 3).**
+BASIC mz-5z001.mzt (A216 bytes + a type 02 AUTO RUN record), Zulpoko Daisakusen and Techno City Cars (type 02, load A215).
+MZ-5Z001 rejects type 02 in the core; patched to 05, Zulpoko stops at "Illegal data error in 150", as in mz1500emu (Z01).
+But three files of the collection use 02 for MZ-5Z001 programs, so 02 may be right and something else is wrong.
+- [ ] Run the unmodified files in mz1500emu: BASIC tape (C at the IPL), then LOAD Zulpoko / TCCARS. Does the emulator
+      accept type 02? If yes, the core differs: compare the CMT header path (the type byte at 10F0, Sharp ASCII Name
+      conversion, tape_image) with a trace of BASIC's file mode check.
+- [ ] If the emulator also rejects 02: they are Quick Disk files (02 = BTX on QD) dumped to tape. Try them as Quick
+      Disks (`tools/mzf2qdf.py`) with MZ-5Z001's QD support, and document / offer a converter.
+- [ ] Techno City Cars as a second case (smaller, may not hit Zulpoko's line 150 problem).
+- [ ] Dark Storm - Demon Crystal III (type 01, sides A and B): C at the IPL with side A, then side B. Check it loads.
+
+**D. MZ-1500 "didn't load anything" (tester 2).** Loads then nothing happens, or the machine resets.
+- [ ] Ask for titles and how they were loaded (Tape Image / Load Direct / Start Direct, Fast Tape setting).
+- [ ] Try Dark Storm and a few C01-C24 titles with each method; Load Direct on the MZ-1500 starts at the exec address
+      without the IPL's setup (PCG, PSG, banks), so it may need the IPL path instead.
+
+**E. Japanese MZ-700/800 programs: no Japanese character set (tester 2).** Japanese adventure games show garbage; the
+Japanese MZ-700 (MZ-700 JP) has a CG ROM with katakana in place of the European lower case. Load CGROM didn't help
+(the file must be the 40 KB combined layout).
+- [ ] Find the Japanese MZ-700 CG ROM (mz800emu ROM sets, MAME mz700j) and the MZ-80K Japanese CG (idealine
+      `MZ80K2E Jap CG`).
+- [ ] OSD option Character Set: Europe / Japan (per model), or a documented Load CGROM file per model made by a tool
+      (`tools/make_cgrom.py`), so users don't need the combined layout.
+
+**F. MZ-700 PCG (tester 2): "some games might use the PCG-8800".**
+- [ ] Check which PCG the core has for the MZ-700 (the original docs mention PCG-8000/PCG-1200), find a test program,
+      compare with mz800emu (which has PCG-700 support?).
+
+**G. Graphics glitches on MZ-700 games (tester 2).** Metrocross: a third of the screen on the left; Tiny Xevious:
+garbage on the right side (the logo area) during play; Donkey Gorilla: title screen garbled (the game itself works).
+- [ ] Get the files (mz-archive / collection), run in the sim and in mz800emu (MZ-700 mode), compare screenshots.
+- [ ] Suspects: VRAM wait / blanking-access timing (OSD VRAM Wait), attribute RAM, the 8253 or vblank timing used for
+      raster tricks.
+
+Working well for testers: Snake & Snake (MZ-700), Donkey Gorilla in play, MZ-80K/80A BASIC programs.
+
 ### Tester report 2026-10-12 (after the first release)
 - [x] Replacement ROMs persist: Load System ROM and Load CGROM are remembered OSD files (`FC`), so Main reloads the last one at every core start, and the machine is held and reset while a ROM image loads, so it starts on it. `boot.rom` in games/SharpMZ loads too. On hardware: with 80ktc chosen once, the core starts in it ("System Monitor"). Found on the way: Load System RAM and Load CGROM wrote over the monitor ROM (Main gives every file address 0; the CONF_STR addresses only count in DDR); they now go to their own regions.
 - [x] Tape position on screen (OSD Tape Messages, on by default): `rtl/tape_osd.sv` draws a line at the bottom of the picture for 150 frames when the tape image has a record ready (`TAPE 2/5 NAME`), reaches the end, saves or is full, in the MZ-700's characters (`tools/make_osd_font.py`). MiSTer's info popups (CONF_STR `I,`) only show fixed strings, so they can't name the program. On hardware: TAPE 1/2 S-BASIC on mounting, TAPE 2/2 R.P.S. once BASIC is in (L16). The first message comes a few seconds after the core starts, when the record has loaded.
