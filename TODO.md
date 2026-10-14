@@ -53,13 +53,17 @@ Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lor
 Confirmed fixed by testers: replacement ROMs persist, MZ-80A floppy, OSD Reset. Tester 2 suspects their own MiSTer is faulty,
 so their results need confirming here. Files from tester 3 are byte-identical to the year-based collection's copies.
 
-**A. MZ-80B / MZ-2000 floppy hangs (EeDee).** Mount a disk, reset: "IPL is Loading xxxx" flashes for ever; unmounting
-gives "Loading Error"; S starts the CMT. "Whatever the disk image I try." Our tests boot SB-6511 Disk BASIC and CP/M
-(idealine.info DSKs, T14-T18) and TF-DOS (fukui brave.d88, T23), so it depends on the images or the settings.
-- [ ] Ask which images (names, DSK or D88) and which OSD floppy settings.
-- [ ] Reproduce in the sim with those images (`--fdd`, --verbose), and on mister126 (T14/T23 still pass?).
-- [ ] Suspects: D88 variants (2D vs 2DD, 80 tracks, density flag, 1 KB sectors), Floppy Interface Auto with a late mount,
-      drive B unit, 80B/2000 IPL expecting the disk at reset. Fix, and add the failing images as tests.
+**A. MZ-80B / MZ-2000 floppy hangs (EeDee): fixed (2026-10-13).** With OSD MZ-80B/2000 Boot Reset on, the IPL loaded the
+boot program, then restarted for ever ("IPL is loading CP/M 2.2" flashing): `mz80b.vhd` held BOOTSTRAP_n (IPL ROM at 0000)
+for as long as the option was on, so the IPL's switch to RAM (NST) never took. Boot Reset now acts only at a reset. Our
+tests passed because they leave Boot Reset off; EeDee needs it on to get back to the IPL with a reset. The floppy
+controller now also takes the machine's warm reset, as the real interface does (it had only the core's cold reset).
+On hardware: F03 (MZ-80B, disk mounted at the IPL, reset boots CP/M 2.2, reset again boots it again), F04 (MZ-2000
+TF-DOS the same way). Sim: `--fdd-frame N` (mount later), `--boot-reset`. Test tool: `--sweep MODEL SLOT WAIT GLOB`,
+`('keys', '29+56+100')` steps. Fresh-core sweep of the idealine MZ-80B disks: DISK06 and DISK10 report "Repeated read
+error" (check against MAME or their CRCs).
+- [ ] Sim regression test for Boot Reset + disk (fdd_mz80b_br).
+- [ ] DISK06 / DISK10 read errors on the MZ-80B.
 
 **B. Tape Image is hard to follow (EeDee).** Already improved in 20261012b by Tape Messages (TAPE n/total NAME).
 - [ ] Check with EeDee once on 12b; consider a README walkthrough (mount, C/L, how records advance, Rewind).

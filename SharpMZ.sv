@@ -621,7 +621,7 @@ wire [7:0]  fdc_buff_din[2];
 mz_fdc mz_fdc
 (
 	.clk_sys(clk_sys),
-	.reset(reset),
+	.reset(reset | warm_reset_user),            // the machine's reset line resets the interface too (the mounted images stay)
 	.ce_cpu(ext_ce_cpu),
 	.model_ok(cfg_model[2] | cfg_model == 3'b011), // MZ-700, MZ-800, MZ-80B, MZ-2000 and the MZ-80A (same FDC ports)
 	.mode(status[34:33]),

@@ -81,6 +81,8 @@ struct Options {
     bool     verbose = false;
     std::string tape_image;
     std::string fdd;
+    uint32_t    fdd_frame = 0;
+    bool        boot_reset = false;          // --boot-reset: OSD MZ-80B/2000 Boot Reset (a reset goes back to the IPL)               // --fdd-frame N: mount --fdd at frame N (after the boot), as from the OSD
     std::string qd;
     bool        qd_readonly = false;
     bool        ramdisk = false;
@@ -127,6 +129,8 @@ static void usage()
 "  --ramdisk              MZ-800 64 KB RAM disk board (OSD MZ-800 RAM Disk)\n"
 "  --joy0 BITS            joystick 1 held all run (MiSTer bits: 0 right, 1 left, 2 down, 3 up, 4 fire 1, 5 fire 2)\n"
 "  --qd FILE              Quick Disk image (.mzq or .qdf; MZ-1500, MZ-800), written back; --qd-readonly\n"
+"  --boot-reset           OSD MZ-80B/2000 Boot Reset: a reset goes back to the IPL\n"
+"  --fdd-frame N          mount the --fdd image at frame N instead of at the start (as from the OSD, later)\n"
 "  --qd-swap FRAME:FILE   mount another Quick Disk image at FRAME (side B); repeatable\n"
 "  --printer FILE         printer connected (OSD Printer: UART); the UART line is decoded into FILE\n"
 "  --printer-baud N       UART speed (default 9600)\n"
@@ -245,6 +249,8 @@ static bool parse_args(int argc, char **argv, Options &o)
         }
         else if (a == "--tape-image") o.tape_image = next();
         else if (a == "--fdd") o.fdd = next();
+        else if (a == "--fdd-frame") o.fdd_frame = parse_num(next());
+        else if (a == "--boot-reset") o.boot_reset = true;
         else if (a == "--qd") o.qd = next();
         else if (a == "--qd-readonly") o.qd_readonly = true;
         else if (a == "--printer") o.printer = next();
@@ -698,6 +704,7 @@ void Sim::on_frame_end()
     if (!opt.mzf.empty() && opt.mzf_direct && frame == opt.mzf_direct_frame && frame != 0) load_mzf(true);
     if (!opt.mzf.empty() && !opt.mzf_direct && frame == opt.mzf_frame && frame != 0) load_mzf(false);
 
+    if (!opt.fdd.empty() && opt.fdd_frame != 0 && frame == opt.fdd_frame) mount_fdd();
     auto sw = opt.qd_swaps.find(frame);
     if (sw != opt.qd_swaps.end()) {
         if (qd) fclose(qd);
@@ -735,7 +742,7 @@ void Sim::write_config()
     top->cfg_display2 = opt.vmode == "native" ? 3 : 1;         // SharpMZ.sv: 2'b11 native, 2'b01 640x480@60
     top->cfg_display3 = (opt.mz800_700 ? 0 : 4) | (m->mz1500 ? 8 : 0);   // bit 2: MZ-800 mode switch, bit 3: MZ-1500
     top->fdc_mode     = opt.fdc_mode;
-    top->cfg_cpu      = (uint8_t)(opt.turbo & 7);
+    top->cfg_cpu      = (uint8_t)((opt.turbo & 7) | (opt.boot_reset ? 0x80 : 0));   // bit 7: OSD MZ-80B/2000 Boot Reset
     top->cfg_audio    = 0;
     top->ramdisk_en   = opt.ramdisk;
     top->key_sharp    = opt.key_sharp;
@@ -938,7 +945,7 @@ int Sim::run()
     if (!opt.mzf.empty() && (opt.mzf_direct ? opt.mzf_direct_frame == 0 : opt.mzf_frame == 0))
         if (!load_mzf(opt.mzf_direct)) return exit_code;
     if (!opt.tape_image.empty()) { mount_tape(); if (exit_code) return exit_code; }
-    if (!opt.fdd.empty()) { mount_fdd(); if (exit_code) return exit_code; }
+    if (!opt.fdd.empty() && opt.fdd_frame == 0) { mount_fdd(); if (exit_code) return exit_code; }
     if (!opt.fdd_b.empty()) { mount_fdd2(); if (exit_code) return exit_code; }
     if (!opt.qd.empty()) { mount_qd(); if (exit_code) return exit_code; }
     if (!opt.printer.empty()) {

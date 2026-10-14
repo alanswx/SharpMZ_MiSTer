@@ -238,6 +238,16 @@ for n, game in (('L14', 'Exolon'), ('L15', 'Knight Lore')):     # a loading scre
          files=[('s', 0, f'{PACK800}/{game}.mzt')], opts=[FAST_TAPE(6), (52, 1, 1)], reset=True,
          steps=[('wait', 6), ('shot', 'loader'), ('wait', 30), ('shot', 'game')])
 
+# MZ-80B/2000 Boot Reset on (EeDee): a disk mounted while the IPL waits, then a reset, boots it; a second reset goes
+# back to the IPL and boots it again. Boot Reset used to hold the IPL ROM at 0000, so the IPL restarted for ever.
+RESET_KEYS = '29+56+100'
+test('F03', 'MZ80B', 'MZ-80B Boot Reset: disk mounted at the IPL, reset boots CP/M 2.2; reset again boots it again',
+     files=[], late=[('s', 1, f'{SW}/idealine/mz-80b/rb_DSK/DSK/DISK01.DSK', 8)], opts=[(30, 1, 1)],
+     steps=[('wait', 12), ('keys', RESET_KEYS), ('wait', 15), ('shot', 'cpm'), ('keys', RESET_KEYS), ('wait', 15), ('shot', 'again')])
+test('F04', 'MZ2000', 'MZ-2000 Boot Reset: TF-DOS disk mounted at the IPL, reset boots it',
+     files=[], late=[('s', 1, f'{SW}/fukui-mz2000/brave.d88', 8)], opts=[(30, 1, 1)],
+     steps=[('wait', 12), ('keys', RESET_KEYS), ('wait', 20), ('shot', 'boot')])
+
 # OSD Tape Messages: the overlay names the record the tape image is at (TAPE 1/2 S-BASIC on mounting, TAPE 2/2 R.P.S.
 # once BASIC is in and the tape has stopped).
 test('L16', 'MZ700', 'Tape Messages overlay: after L loads BASIC, TAPE 2/2 R.P.S. at the bottom for 3 s',
@@ -518,6 +528,8 @@ def steps_file(t):
             out.append('key ' + ' '.join(str(KEYS[c]) for c in arg.upper()))
         elif op == 'pctype':
             out.append('key ' + ' '.join(PCKEYS[c] for c in arg.upper()))
+        elif op == 'keys':
+            out.append('key ' + arg)
         elif op == 'shot':
             out.append(f'shot {arg}')
     return '\n'.join(out) + '\n'
@@ -554,6 +566,9 @@ def main():
     ap.add_argument('--only')
     ap.add_argument('--quick', action='store_true', help='a short set: one or two tests per model and feature')
     ap.add_argument('--basic', type=int, metavar='N', help='BASIC triage instead: N random BASIC programs per model')
+    ap.add_argument('--sweep', nargs=4, metavar=('MODEL', 'SLOT', 'WAIT', 'GLOB'),
+                    help='one test per file matching GLOB: mount it in image slot SLOT (0 tape, 1/2 floppy, 3 QD), reset, '
+                         'wait WAIT seconds, screenshot (e.g. --sweep MZ80B 1 15 "software/idealine/mz-80b/rb_DSK/DSK/*.DSK")')
     ap.add_argument('--update-refs', action='store_true',
                     help='after the run, keep each screenshot\'s md5 in tools/mister_refs.json (only from a good run)')
     ap.add_argument('--no-refs', action='store_true', help='fixed waits, ignoring tools/mister_refs.json')
@@ -563,6 +578,12 @@ def main():
                     help=f'only deploy: put each test as an MGL in "{MENU}" (MiSTer main menu) to run by hand')
     a = ap.parse_args()
     pool = basic_tests(a.basic) if a.basic else T
+    if a.sweep:
+        import glob as _glob
+        model, slot, wait, pattern = a.sweep
+        pool = [dict(name=f'S{i:02d}', model=model, desc=os.path.basename(f), files=[('s', int(slot), os.path.abspath(f))],
+                     opts=[], reset=True, steps=[('wait', float(wait)), ('shot', 'boot')], late=[])
+                for i, f in enumerate(sorted(_glob.glob(pattern)))]
     tests = [t for t in pool if not a.only or t['name'] in a.only.split(',')]
     if a.quick:
         tests = [t for t in tests if t['name'] in QUICK]
@@ -680,6 +701,9 @@ def main():
                 m.wait_for(arg, ref)
             elif op == 'type':
                 m.type(arg)
+            elif op == 'keys':            # raw key codes / chords, e.g. 29+56+100 (LCtrl+LAlt+RAlt: MiSTer's reset)
+                m.ssh(f'python3 {Mister.KEYS_TOOL} key {arg}')
+                time.sleep(1)
             elif op == 'pctype':
                 codes = [PCKEYS[c] for c in arg.upper()]
                 m.ssh(f'python3 {Mister.KEYS_TOOL} key ' + ' '.join(codes))
