@@ -92,22 +92,31 @@ But three files of the collection use 02 for MZ-5Z001 programs, so 02 may be rig
       without the IPL's setup (PCG, PSG, banks), so it may need the IPL path instead.
 
 **E. Japanese MZ-700/800 programs: no Japanese character set (tester 2).** Japanese adventure games show garbage; the
-Japanese MZ-700 (MZ-700 JP) has a CG ROM with katakana in place of the European lower case. Load CGROM didn't help
-(the file must be the 40 KB combined layout).
-- [ ] Find the Japanese MZ-700 CG ROM (mz800emu ROM sets, MAME mz700j) and the MZ-80K Japanese CG (idealine
-      `MZ80K2E Jap CG`).
-- [ ] OSD option Character Set: Europe / Japan (per model), or a documented Load CGROM file per model made by a tool
-      (`tools/make_cgrom.py`), so users don't need the combined layout.
+Japanese MZ-700 has a CG ROM with katakana in place of the European lower case.
+- [x] The MZ-1500's CG in the core is MAME's `mz700fon.jpn`, the Japanese MZ-700 font, already in the core's format
+      (CG bank Ah). New OSD option MZ-700 Char Set: Europe / Japan selects it on the MZ-700 (status 56,
+      CONFIG(CG_JAPAN)). Sim: `--osd "MZ-700 Char Set=Japan"`. Hardware: X03 (Donkey Gorilla), X04 (Tiny Xevious).
+- [ ] MZ-800 Japanese: its CG is read by the CPU from the MZ-800 system ROM (1000-1FFF) and copied by the IPL into the
+      700-mode CG-RAM, so it needs a Japanese MZ-800 ROM image as well as a CG bank.
+- [ ] MZ-80K Japanese CG (idealine `MZ80K2E Jap CG`, 2 KB): the CG ROM image is full (12 banks), so it needs extending.
 
-**F. MZ-700 PCG (tester 2): "some games might use the PCG-8800".**
-- [ ] Check which PCG the core has for the MZ-700 (the original docs mention PCG-8000/PCG-1200), find a test program,
-      compare with mz800emu (which has PCG-700 support?).
+**F. MZ-700 PCG (tester 2): "some games might use the PCG-8800".** Probably the HAL PCG-700, the MZ-700's PCG.
+- [x] The core had its registers (E010 data, E011 address, E012 control: bits 0-1 address, 2 set, 3 display off,
+      4 strobe, 5 copy from ROM; idealine pcg700_05) but never switched the display to the PCG RAM (E012 bit 3 was
+      ignored) and wrote set 2 into set 1 on the MZ-700. Fixed in VideoController: with bit 3 low the upper 128
+      characters of each set come from the PCG RAM. Off at reset. Sim test pcg700_mz700 (tests/mz700); hardware X02.
+      mz800emu has no PCG-700, so the reference is the documentation.
+- [ ] Try Mappy with its PCG data (Year-Based 1984) and PCG BASIC (idealine) on hardware.
 
-**G. Graphics glitches on MZ-700 games (tester 2).** Metrocross: a third of the screen on the left; Tiny Xevious:
-garbage on the right side (the logo area) during play; Donkey Gorilla: title screen garbled (the game itself works).
-- [ ] Get the files (mz-archive / collection), run in the sim and in mz800emu (MZ-700 mode), compare screenshots.
-- [ ] Suspects: VRAM wait / blanking-access timing (OSD VRAM Wait), attribute RAM, the 8253 or vblank timing used for
-      raster tricks.
+**G. Graphics glitches on MZ-700 games (tester 2).**
+- [x] Metro-Cross (a third of the screen on the left): the game reads E200-E2FF in play; the core applied the MZ-80A's
+      hardware scroll (and E014/E015 display invert) on the MZ-700 too, which has neither. Now MZ-80A only. The
+      title matches mz800emu. Sim test e2scroll_mz700; hardware X01. `--trace-io` also logs those E-page accesses.
+- [x] Donkey Gorilla's garbled title and the odd text in Tiny Xevious and Metro-Cross ("(c) namco", "Arranged by
+      Oh!mz") are Japanese-set text shown in the European set (mz800emu shows the same); with MZ-700 Char Set: Japan
+      Donkey Gorilla's title is its Japanese instructions and the Namco texts read correctly (item E).
+- [ ] Tiny Xevious's side panel in play (":TINY: XEVIO :MZ", "(:C:):NA") is the same in mz800emu and in both sets;
+      ask the tester whether that is what they meant.
 
 Working well for testers: Snake & Snake (MZ-700), Donkey Gorilla in play, MZ-80K/80A BASIC programs.
 

@@ -118,6 +118,7 @@ module top(
    output        dbg_bde /*verilator public_flat*/,
    output [2:0]  dbg_map /*verilator public_flat*/,
    output        dbg_memwr /*verilator public_flat*/,
+   output        dbg_memrd /*verilator public_flat*/,
    output [15:0] dbg_addr /*verilator public_flat*/,
    output [7:0]  dbg_wdata /*verilator public_flat*/,
    output [1:0]  dbg_cse /*verilator public_flat*/,
@@ -230,6 +231,7 @@ module top(
    assign dbg_snd_en = sm.core.mz80hw.sound_enable;        // 8253 GATE0 (E008 bit 0)
    assign dbg_snd    = sm.core.mz80hw.sound_pulse_x2;      // 8253 OUT0
    assign dbg_memwr  = ~sm.core.t80_mreq_n & ~sm.core.t80_wr_n;
+   assign dbg_memrd  = ~sm.core.t80_mreq_n & ~sm.core.t80_rd_n;
 `ifdef KEYDBG
    // Keyboard debug: every change of what the CPU reads from E001 (8255 PB, the key data) with the row (E000 write).
    reg [7:0] kd_last = 8'hAA, kd_row = 0;

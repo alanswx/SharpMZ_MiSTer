@@ -178,7 +178,8 @@ wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & (cfg_model ==
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, status[18], 1'b0, 1'b0, 1'b0, cfg_display};  // video and graphics always on  // PCG is software controlled (E010-E012).
 wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
-wire [7:0] cfg_reg3_display = {4'd0, cfg_mz1500, status[32], 2'b00};   // 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
+wire       cfg_cg_japan = status[56] & (cfg_model == 3'b100) & ~cfg_mz1500;   // OSD MZ-700 Char Set: Japan (the MZ-1500's CG, MAME mz700fon.jpn)
+wire [7:0] cfg_reg3_display = {3'd0, cfg_cg_japan, cfg_mz1500, status[32], 2'b00};   // 4: Japanese CG. 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
 // CPU Speed: Normal, 2x .. 16x, Fastest. The core's steps past a model's limit fall back to the original speed, so
 // Fastest (and the old +6/+7) is that model's last step: 64 MHz on the MZ-80K/80C/1200/80A (5), 56/64 MHz elsewhere
 // (4), both capped at clk_sys/2 (about 35 MHz).

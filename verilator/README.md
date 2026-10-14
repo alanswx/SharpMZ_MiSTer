@@ -64,7 +64,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--mz800-mode 700\|800` | The MZ-800 rear switch (default 700, as mz800emu). |
 | `--turbo N`, `--vmode` | CPU speed step; video mode. |
 | `--trace-cpu FILE` | PC of every opcode fetch; `--trace-from`/`--trace-to` limit the frames. |
-| `--trace-io FILE` | Every I/O write: frame, PC, port, data. |
+| `--trace-io FILE` | Every I/O write: frame, PC, port, data. Also the E-page video registers as `frame,pc,mem,R/W,address[,data]`: writes to E010-E012 (PCG-700) and reads of E014/E015 (invert) and E200-E2FF (MZ-80A scroll). |
 | `--wav FILE` | Audio at 48 kHz, as `SharpMZ.sv` mixes it. |
 | `--dump-mem A:L:FILE` | Main RAM at exit (hex address and length). |
 | `--verbose` | Tape status and deck lines (`[cmt]`), record FSM and pulse widths, the tape transmitter's block type and state (`[xmit]`), MZ-800 mode changes, sound. |

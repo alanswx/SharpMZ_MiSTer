@@ -24,6 +24,9 @@
 #   tape_mz2000   MZ-2000: the MZ-2200 IPL loads Gang Man (../software/mz2200) to its title; frame hash.
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
 #   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
+#   pcg700_mz700  MZ-700: tests/mz700/pcg700.mzf programs code EF in both sets of a HAL PCG-700 (E010-E012) and
+#                 switches its display on; frame hash (the two EFs show the two patterns, the cursor the first)
+#   e2scroll_mz700 MZ-700: tests/mz700/e2scroll.mzf reads E250 in a loop; the MZ-80A scroll must not act; hash
 #   fdd_hd        MZ-800: 1.44 MB image on unit 2 (--fdd-b-hd); a sector 1.45 MB into the image written and read
 #                 back by tests/fdd/fdhd.mzf (status bytes, count, data). Skipped without ../software/dsk/_Vzor144.dsk.
 #   prn_ascii_mz700  tests/printer/prnsharp.mzf prints lowercase in Sharp codes with bare CRs; with --printer-ascii
@@ -101,6 +104,12 @@ pids+=($!); names+=("ipl_mz2000")
 ( $BIN --model mz1500 --stop-at-frame 151 --frame-log "$OUT/ipl_mz1500.csv" --quiet > /dev/null 2> "$OUT/ipl_mz1500.log"
   awk -F, '$1==150 {print $2}' "$OUT/ipl_mz1500.csv" > "$OUT/ipl_mz1500.txt" ) &
 pids+=($!); names+=("ipl_mz1500")
+for t in pcg700 e2scroll; do
+    ( $BIN --model mz700 --mzf tests/mz700/$t.mzf --mzf-direct --mzf-direct-frame 30 --direct-start --stop-at-frame 181 \
+          --frame-log "$OUT/${t}_mz700.csv" --quiet > /dev/null 2> "$OUT/${t}_mz700.log"
+      awk -F, '$1==180 {print $2}' "$OUT/${t}_mz700.csv" > "$OUT/${t}_mz700.txt" ) &
+    pids+=($!); names+=("${t}_mz700")
+done
 # Printer: tests/printer/prntest.mzf prints two lines through the Sharp handshake (MZ-700 ports FE/FF, MZ-800 PIO);
 # the sim decodes the UART line (9600 8N1) into the .bin, compared as hex with tests/expected/prn_*.txt.
 ( $BIN --model mz700 --mzf tests/printer/prntest.mzf --mzf-direct --mzf-direct-frame 20 --type '100:J2000\n' \
@@ -266,6 +275,14 @@ for n in "${names[@]}"; do
                 echo "PASS $n"
             else
                 echo "FAIL $n"; head -5 "$OUT/tape_image.txt"; fail=1
+            fi ;;
+        *)                                   # everything else: the output against tests/expected/<name>.txt
+            if [ ! -f "tests/expected/$n.txt" ]; then
+                echo "FAIL $n (no tests/expected/$n.txt)"; fail=1
+            elif diff -q "tests/expected/$n.txt" "$OUT/$n.txt" > /dev/null; then
+                echo "PASS $n"
+            else
+                echo "FAIL $n"; diff "tests/expected/$n.txt" "$OUT/$n.txt" | head -5; fail=1
             fi ;;
     esac
 done

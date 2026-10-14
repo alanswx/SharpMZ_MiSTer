@@ -327,6 +327,18 @@ for name, model, desc, src, wait in [
         ('L08', 'MZ80K', 'Load Direct on the MZ-80K: Galactic Attack', yb(1980, 'MZ-80K', 'Galactic Attack (1980)(Cromwell Computing).mzf'), 8),
         ('L09', 'MZ80A', 'Load Direct on the MZ-80A: Super Fire', yb(1980, 'MZ-80A', 'Super Fire (1980).mzf'), 8)]:
     test(name, model, desc, files=[('f', 2, src)], steps=[('wait', wait), ('shot', 'run')])
+
+# MZ-700 video (tester report 2026-10-13, G/F/E): Load Direct, then the picture.
+test('X01', 'MZ700', 'MZ-700: Metro-Cross title in place (the MZ-80A E200 scroll no longer acts on the MZ-700)',
+     files=[('f', 2, yb(1989, 'MZ-700', 'Metro-Cross (1989)(Namco).mzt'))], steps=[('wait', 14), ('shot', 'title')])
+test('X02', 'MZ700', 'MZ-700 PCG-700: line 2 shows the programmed EF (set 1), A, the box (set 2); the cursor is the EF',
+     files=[('f', 2, os.path.join(ROOT, 'verilator/tests/mz700/pcg700.mzf'))], steps=[('wait', 5), ('shot', 'pcg')])
+test('X03', 'MZ700', 'MZ-700 Char Set Japan: Donkey Gorilla title in katakana',
+     files=[('f', 2, yb('19xx', 'MZ-700', 'Donkey Gorilla (19xx)(Tecno Soft).mzt'))], opts=osd('MZ-700 Char Set=Japan'),
+     steps=[('wait', 20), ('shot', 'title')])
+test('X04', 'MZ700', 'MZ-700 Char Set Japan: Tiny Xevious in play (the panel on the right)',
+     files=[('f', 2, yb('19xx', 'MZ-700', 'Tiny Xevious (19xx)(Namco).mzt'))], opts=osd('MZ-700 Char Set=Japan'),
+     steps=[('wait', 12), ('type', ' '), ('wait', 8), ('shot', 'play')])
 # Puckn Boy after MZ-1Z002 BASIC from one tape image (the CMT used to keep sending BASIC's backup copy).
 test('L10', 'MZ2000', 'MZ-2000: MZ-1Z002 BASIC from the IPL, then MON, L: Puckn Boy loads and starts',
      files=[('s', 0, os.path.join(ROOT, 'verilator/out/pb2/t.mzt'))], opts=[FAST_TAPE(5)], reset=True,
@@ -516,7 +528,7 @@ def basic_tests(n, seed=1):
 
 # --quick: one or two tests per model and feature (about 15 minutes).
 QUICK = {'T01', 'T02', 'T03', 'T04', 'T05', 'T06', 'T07', 'T08', 'T09', 'T13', 'T21', 'T22', 'T25', 'T26',
-         'W01', 'L01', 'L04', 'L05', 'L07', 'L08', 'L09', 'L10', 'L12', 'V01'}
+         'W01', 'L01', 'L04', 'L05', 'L07', 'L08', 'L09', 'L10', 'L12', 'V01', 'X01', 'X02', 'X03', 'X04'}
 
 MENU = f'{FAT}/_SharpMZ Tests'      # a folder starting with _ shows in the MiSTer main menu
 

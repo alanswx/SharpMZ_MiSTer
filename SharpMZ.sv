@@ -93,6 +93,7 @@ localparam CONF_STR =
 	"P1O[6:4],CPU Speed,Normal,2x,4x,8x,16x,Fastest;",
 	"P1O[30],MZ-80B/2000 Boot Reset,Off,On;",
 	"P1O[32],MZ-800 Mode,MZ-700,MZ-800;",
+	"P1O[56],MZ-700 Char Set,Europe,Japan;",
 	"P1O[39],MZ-1X03 Joysticks,Off,On;",
 	"P1O[51],Keyboard Layout,PC,Sharp;",
 	"-;",

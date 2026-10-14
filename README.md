@@ -16,7 +16,7 @@ How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and 
 
 * Z80 CPU at the original speed (2 MHz MZ-80K/C/1200/A, 3.547 MHz MZ-700/800, 4 MHz MZ-80B/2000), with turbo steps up to about 32–35 MHz.
 * Native video timing, 15.6 kHz (MZ-700/800/1500 50 Hz PAL, the others 60 Hz), scaled by the MiSTer framework for HDMI; analog output gets the native 15 kHz signal, or 31 kHz through the scandoubler (HQ2x, scanlines) for VGA monitors.
-* 40x25 and 80x25, mono and colour character modes; programmable character generator (PCG); MZ-80B/2000 graphics RAM.
+* 40x25 and 80x25, mono and colour character modes; programmable character generator (PCG): the MZ-700's HAL PCG-700 (E010-E012; programs switch it on), the MZ-1500's PCG; MZ-80B/2000 graphics RAM.
 * MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, all 320x200/640x200 graphics modes with hardware scroll, the SN76489 sound chip and the Z80 PIO.
 * Floppy disk (MB8876 interface on the MZ-700, MZ-800, MZ-80B and MZ-2000): two drives from Extended DSK (`.dsk`) or D88/D77 images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks; the MZ-80B/2000 IPL boots Disk BASIC, CP/M and TF-DOS.
 * 8253 sound or the tape signal on the audio output.
@@ -44,6 +44,7 @@ The tape loads, the tape image and the two floppy drives are on the OSD's first 
 | Keyboard Layout | PC (default): each key types what is printed on it, as on a US PC keyboard, on every model: the core presses or releases the machine's SHIFT as needed (on the MZ-80A, @ is unshifted and " is SHIFT 2). Letters, Return, the cursor keys and so on work as in the Sharp layout, so letters type capitals as on the real machines. Characters a model doesn't have do nothing. Sharp: each key is the Sharp key in its place, with the Sharp machine's own legends (for games and for typing as on the original keyboard). On the MZ-80A, MZ-700, MZ-800 and MZ-1500, Ctrl is CTRL (CTL), Esc is BREAK and Alt is GRAPH (GRPH). |
 | MZ-1X03 Joysticks | MZ-700/MZ-1500: connect two Sharp MZ-1X03 joysticks (MiSTer joysticks 1 and 2, read on E008). The MZ-800's own joystick ports (F0/F1) are always connected. |
 | MZ-800 Mode | The MZ-800 rear switch. In MZ-800 mode the IPL switches to MZ-800 graphics before starting a program loaded from tape; in MZ-700 mode (default) programs start in MZ-700 mode, which MZ-700 software needs. Reset after changing it. |
+| MZ-700 Char Set | Europe (default) or Japan: the Japanese MZ-700's character generator, with katakana in place of the European lower case (the MZ-1500's CG, MAME `mz700fon.jpn`). Japanese games and adventures need it for their titles and text (Donkey Gorilla, Tiny Xevious's side panel). |
 
 ### Tape
 

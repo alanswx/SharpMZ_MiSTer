@@ -613,6 +613,16 @@ void Sim::clock()
         if (w && !prev_io_wr)
             fprintf(fio, "%u,%04X,%02X,%02X,%X\n", frame, top->cpu_pc, top->dbg_io_port, top->dbg_io_data, top->dbg_m8_dmd);
         prev_io_wr = w;
+        // The MZ-80K/80A video registers in the E page: E010-E012 (PCG) writes, E014/E015 (invert) and E200-E2FF
+        // (MZ-80A scroll) reads, as "mem" lines (frame,pc,mem,R/W,address,data).
+        static bool prev_mr = false, prev_mw = false;
+        bool mr = top->dbg_memrd, mw = top->dbg_memwr;
+        uint16_t a = top->dbg_addr;
+        if (mr && !prev_mr && ((a & 0xFF00) == 0xE200 || a == 0xE014 || a == 0xE015))
+            fprintf(fio, "%u,%04X,mem,R,%04X\n", frame, top->cpu_pc, a);
+        if (mw && !prev_mw && a >= 0xE010 && a <= 0xE012)
+            fprintf(fio, "%u,%04X,mem,W,%04X,%02X\n", frame, top->cpu_pc, a, top->dbg_wdata);
+        prev_mr = mr; prev_mw = mw;
     }
 
     if (opt.verbose) {                       // MZ-800 border (sim.v: always on): frame size as hps_io video_calc measures it
