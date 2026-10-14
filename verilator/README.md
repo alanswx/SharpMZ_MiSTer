@@ -26,17 +26,22 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
    - VHDL names that are Verilog keywords (`do`, `config`) are renamed.
    - `fix_port_aliases.py` restores `SIG <= in_port;` assignments that GHDL 5.1's Verilog writer drops.
 3. `dpram`/`dprom` (Altera `altsyncram` wrappers) are black boxes, implemented by `rtl_v/dpram.v` and `rtl_v/dprom.v`. `mif2hex.py` converts the `.mif` init files for `$readmemh`, so the ROMs are built in, as on hardware.
-4. `sim.v` stands in for `SharpMZ.sv` (including a behavioural DDR3 for the tape buffer, with random BUSY and read latency):
-   - the OSD configuration as inputs;
-   - the ioctl download bus (MZF to the tape buffer at `0x400000`/`0x410000`, direct loads into RAM at `0x100000+`);
-   - the tape image (`rtl/tape_image.sv`) and floppy (`rtl/mz_fdc.sv`, `rtl/wd1793.sv`) with their image slots.
-5. `sim_headless.cpp` emulates Main's side of hps_io: key presses, downloads, and the 512-byte sector handshake of the image slots (S0 tape, S1 floppy drive A).
+4. `sim.v` instantiates `rtl/sharpmz_top.sv`, the module `SharpMZ.sv` uses between hps_io and video_mixer. The configuration from the OSD status bits, the download routing, the resets, the tape image, Load Direct, the floppy, the Quick Disk, the printer, the border and the tape messages are therefore the hardware's own. `sim.v` adds:
+   - a behavioural DDR3 for the tape buffer, with random BUSY and read latency;
+   - hps_io's image slots, which hold the last mounted image's size and read-only flag;
+   - debug taps into the core.
+5. `sim_headless.cpp` emulates Main's side of hps_io:
+   - the 128-bit OSD status word;
+   - key presses;
+   - downloads, sent with their file index (F1 tape, F2 direct, F3 ROM) and file offsets, as Main sends them;
+   - the 512-byte sector handshake of the image slots (S0 tape, S1/S2 floppy, S3 Quick Disk).
 
 ## Options (main ones)
 
 | Option | |
 |---|---|
 | `--model M` | mz80k, mz80c, mz1200, mz80a, mz700, mz800, mz80b, mz2000 or mz1500 |
+| `--osd "NAME=VALUE, ..."` | Set OSD options by the names and values in `SharpMZ.sv`'s CONF_STR, case-insensitive, e.g. `--osd "Fast Tape=Off, MZ-800 Border=On"`. A value's index also works. Repeatable, and applied after the other options. `--osd-list` prints every option with its status bits and values. The sim's own defaults differ from the core's in a few places (Keyboard Layout Sharp, Fast Tape Off, Load Direct Start Reset Only, Tape Messages Off, MZ-800 Mode MZ-800) so the regression's expected results hold; `--osd` sets the core's. |
 | `--stop-at-frame N` | Run to frame N. |
 | `--screenshot N`, `--dump-every N` | PNGs of frames. |
 | `--ascii-end` | Print the text screen at exit. |
@@ -89,6 +94,10 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `fdd_cpm`, `fdd_hry` | CP/M 4.1 boots from disk and runs DIR; a games disk starts its file manager (pixel-identical to mz800emu). They need the images in `../software/dsk/` (not in the repository) and are skipped otherwise. |
 
 The test programs are in `tests/mz800/`, with the Python scripts that generate them.
+
+## OSD option sweep
+
+`python3 ../tools/osd_sweep.py` runs the sim once for every value of every OSD option, each on a model the option affects, from the core's defaults. It reports which runs fail and which change the picture against that model's default run, in `out/osd_sweep/report.md`, with a screenshot per run. `--only NAME` limits it to some options, and `--frames N` sets the run length. Scandoubler Fx and Aspect ratio act in video_mixer, outside the sim, so they are listed as hardware-only. `tools/sharpmz_osd.py` is the CONF_STR reader the sweep and `tools/mister_test.py` share, so hardware tests name options the same way (`osd('Tape Image Start=Direct')`).
 
 ## Notes
 

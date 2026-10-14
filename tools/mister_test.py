@@ -17,6 +17,9 @@ usage: mister_test.py [--host mister.local] [--rbf output_files/SharpMZ.rbf] [--
 """
 import argparse, datetime, hashlib, json, os, shutil, socket, subprocess, sys, time, urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sharpmz_osd import osd                   # OSD options by name, from SharpMZ.sv's CONF_STR
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SW = os.path.join(ROOT, 'software')
 GAMES800 = os.path.join(SW, 'MZ-800-full/MZ-800/MZ-800 Software/COM/MZF/Games/800')
@@ -32,19 +35,22 @@ CFG_VER = '_v5'           # CONF_STR "v,5"
 MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5, 'MZ2000': 6, 'MZ800': 7, 'MZ1500': 8}
 
 
+# The tests' baseline, where it differs from the core's defaults: Keyboard Layout Sharp (KEYS below types by position),
+# Fast Tape Off (the waits were made at real speed), Tape Messages Off (the overlay would change screenshots).
+BASELINE = 'Keyboard Layout=Sharp, Fast Tape=Off, Tape Messages=Off'
+
+
 def status_bytes(model, opts=()):
-    """16-byte CFG: status bit n is byte n/8, bit n%8. opts: (low_bit, width, value)."""
-    st = MODEL[model] << 35 | 1 << 51 | 1 << 21 | 1 << 55   # Keyboard Layout: Sharp (KEYS below types by position);
-                                                 # Fast Tape: Off; Tape Messages: Off (the overlay would change screenshots)
-                                                 # (the core's default is now Fastest; the tests' waits were made at real speed)
-    for lo, width, val in opts:
+    """16-byte CFG: status bit n is byte n/8, bit n%8. opts: (low_bit, width, value) from osd('Name=Value, ...')."""
+    st = 0
+    for lo, width, val in osd(f'Model={MODEL[model]}, ' + BASELINE) + list(opts):
         st = st & ~(((1 << width) - 1) << lo) | (val & ((1 << width) - 1)) << lo
     return st.to_bytes(16, 'little')
 
 
 FAST_TAPE = lambda step: (21, 3, step)     # OSD Fast Tape: 0 Fastest, 1 Off, 2 2x .. 5 16x, 6 Fastest (was 32x)
-PC_KEYS = (51, 1, 0)                       # OSD Keyboard Layout: PC (the tests default to Sharp)
-MZ800_MODE = (32, 1, 1)                    # rear switch in the MZ-800 position
+PC_KEYS = osd('Keyboard Layout=PC')[0]      # (the tests default to Sharp)
+MZ800_MODE = osd('MZ-800 Mode=MZ-800')[0]   # rear switch in the MZ-800 position
 
 # A test: name, model, OSD options, files to mount [(kind, index, local source)], reset after
 # mounting, then steps: ('wait', s) / ('type', text) / ('shot', label).
@@ -211,7 +217,7 @@ for n, (title, f) in enumerate([
 # OSD Floppy CRC Errors: DISK37 with Report (the IPL says "Loading error"), DISK38 with the default Ignore (boots).
 for n, (d, rep) in enumerate([('DISK37.DSK', 1), ('DISK38.DSK', 0)]):
     test(f'T{n + 27:02d}', 'MZ80B', f'MZ-80B floppy with bad sectors: {d}, CRC errors {"reported" if rep else "ignored"}',
-         files=[('s', 1, f'{RB}/{d}')], opts=[(42, 1, rep)], reset=True,
+         files=[('s', 1, f'{RB}/{d}')], opts=[(*osd('Floppy CRC Errors=Ignore')[0][:2], rep)], reset=True,
          steps=[('wait', 25), ('shot', 'a'), ('wait', 20), ('shot', 'b'), ('wait', 60), ('shot', 'c')])
 
 # Floppy write: CP/M 4.1 saves a file (SAVE 1 TEST.COM) on a copy of its system disk; DIR shows it, and the image
@@ -229,29 +235,29 @@ test('K09', 'MZ2000', 'MZ-2000 BASIC LOAD "EXPLORER" finds the third program on 
 # OSD Tape Image Start: Direct: the tape image's first program goes into RAM and starts (no L, no tape wait);
 # the second is then on the tape for LOAD.
 test('L13', 'MZ700', 'Tape Image Start Direct: BASIC 1Z-013B starts by itself, LOAD gets the next program, LIST',
-     files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(5), (52, 1, 1)], reset=True,
+     files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(5)] + osd('Tape Image Start=Direct'), reset=True,
      steps=[('wait', 8), ('shot', 'basic'), ('type', 'LOAD\n'), ('wait', 12), ('type', 'LIST\n'), ('wait', 4), ('shot', 'list')])
 
 PACK800 = os.path.join(ROOT, 'out/SharpMZ-tester-pack-20261004/games/SharpMZ/MZ-800')
 for n, game in (('L14', 'Exolon'), ('L15', 'Knight Lore')):     # a loading screen, then the game it loads from tape
     test(n, 'MZ800', f'Tape Image Start Direct: {game} (screen loader starts, loads the game from the tape)',
-         files=[('s', 0, f'{PACK800}/{game}.mzt')], opts=[FAST_TAPE(6), (52, 1, 1)], reset=True,
+         files=[('s', 0, f'{PACK800}/{game}.mzt')], opts=[FAST_TAPE(6)] + osd('Tape Image Start=Direct'), reset=True,
          steps=[('wait', 6), ('shot', 'loader'), ('wait', 30), ('shot', 'game')])
 
 # MZ-80B/2000 Boot Reset on (EeDee): a disk mounted while the IPL waits, then a reset, boots it; a second reset goes
 # back to the IPL and boots it again. Boot Reset used to hold the IPL ROM at 0000, so the IPL restarted for ever.
 RESET_KEYS = '29+56+100'
 test('F03', 'MZ80B', 'MZ-80B Boot Reset: disk mounted at the IPL, reset boots CP/M 2.2; reset again boots it again',
-     files=[], late=[('s', 1, f'{SW}/idealine/mz-80b/rb_DSK/DSK/DISK01.DSK', 8)], opts=[(30, 1, 1)],
+     files=[], late=[('s', 1, f'{SW}/idealine/mz-80b/rb_DSK/DSK/DISK01.DSK', 8)], opts=osd('MZ-80B/2000 Boot Reset=On'),
      steps=[('wait', 12), ('keys', RESET_KEYS), ('wait', 15), ('shot', 'cpm'), ('keys', RESET_KEYS), ('wait', 15), ('shot', 'again')])
 test('F04', 'MZ2000', 'MZ-2000 Boot Reset: TF-DOS disk mounted at the IPL, reset boots it',
-     files=[], late=[('s', 1, f'{SW}/fukui-mz2000/brave.d88', 8)], opts=[(30, 1, 1)],
+     files=[], late=[('s', 1, f'{SW}/fukui-mz2000/brave.d88', 8)], opts=osd('MZ-80B/2000 Boot Reset=On'),
      steps=[('wait', 12), ('keys', RESET_KEYS), ('wait', 20), ('shot', 'boot')])
 
 # OSD Tape Messages: the overlay names the record the tape image is at (TAPE 1/2 S-BASIC on mounting, TAPE 2/2 R.P.S.
 # once BASIC is in and the tape has stopped).
 test('L16', 'MZ700', 'Tape Messages overlay: after L loads BASIC, TAPE 2/2 R.P.S. at the bottom for 3 s',
-     files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6), (55, 1, 0)], reset=True,
+     files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6)] + osd('Tape Messages=On'), reset=True,
      steps=[('type', 'L\n')] + [s for k in range(24) for s in (('wait', 0.3), ('shot', f'{k:02d}'))])
 
 # MZ-80A floppy: the interface ROM (F000, banks 1Ah-1Bh) boots SA-6510 Disk BASIC: F at the monitor, Return for drive 1.
@@ -280,17 +286,17 @@ test('J01', 'MZ800', 'MZ-800 joystick: right + fire 1 held on a virtual pad, joy
 # 1.44 MB disk as CP/M 4.1's drive C: (OSD Floppy > Drive B Unit: 3rd = unit 2), a blank CP/M (E5) image in drive B:
 # DIR C:, SAVE a file there, DIR C: again; the image is fetched back.
 test('F01', 'MZ800', 'MZ-800 CP/M 4.1: 1.44 MB disk as drive C: (Drive B unit 2): DIR, SAVE, DIR',
-     files=[('s', 1, f'{DSK}/CPMv41 System.dsk'), ('s', 2, 'gen:blank144')], opts=[(48, 1, 1)], reset=True,
+     files=[('s', 1, f'{DSK}/CPMv41 System.dsk'), ('s', 2, 'gen:blank144')], opts=osd('Drive B Unit=1'), reset=True,
      steps=[('wait', 15), ('type', 'DIR C:\n'), ('wait', 6), ('shot', 'dir_empty'), ('type', 'SAVE 1 C:TEST.COM\n'),
             ('wait', 6), ('type', 'DIR C:\n'), ('wait', 6), ('shot', 'dir_saved'), ('fetch', 1)])
 
 # MZ-800 border (OSD Display > MZ-800 Border): Cybernoid and CP/M 4.1 with the border shown.
-test('T29', 'MZ800', 'MZ-800 border on: Cybernoid', files=[('s', 0, f'{GAMES800}/Cyberno.mzf')], opts=[FAST_TAPE(6), (43, 1, 1)],
+test('T29', 'MZ800', 'MZ-800 border on: Cybernoid', files=[('s', 0, f'{GAMES800}/Cyberno.mzf')], opts=[FAST_TAPE(6)] + osd('MZ-800 Border=On'),
      reset=True, steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 45), ('shot', 'a')])
 test('T31', 'MZ800', 'MZ-800 border on: a program sets the border to light red (OUT (CF) with B = 06)',
-     files=[('s', 0, f'{TESTS}/border.mzf')], opts=[FAST_TAPE(6), (43, 1, 1)], reset=True,
+     files=[('s', 0, f'{TESTS}/border.mzf')], opts=[FAST_TAPE(6)] + osd('MZ-800 Border=On'), reset=True,
      steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 15), ('shot', 'a')])
-test('T30', 'MZ800', 'MZ-800 border on: CP/M 4.1', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], opts=[(43, 1, 1)], reset=True,
+test('T30', 'MZ800', 'MZ-800 border on: CP/M 4.1', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], opts=osd('MZ-800 Border=On'), reset=True,
      steps=[('wait', 15), ('shot', 'boot')])
 
 # More MZ-2000 tapes (software/mz2200): the IPL loads them from the tape image (fast tape 32x).
@@ -341,14 +347,14 @@ test('L12', 'MZ700', 'MZ-700 Tape Image order: L loads BASIC 1Z-013B (record 1),
 # no daemon needed) and compared with the simulation's bytes (verilator/tests/expected/prn_*.txt).
 PRN = os.path.join(ROOT, 'verilator/tests/printer')
 test('P01', 'MZ700', 'Printer (UART): prntest prints two lines; the bytes on /dev/ttyS1 match the sim (prn_mz700)',
-     files=[('f', 2, f'{PRN}/prntest.mzf')], opts=[(47, 1, 1)],
+     files=[('f', 2, f'{PRN}/prntest.mzf')], opts=osd('Printer=1'),
      steps=[('capture', 'start'), ('wait', 10), ('capture', 'prn_mz700'), ('shot', 'done')])
 test('P02', 'MZ700', 'Printer Charset ASCII: Sharp lowercase and bare CRs arrive as ASCII with CR LF (prn_ascii_mz700)',
-     files=[('f', 2, f'{PRN}/prnsharp.mzf')], opts=[(47, 1, 1), (50, 1, 1)],
+     files=[('f', 2, f'{PRN}/prnsharp.mzf')], opts=osd('Printer=1, Printer Charset=ASCII'),
      steps=[('capture', 'start'), ('wait', 10), ('capture', 'prn_ascii_mz700'), ('shot', 'done')])
 
 test('P03', 'MZ700', 'MZ-700 BASIC: LIST/P, then PRINT/P "HELLO" (the sim seemed to drop the PRINT/P)',
-     files=[('f', 2, yb('BASIC', 'MZ-700', 'BASIC 1Z-013B.mzf'))], opts=[(47, 1, 1)],
+     files=[('f', 2, yb('BASIC', 'MZ-700', 'BASIC 1Z-013B.mzf'))], opts=osd('Printer=1'),
      steps=[('capture', 'start'), ('wait', 6), ('type', '10 REM TEST\n'), ('wait', 1), ('type', 'LIST/P\n'), ('wait', 4),
             ('type', 'PRINT/P "HELLO"\n'), ('wait', 4), ('shot', 'screen'), ('capture', 'show')])
 
@@ -383,7 +389,7 @@ test('V02', 'MZ80A', 'Scandoubler HQ2x: MZ-80A monitor (60 Hz, 8 MHz pixels)', o
 test('V03', 'MZ800', 'Scandoubler CRT 25%: MZ-800 CP/M 4.1 (640 mode)', files=[('s', 1, f'{DSK}/CPMv41 System.dsk')], opts=[SDFX(2)],
      reset=True, steps=[('wait', 15), ('shot', 'boot')])
 test('V04', 'MZ800', 'Scandoubler CRT 50% with the MZ-800 border', files=[('s', 0, f'{TESTS}/border.mzf')],
-     opts=[FAST_TAPE(6), (43, 1, 1), SDFX(3)], reset=True,
+     opts=[FAST_TAPE(6), SDFX(3)] + osd('MZ-800 Border=On'), reset=True,
      steps=[('wait', 6), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 15), ('shot', 'a')])
 test('V05', 'MZ80B', 'Scandoubler CRT 50%: MZ-80B (80 columns, 16 MHz pixels)', files=[('s', 1, f'{RB}/DISK23.DSK')], opts=[SDFX(3)],
      reset=True, steps=[('wait', 20), ('shot', 'boot')])
