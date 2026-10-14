@@ -1405,6 +1405,8 @@ begin
                                 else
                                 "011000"                  when CONFIG(MZ80A)                 = '1' and T80_A16(11) = '1'                 and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')
                                 else
+                                "11010" & T80_A16(11)     when CONFIG(MZ700)                 = '1' and CONFIG(REGION_JAPAN) = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')   -- Japanese MZ-700: 1Z-009B
+                                else
                                 "01110" & T80_A16(11)     when CONFIG(MZ700)                 = '1' and (CONFIG(NORMAL80) = '0' and CONFIG(COLOUR80) = '0')
                                 else
                                 "01111" & T80_A16(11)     when CONFIG(MZ700)                 = '1' and (CONFIG(NORMAL80) = '1' or CONFIG(COLOUR80) = '1')

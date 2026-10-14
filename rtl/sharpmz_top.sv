@@ -93,6 +93,7 @@ wire        tape_msg;                               // tape_image -> tape_osd: w
 wire  [1:0] tape_msg_kind;
 wire  [7:0] tape_rec_total;
 wire[127:0] tape_rec_name;
+wire        tape_rec_qd;                            // the record is a Quick Disk BASIC file (tape_osd: "QD:")
 wire        warm_reset_user;                        // the resets that also reset the tape engine (below)
 reg         tape_ram_load_d = 0;
 wire        ds_bus_active, ds_bus_wr, ds_inj_go;   // Load Direct start (direct_start, below)
@@ -178,8 +179,8 @@ wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & (cfg_model ==
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, status[18], 1'b0, 1'b0, 1'b0, cfg_display};  // video and graphics always on  // PCG is software controlled (E010-E012).
 wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
-wire       cfg_cg_japan = status[56] & (cfg_model == 3'b100) & ~cfg_mz1500;   // OSD MZ-700 Char Set: Japan (the MZ-1500's CG, MAME mz700fon.jpn)
-wire [7:0] cfg_reg3_display = {3'd0, cfg_cg_japan, cfg_mz1500, status[32], 2'b00};   // 4: Japanese CG. 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
+wire       cfg_japan = status[56] & (cfg_model == 3'b100) & ~cfg_mz1500;   // OSD Region: Japan (MZ-700: Japanese CG, monitor 1Z-009B, 60 Hz)
+wire [7:0] cfg_reg3_display = {3'd0, cfg_japan, cfg_mz1500, status[32], 2'b00};   // 4: Japanese MZ-700. 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
 // CPU Speed: Normal, 2x .. 16x, Fastest. The core's steps past a model's limit fall back to the original speed, so
 // Fastest (and the old +6/+7) is that model's last step: 64 MHz on the MZ-80K/80C/1200/80A (5), 56/64 MHz elsewhere
 // (4), both capped at clk_sys/2 (about 35 MHz).
@@ -321,7 +322,7 @@ tape_image tape_image
 
 	.mounted(tape_mounted),
 	.tape_full(tape_full),
-	.msg(tape_msg), .msg_kind(tape_msg_kind), .rec_total(tape_rec_total), .rec_name(tape_rec_name),
+	.msg(tape_msg), .msg_kind(tape_msg_kind), .rec_total(tape_rec_total), .rec_name(tape_rec_name), .rec_qd(tape_rec_qd),
 	.record_no(tape_record)
 );
 
@@ -413,9 +414,13 @@ wire [13:0] audio_psg;                              // MZ-800 PSG mix; MZ-1500 l
 wire [13:0] audio_psg_r;                            // MZ-1500 right PSG; the MZ-800 PSG otherwise.
 // The beeper (8253 counter 0) is as loud as one PSG channel on the machines with a PSG, as mz800emu mixes them
 // (each source at the same gain); on the others it is the only source and uses the full range.
+// On the MZ-800/1500 everything is 3x the PSG's 14-bit mix: one channel at full volume was 1/16 of full scale
+// (testers: "extremely low"); now four channels and the beeper at full volume reach 61428 of 65535.
 wire        has_psg = (cfg_model == 3'b101) | cfg_mz1500;
-wire [15:0] beep_l  = has_psg ? {3'b000, audio_l_emu, 12'd0} : {1'b0, audio_l_emu, 14'd0};
-wire [15:0] beep_r  = has_psg ? {3'b000, audio_r_emu, 12'd0} : {1'b0, audio_r_emu, 14'd0};
+wire [15:0] beep_l  = has_psg ? (audio_l_emu ? 16'd12288 : 16'd0) : {1'b0, audio_l_emu, 14'd0};
+wire [15:0] beep_r  = has_psg ? (audio_r_emu ? 16'd12288 : 16'd0) : {1'b0, audio_r_emu, 14'd0};
+wire [15:0] psg_l   = {2'b00, audio_psg} + {1'b0, audio_psg, 1'b0};       // x3
+wire [15:0] psg_r   = {2'b00, audio_psg_r} + {1'b0, audio_psg_r, 1'b0};
 // Tape Sound: the tape signal (playback, cmt_status[6]; recording, cmt_ctrl[0]) mixed in quietly while the tape
 // moves (cmt_status[4]), like a deck's monitor speaker; Audio Source = Tape plays it instead of the sound.
 wire        tape_bit = cmt_status[4] & (cmt_status[6] | cmt_ctrl[0]);
@@ -439,8 +444,8 @@ mz_printer #(.CLK_HZ(CLK_HZ)) mz_printer
 	.count()
 );
 assign uart_txd = status[47] ? prn_txd : 1'b1;
-assign audio_l = beep_l + {2'b00, audio_psg} + tape_snd;
-assign audio_r = beep_r + {2'b00, audio_psg_r} + tape_snd;
+assign audio_l = beep_l + psg_l + tape_snd;
+assign audio_r = beep_r + psg_r + tape_snd;
 
 wire clk_video_in;
 wire [7:0] R_emu;
@@ -652,7 +657,8 @@ tape_osd #(.CLK_HZ(CLK_HZ), .FONT_FILE(FONT_FILE), .A2D_FILE(A2D_FILE)) tape_osd
 	.kind(tape_msg_kind),
 	.rec_no(tape_msg_kind == 2'd2 ? tape_rec_total - 1'd1 : tape_record),
 	.rec_total(tape_rec_total),
-	.name(tape_rec_name)
+	.name(tape_rec_name),
+	.qd_file(tape_rec_qd & cfg_mz1500)
 );
 
 

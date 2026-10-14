@@ -75,6 +75,7 @@ struct Options {
     std::map<uint32_t, std::string> qd_swaps;   // frame -> Quick Disk image to mount then (side B etc.)
     std::string trace_file;
     std::string wav_file;
+    std::string wav_out_file;                // --wav-out: the core's final stereo output (sharpmz_top audio_l/r)
     std::string io_file;
     uint32_t trace_from = 0, trace_to = UINT32_MAX;
     bool     quiet = false;
@@ -167,6 +168,7 @@ static void usage()
 "  --trace-cpu FILE       PC of each instruction fetch\n"
 "  --trace-io FILE        each I/O write: frame,pc,port,data,MZ-800 DMD\n"
 "  --wav FILE             audio at 48 kHz, 16-bit mono (sound/tape bit + MZ-800 PSG, as SharpMZ.sv)\n"
+"  --wav-out FILE         the core's final audio output (sharpmz_top audio_l/r), 48 kHz 16-bit stereo\n"
 "  --trace-from N         start tracing at frame N; --trace-to N stops after frame N\n"
 "\n"
 "fb_hash is FNV-1a 32 over the RGB888 bytes of the active (unblanked) picture,\n"
@@ -282,6 +284,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
         else if (a == "--trace-cpu") o.trace_file = next();
         else if (a == "--wav") o.wav_file = next();
+        else if (a == "--wav-out") o.wav_out_file = next();
         else if (a == "--trace-io") o.io_file = next();
         else if (a == "--trace-from") o.trace_from = parse_num(next());
         else if (a == "--trace-to") o.trace_to = parse_num(next());
@@ -392,10 +395,13 @@ private:
 
     // Audio capture (--wav): 48 kHz samples of AUDIO_L as SharpMZ.sv mixes it.
     FILE    *fwav = nullptr;
+    FILE    *fwav2 = nullptr;                // --wav-out
+    uint64_t wav2_acc = 0, wav2_samples = 0;
     FILE    *fio = nullptr;
     bool     prev_io_wr = false;
     uint64_t wav_acc = 0, wav_samples = 0;
     void wav_header();
+    void wav_out_header();
 
     // Tape image slot, emulating Main_MiSTer's side of hps_io's sd_* handshake.
     // Image slots: 0 = tape (S0), 1 = floppy drive A (S1). The buffer bus is shared.
@@ -650,6 +656,16 @@ void Sim::clock()
             if (top->dbg_snd_en != last_en || toggles || frame % 10 == 0)
                 fprintf(stderr, "[snd] frame %u gate %d out0 toggles %d map %d\n", frame, top->dbg_snd_en, toggles, top->dbg_map);
             last_en = top->dbg_snd_en; last_frame = frame; toggles = 0;
+        }
+    }
+
+    if (fwav2) {                             // 48 kHz stereo, signed (the core's output is unsigned around 0)
+        wav2_acc += 48000;
+        if (wav2_acc >= (uint64_t)CLK_HZ) {
+            wav2_acc -= (uint64_t)CLK_HZ;
+            int16_t lr[2] = {(int16_t)(top->AUDIO_OUT_L - 0x8000), (int16_t)(top->AUDIO_OUT_R - 0x8000)};
+            fwrite(lr, 2, 2, fwav2);
+            wav2_samples++;
         }
     }
 
@@ -967,6 +983,18 @@ void Sim::wav_header()
     fseek(fwav, 0, SEEK_END);
 }
 
+void Sim::wav_out_header()
+{
+    uint32_t data = (uint32_t)(wav2_samples * 4);
+    auto u32 = [&](uint32_t v) { fwrite(&v, 4, 1, fwav2); };
+    auto u16 = [&](uint16_t v) { fwrite(&v, 2, 1, fwav2); };
+    fseek(fwav2, 0, SEEK_SET);
+    fwrite("RIFF", 1, 4, fwav2); u32(36 + data); fwrite("WAVEfmt ", 1, 8, fwav2);
+    u32(16); u16(1); u16(2); u32(48000); u32(192000); u16(4); u16(16);
+    fwrite("data", 1, 4, fwav2); u32(data);
+    fseek(fwav2, 0, SEEK_END);
+}
+
 void Sim::write_png(uint32_t f)
 {
     if (fb_w == 0 || fb_h == 0) return;
@@ -1033,6 +1061,10 @@ int Sim::run()
         if (!(fwav = fopen(opt.wav_file.c_str(), "wb"))) { fprintf(stderr, "cannot write %s\n", opt.wav_file.c_str()); return 2; }
         wav_header();
     }
+    if (!opt.wav_out_file.empty()) {
+        if (!(fwav2 = fopen(opt.wav_out_file.c_str(), "wb"))) { fprintf(stderr, "cannot write %s\n", opt.wav_out_file.c_str()); return 2; }
+        wav_out_header();
+    }
     if (!opt.trace_file.empty() && !(ftrace = fopen(opt.trace_file.c_str(), "w"))) {
         fprintf(stderr, "cannot write %s\n", opt.trace_file.c_str()); return 2;
     }
@@ -1090,6 +1122,7 @@ int Sim::run()
     dump_memory();
     if (flog) fclose(flog);
     if (fwav) { wav_header(); fclose(fwav); }
+    if (fwav2) { wav_out_header(); fclose(fwav2); }
     if (fio) fclose(fio);
     if (ftrace) fclose(ftrace);
     return exit_code;

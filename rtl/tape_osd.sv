@@ -9,6 +9,8 @@
 //                      TAPE 6/5 END                  past the last record
 //                      TAPE SAVED 6 MYPROG           a save was appended to the image
 //                      TAPE FULL                     no room for a save
+//                      QD:  1/1 ZULPOKO              an MZ-1500 Quick Disk BASIC file dumped to tape (type 02 at
+//                                                    A215): MZ-5Z001 only loads it from a Quick Disk
 //                  MiSTer's own popups (CONF_STR "I,") only show fixed strings, so they can't name the program.
 //
 //                  The text is drawn between the core's video and video_mixer, so it works at 15 kHz and
@@ -41,7 +43,8 @@ module tape_osd #(
 	input       [1:0] kind,            // 0 record ready, 1 end of tape, 2 saved, 3 full
 	input       [7:0] rec_no,          // 0 = the first record
 	input       [7:0] rec_total,
-	input     [127:0] name             // header bytes 1-16 (byte 1 in bits 7:0), ended by 0D
+	input     [127:0] name,            // header bytes 1-16 (byte 1 in bits 7:0), ended by 0D
+	input             qd_file          // the record is a Quick Disk file (MZ-1500): "QD:" in place of "TAPE"
 );
 
 localparam COLS = 32;
@@ -80,12 +83,15 @@ task automatic put_str(input [8*12-1:0] s, input integer n, inout integer p);  /
 	end
 endtask
 
+reg qd_q = 0;               // qd_file, registered (it comes from the OSD status; timing)
+always @(posedge clk) qd_q <= qd_file;
+
 integer i, p, e;
 always @(posedge clk) begin
 	if (show & enable) begin
 		for (i = 0; i < COLS; i = i + 1) text[i] <= 8'h20;
 		p = 0;
-		put_str("TAPE        ", 5, p);
+		put_str((qd_q && kind == 2'd0) ? "QD:         " : "TAPE        ", 5, p);   // QD: mount it as the Quick Disk (README)
 		case (kind)
 			2'd0, 2'd1: begin
 				put_num(rec_no + 1'd1, p);

@@ -47,7 +47,7 @@ Needs GHDL 5.x, Verilator 5.x and Python 3 (`brew install ghdl verilator`). **Ru
 | `--ascii-end` | Print the text screen at exit. |
 | `--frame-log FILE` | Per frame: hash, CPU cycles, PC. |
 | `--type FRAME:TEXT` | Type text from a frame on, with escapes like `\n` and `{WAIT n}`, and key names such as `{LEFT}`, `{BS}`, `{BREAK}`. |
-| `--mzf FILE` | Put an MZF on the tape. `--mzf-direct` / `--mzf-direct-frame N` load it into RAM instead. |
+| `--mzf FILE` | Put an MZF on the tape through the core's CMT download (file index 1; no longer in the OSD, which uses the tape image, but kept for the tests). `--mzf-direct` / `--mzf-direct-frame N` load it into RAM instead (index 2, OSD Load Direct to RAM). |
 | `--direct-start` | After a direct load, start the program as the core's Load Direct: Start Program does (boot, restore 10F0-11FF, jump to exec). Off by default in the sim, so the tests that type `J` still work. |
 | `--tape-image FILE` | Mount a tape image (S0). Also `--tape-readonly`, `--tape-rewind`. |
 | `--fast-tape STEP` | The OSD Fast Tape step (0–7), not a multiplier. 4 is about 8x; 5 is the fastest (capped at clk_sys/2). |

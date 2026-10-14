@@ -21,6 +21,13 @@
 //  header, skipped), read through two 512-byte sector buffers with prefetch. If a sector is late the
 //  disk waits for it.
 //
+//  A tape (.mzt or .mzf: the image starts with an MZF header, type 01-05) is shown as the Quick Disk
+//  tools/mzf2qdf.py would make of it, built as the head moves: every record becomes a file (QD header:
+//  the MZF type and name, two zero bytes, size, load, exec; then the body), with the sync runs, A5 marks,
+//  CRCs and gaps of that layout. Many MZ-1500 titles survive only as Quick Disk files dumped to tape
+//  (Door Door, Rally-X, Zulpoko's BASIC files); they load this way without converting them. Such a disk
+//  is read only. At mount the records are counted for the disk's first block.
+//
 //  Writing follows the Z80 SIO in bisync mode as the MZ-1500 ROM drives it (FD4D-FDD9): WR5 b1 (RTS) is
 //  the write gate. With it and Tx enable (b3) on, every byte time the transmitter puts one byte on the disk:
 //  00 while WR5 b4 (break) is set, else the Tx buffer (F4), else on an underrun the CRC-16 of the bytes
@@ -76,6 +83,7 @@ reg        wprot   = 1;                          // image is read only
 reg [19:0] size    = 0;                          // image size (bytes)
 reg  [4:0] base    = 0;                          // 16 for a .qdf
 reg        base_known = 0;
+reg        tmode   = 0;                          // the image is a tape (.mzt/.mzf), shown as a Quick Disk
 
 // Two sector buffers, selected by the sector number's bit 0. Port A is the SD side, port B the head.
 wire [7:0] buf_q;
@@ -108,20 +116,71 @@ reg [16:0] pos = 0;                              // position in the disk stream 
 wire       motor = wb[5][7];
 assign busy = mounted & motor;
 
+// ---------------------------------------------------------------------------------------------
+// Tape as Quick Disk: the stream at pos, segment by segment (tools/mzf2qdf.py's layout).
+// ---------------------------------------------------------------------------------------------
+localparam [3:0] G_LEAD = 4'd0,  G_LSYNC = 4'd1, G_CMARK = 4'd2, G_CNT  = 4'd3, G_CCRC = 4'd4, G_CGAP = 4'd5,
+                 F_HSYNC = 4'd6, F_HMARK = 4'd7, F_HFLAG = 4'd8, F_HDR = 4'd9, F_HCRC = 4'd10, F_HGAP = 4'd11,
+                 F_BSYNC = 4'd12, F_BMARK = 4'd13, F_BFLAG = 4'd14, F_BODY = 4'd15;
+reg  [3:0] gseg   = G_LEAD;
+reg        gend   = 0;                           // past the last file: zeros
+reg [15:0] gcnt   = 0;                           // byte within the segment
+reg [15:0] gcrc   = 0;
+reg [19:0] gro    = 0;                           // image offset of the current record's MZF header
+reg [15:0] grsize = 0;                           // its body size
+reg  [6:0] gfile  = 0;                           // files done
+reg  [6:0] nfiles = 0;                           // records on the tape (counted at mount)
+reg        scan_done = 0;
+reg        scanning  = 0;
+reg [19:0] scan_addr = 0;
+
+// Header byte i of the QD file: the MZF type and name (0-17), two zero bytes, size, load and exec (MZF 18-23).
+wire        hdr_src  = (gcnt < 16'd18) | (gcnt >= 16'd20 && gcnt < 16'd26);
+wire        need_src = ~gend & ((gseg == F_HDR & hdr_src) | gseg == F_BODY);
+wire [19:0] src_addr = (gseg == F_BODY) ? gro + 20'd128 + {4'd0, gcnt} : gro + {4'd0, gcnt} - ((gcnt >= 16'd20) ? 20'd2 : 20'd0);
+
+function [15:0] glen(input [3:0] seg, input [15:0] rsize);   // segment lengths
+	case (seg)
+		G_LEAD: glen = 16'd4826;  G_LSYNC: glen = 16'd9;   G_CMARK: glen = 16'd1;  G_CNT:   glen = 16'd1;
+		G_CCRC: glen = 16'd2;     G_CGAP:  glen = 16'd2800;                                         // 16 x5, 00 x2795
+		F_HSYNC: glen = 16'd9;    F_HMARK: glen = 16'd1;   F_HFLAG: glen = 16'd3;  F_HDR:   glen = 16'd64;
+		F_HCRC: glen = 16'd2;     F_HGAP:  glen = 16'd261;                                          // 16 x6, 00 x255
+		F_BSYNC: glen = 16'd10;   F_BMARK: glen = 16'd1;   F_BFLAG: glen = 16'd3;  default: glen = rsize;   // F_BODY
+	endcase
+endfunction
+
 // The byte at pos: absolute offset, sector, buffer.
-wire [19:0] abs     = {3'd0, pos} + base;
+wire [19:0] abs     = tmode ? (scanning ? scan_addr : src_addr) : {3'd0, pos} + base;
 wire [10:0] sector  = abs[19:9];
 wire        b_sel   = sector[0];
 wire        in_img  = abs < size;
 wire        hit     = valid[b_sel] & (tag[b_sel] == sector);
 
-reg  [7:0] head_byte;                            // byte at pos, once fetched
+reg  [7:0] head_byte;                            // byte at abs, once fetched
 reg        head_ok = 0;                          // head_byte is current
 reg  [1:0] fetch = 0;
-reg [16:0] head_pos;
+reg [19:0] abs_last;
+reg [19:0] head_abs;                             // the offset head_byte was read from
+wire       byte_ok = head_ok & (head_abs == abs);
+
+// Tape as Quick Disk: the stream byte at pos.
+wire [7:0] gbyte = gend ? 8'h00 :
+                   (gseg == G_LEAD) ? 8'h00 :
+                   (gseg == G_LSYNC || gseg == F_HSYNC || gseg == F_BSYNC) ? 8'h16 :
+                   (gseg == G_CMARK || gseg == F_HMARK || gseg == F_BMARK) ? 8'hA5 :
+                   (gseg == G_CNT) ? {nfiles, 1'b0} :
+                   (gseg == G_CCRC || gseg == F_HCRC) ? (gcnt[0] ? gcrc[15:8] : gcrc[7:0]) :
+                   (gseg == G_CGAP) ? ((gcnt < 16'd5) ? 8'h16 : 8'h00) :
+                   (gseg == F_HGAP) ? ((gcnt < 16'd6) ? 8'h16 : 8'h00) :
+                   (gseg == F_HFLAG) ? ((gcnt == 16'd1) ? 8'h40 : 8'h00) :
+                   (gseg == F_BFLAG) ? ((gcnt == 16'd0) ? 8'h05 : (gcnt == 16'd1) ? grsize[7:0] : grsize[15:8]) :
+                   (gseg == F_HDR & ~hdr_src) ? 8'h00 :
+                   in_img ? head_byte : 8'h00;                       // header and body bytes from the tape
+// Ready to pass the head: a fetched image byte where one is needed; the file count once the scan is done.
+wire       gready = (gseg == G_CNT & ~gend) ? scan_done : (~need_src | ~in_img | byte_ok);
 
 // The byte under the head (FF past the end of the image or the medium).
-wire [7:0] next_byte = (in_img & (pos <= QD_MAX)) ? head_byte : 8'hFF;
+wire [7:0] next_byte = (pos > QD_MAX) ? 8'hFF : tmode ? gbyte : in_img ? head_byte : 8'hFF;
 wire       spinning  = mounted & motor & base_known;
 
 reg  [7:0] rx_buf;
@@ -167,17 +226,20 @@ assign io_din = rd_data;
 
 reg [7:0] last_b;                                // hunt: previous byte
 reg       consume;                               // the head moved on to the next byte
+reg       grewind = 0;                           // tape as Quick Disk: back to the start of the stream
+reg       gseg_body = 0;                         // the CRC / gap being sent is the body's (else the header's)
 
 always @(posedge clk_sys) begin
 	rd_last <= io_rd & sel;
 	wr_last <= io_wr & sel;
 	consume <= 0;
+	grewind <= 0;
 	hd_we   <= 0;
 
 	// --- the disk: one byte every BYTE_CLKS while the motor runs (waits for a late sector) ---
 	if (~spinning) tick <= BYTE_CLKS[12:0];
 	else if (tick != 0) tick <= tick - 1'd1;
-	else if ((head_ok | ~in_img | (pos > QD_MAX)) & ~consume) begin
+	else if (((tmode ? gready : (byte_ok | ~in_img)) | (pos > QD_MAX)) & ~consume) begin
 		tick    <= BYTE_CLKS[12:0];
 		consume <= 1;
 		if (wgate) begin
@@ -263,7 +325,7 @@ always @(posedge clk_sys) begin
 				end
 				else begin
 					if (pb == 2) rb2 <= io_dout;
-					if (pb == 5 && ~io_dout[7]) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; end   // motor off: rewind
+					if (pb == 5 && ~io_dout[7]) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; grewind <= 1; end   // motor off: rewind
 					pb <= 0;
 				end
 			end
@@ -273,6 +335,32 @@ always @(posedge clk_sys) begin
 
 	if (consume) pos <= pos + 1'd1;
 
+	// Tape as Quick Disk: the generator follows the head (consume is the byte that just passed).
+	if (consume & tmode & ~gend) begin
+		if (gseg == G_CMARK || gseg == F_HMARK || gseg == F_BMARK) gcrc <= crc16(16'd0, 8'hA5);
+		else if (gseg == G_CNT || gseg == F_HFLAG || gseg == F_HDR || gseg == F_BFLAG || gseg == F_BODY) gcrc <= crc16(gcrc, gbyte);
+		if (gseg == F_HDR && gcnt == 16'd20) grsize[7:0]  <= gbyte;
+		if (gseg == F_HDR && gcnt == 16'd21) grsize[15:8] <= gbyte;
+		if (gcnt + 1'd1 < glen(gseg, grsize)) gcnt <= gcnt + 1'd1;
+		else begin
+			gcnt <= 0;
+			case (gseg)
+				G_CGAP:  if (nfiles == 0) gend <= 1; else gseg <= F_HSYNC;
+				F_BFLAG: gseg <= (grsize == 0) ? F_HCRC : F_BODY;         // (an empty body: straight to its CRC)
+				F_BODY:  gseg <= F_HCRC;
+				F_HCRC:  gseg <= F_HGAP;                                   // (the header's or the body's CRC)
+				F_HGAP:  if (gseg_body) begin                              // after the body's gap: the next file
+				             gro <= gro + 20'd128 + {4'd0, grsize};
+				             gfile <= gfile + 1'd1;
+				             gseg_body <= 0;
+				             if (gfile + 1'd1 >= nfiles) gend <= 1; else gseg <= F_HSYNC;
+				         end
+				         else begin gseg <= F_BSYNC; gseg_body <= 1; end
+				default: gseg <= gseg + 1'd1;
+			endcase
+		end
+	end
+
 	if (reset) begin
 		wa[0] <= 0; wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0;
 		wb[0] <= 0; wb[1] <= 0; wb[2] <= 0; wb[3] <= 0; wb[4] <= 0; wb[5] <= 0; wb[6] <= 0; wb[7] <= 0;
@@ -280,6 +368,9 @@ always @(posedge clk_sys) begin
 		tx_full <= 0; eom <= 1; crc <= 0;
 	end
 	if (img_mounted) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; dirty <= 0; end
+	if (grewind | reset | img_mounted) begin
+		gseg <= G_LEAD; gcnt <= 0; gcrc <= 0; gro <= 0; grsize <= 0; gfile <= 0; gend <= 0; gseg_body <= 0;
+	end
 	if (wb_clear) dirty[wb_buf] <= 0;
 end
 
@@ -287,7 +378,7 @@ end
 // Fetch the byte at pos from the buffers (2 clocks); invalidate when pos moves.
 // ---------------------------------------------------------------------------------------------
 always @(posedge clk_sys) begin
-	if (consume | img_mounted | reset | (head_pos != pos)) begin
+	if (consume | img_mounted | reset | (abs_last != abs)) begin
 		head_ok <= 0;
 		fetch   <= 0;
 	end
@@ -295,10 +386,10 @@ always @(posedge clk_sys) begin
 		case (fetch)
 			2'd0: begin buf_raddr <= {b_sel, abs[8:0]}; fetch <= 2'd1; end
 			2'd1: fetch <= 2'd2;
-			2'd2: begin head_byte <= buf_q; head_ok <= 1; fetch <= 0; end
+			2'd2: begin head_byte <= buf_q; head_abs <= abs; head_ok <= 1; fetch <= 0; end
 		endcase
 	end
-	head_pos <= pos;
+	abs_last <= abs;
 end
 
 // ---------------------------------------------------------------------------------------------
@@ -313,7 +404,7 @@ reg        wb_buf;
 wire       wb0 = dirty[0] & (~motor | tag[0] != sector);
 wire       wb1 = dirty[1] & (~motor | tag[1] != sector);
 
-wire [10:0] want0 = base_known ? sector : 11'd0;
+wire [10:0] want0 = base_known ? sector : 11'd0;      // (tape as Quick Disk: the sector of the byte the generator or the scan wants)
 wire [10:0] want1 = sector + 1'd1;
 wire        need0 = ~(valid[want0[0]] & tag[want0[0]] == want0);
 wire        need1 = base_known & ({want1, 9'd0} < size) & ~(valid[want1[0]] & tag[want1[0]] == want1);
@@ -331,7 +422,7 @@ always @(posedge clk_sys) begin
 			sd_wr    <= 1;
 			ld_state <= 3'd4;
 		end
-		else if (mounted & (motor | ~base_known)) begin
+		else if (mounted & (motor | ~base_known | scanning)) begin
 			if (need0) begin ld_sector <= want0; ld_state <= 3'd1; end
 			else if (need1 & motor) begin ld_sector <= want1; ld_state <= 3'd1; end
 		end
@@ -358,6 +449,8 @@ always @(posedge clk_sys) begin
 		if (sd_buff_addr == 2) begin
 			base       <= ({hdr[15:0], sd_buff_dout} == 24'h2D5144) ? 5'd16 : 5'd0;   // "-QD"
 			base_known <= 1;
+			// An MZF header (type 01-05, then the name) rather than a disk stream (.mzq: 00 16 16; .qdf: "-QD").
+			if (hdr[15:8] >= 8'h01 && hdr[15:8] <= 8'h05 && hdr[7:0] != 8'h16) begin tmode <= 1; wprot <= 1; end
 		end
 	end
 
@@ -368,9 +461,40 @@ always @(posedge clk_sys) begin
 		valid      <= 0;
 		base_known <= 0;
 		base       <= 0;
+		tmode      <= 0;
 		ld_state   <= 0;
 		sd_rd      <= 0;
 		sd_wr      <= 0;
+	end
+end
+
+// ---------------------------------------------------------------------------------------------
+// Tape as Quick Disk: count the tape's records at mount (type byte, size), for the disk's first block.
+// ---------------------------------------------------------------------------------------------
+reg  [1:0] scan_st = 0;
+reg [19:0] scan_o;                               // the record's offset
+reg  [7:0] scan_slo;
+
+always @(posedge clk_sys) begin
+	if (img_mounted | reset) begin
+		scanning <= 0; scan_done <= 0; nfiles <= 0; scan_st <= 0; scan_o <= 0; scan_addr <= 0;
+	end
+	else if (tmode & base_known & ~scan_done) begin
+		scanning <= 1;
+		case (scan_st)
+			2'd0: if (scan_o + 20'd128 > size || nfiles == 7'd127) begin scanning <= 0; scan_done <= 1; end
+			      else begin scan_addr <= scan_o; scan_st <= 2'd1; end
+			2'd1: if (byte_ok) begin
+			          if (head_byte == 8'h00) begin scanning <= 0; scan_done <= 1; end   // type 0 ends the tape
+			          else begin scan_addr <= scan_o + 20'd18; scan_st <= 2'd2; end
+			      end
+			2'd2: if (byte_ok) begin scan_slo <= head_byte; scan_addr <= scan_o + 20'd19; scan_st <= 2'd3; end
+			2'd3: if (byte_ok) begin
+			          nfiles  <= nfiles + 1'd1;
+			          scan_o  <= scan_o + 20'd128 + {4'd0, head_byte, scan_slo};
+			          scan_st <= 2'd0;
+			      end
+		endcase
 	end
 end
 

@@ -83,7 +83,8 @@ module tape_image
 	output reg        msg = 0,
 	output reg  [1:0] msg_kind,        // 0 record ready (record_no), 1 end of tape, 2 saved, 3 full
 	output reg  [7:0] rec_total = 0,   // records on the tape
-	output reg[127:0] rec_name         // header bytes 1-16 of the record (byte 1 in bits 7:0)
+	output reg[127:0] rec_name,        // header bytes 1-16 of the record (byte 1 in bits 7:0)
+	output            rec_qd           // the record is an MZ-5Z001 Quick Disk BASIC file (type 02 loading at A215)
 );
 
 // CMT_BUS_OUT bit positions (mctrl_pkg.vhd).
@@ -143,6 +144,8 @@ reg [15:0] rec_size;       // Data size of the record at rpos.
 reg        loaded;         // The CMT buffer holds the record at rpos.
 reg        direct_pending = 0;  // Start direct: the first record goes to RAM when it is loaded.
 reg [15:0] load_addr;      // Its load address (header bytes 20-21).
+reg  [7:0] rec_type;       // Its type (header byte 0).
+assign rec_qd = (rec_type == 8'h02) & (load_addr == 16'hA215);
 
 // Previous record offsets, for APSS seek back.
 reg [31:0] hist[8];
@@ -343,6 +346,7 @@ always @(posedge clk) begin
 	end
 	S_LOAD_HDR_WR: if (!bus_busy) begin
 		if (cnt >= 17'd1 && cnt <= 17'd16) rec_name[8*(cnt[3:0] - 4'd1) +: 8] <= img_byte;
+		if (cnt == 17'd0)  rec_type <= img_byte;
 		if (cnt == 17'd20) load_addr[7:0]  <= img_byte;
 		if (cnt == 17'd21) load_addr[15:8] <= img_byte;
 		bus_addr <= ram_load ? SYSRAM + 25'h10F0 + cnt[6:0] : CMT_HDR + cnt[6:0];

@@ -45,6 +45,8 @@ module top(
 
    output        AUDIO_L /*verilator public_flat*/,    // the 1-bit sound (8253 / tape), before the mix
    output [13:0] AUDIO_PSG /*verilator public_flat*/,  // MZ-800 PSG / MZ-1500 left PSG
+   output [15:0] AUDIO_OUT_L /*verilator public_flat*/,  // the core's final audio (sharpmz_top audio_l/r: unsigned, as
+   output [15:0] AUDIO_OUT_R /*verilator public_flat*/,  // SharpMZ.sv gives the framework with AUDIO_S = 0)
    output        prn_txd /*verilator public_flat*/,
 
    output [15:0] cpu_pc /*verilator public_flat*/,
@@ -205,6 +207,8 @@ module top(
    );
 
    assign AUDIO_L      = sm.audio_l_emu;
+   assign AUDIO_OUT_L  = aud_l;
+   assign AUDIO_OUT_R  = aud_r;
    assign AUDIO_PSG    = sm.audio_psg;
    assign prn_txd      = uart_txd;
    assign fdd_busy     = sm.fdd_busy;

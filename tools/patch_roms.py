@@ -9,6 +9,8 @@ Run after romtool (build_meminitfiles.sh).
   combined_mrom  0x17800: the MZ-2000 IPL banks (40 and 80 column): MZ2000_IPL.rom (MAME mz20ipl.bin, CRC d7ccf37f).
   combined_mrom  0x11800: MZ-1500 9Z-502M monitor (banks 23h/24h) and E800/F000/F800 (27h-29h), the old MZ-800 slots;
                           ROMs from mz800emu (ROM_MZ1500_0000/E000).
+  combined_mrom  0x1A000: the Japanese MZ-700 monitor 1Z-009B (MZ700J_1Z009B.rom, idealine.info mz-800/1z-009b.zip;
+                          the MZ-1500's monitor is the same ROM with its reset jumping to the IPL), banks 34h/35h.
   combined_cgrom 0x5000:  the MZ-1500 CG (4 KB, CG bank Ah), bit-reversed from mz800emu's copy.
   combined_cgrom 0x3000:  the MZ-800 CG (the MZ-700 CG with each byte bit-reversed).
   combined_cgrom 0x4800:  the MZ-2000 CG with katakana (MAME font.bin, CRC 6ae6ce8e; rebuilt from EmuZ-2000 bitmaps,
@@ -60,6 +62,10 @@ m1500 = read("MZ1500_0000.rom"); e1500 = read("MZ1500_E000.rom")
 assert len(m1500) == 0x1000 and len(e1500) == 0x2000
 patch("combined_mrom", 0x23 * 0x800, m1500)
 patch("combined_mrom", 0x27 * 0x800, e1500[0x800:0x2000])
+# MROM_BANK "11010x" = the Japanese MZ-700's 1Z-009B monitor at 0000-0FFF (OSD Region: Japan).
+m700j = read("MZ700J_1Z009B.rom")
+assert len(m700j) == 0x1000
+patch("combined_mrom", 0x34 * 0x800, m700j)
 # CG_BANK "1001" (video_vc.vhd) = MZ-2000.
 cg2000 = read("MZ2000_CGROM.rom")
 assert len(cg2000) == 0x800

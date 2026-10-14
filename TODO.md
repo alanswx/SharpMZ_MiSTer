@@ -50,41 +50,60 @@ In order; each result is checked on mister.local later.
 
 Waiting for the hardware: the scandoubler on a CRT and a VGA monitor; Knight Lore and Exolon with a real joystick; Tape Sound by ear; hardware runs of whatever 1-7 fix.
 
-### Tester report 2026-10-14 (Danjuro, on SharpMZ_20261014)
-MZ-700 Char Set: Japan works: every game tried shows its Japanese text. Attachments (in ~/Downloads): Tiny Xevious is
-the collection's file; Batten Tanuki and 3-D Golf .qdf are byte-identical to ours; Bacterianns and Door Door are tapes.
+### Tester reports 2026-10-14 (Danjuro, EeDee; on SharpMZ_20261014)
+Region Japan works for the testers' games. EeDee: replacement ROMs persist but "only for one machine at a time";
+MZ-80B/2000 and MZ-80A floppies work; the tape image is "a different beast"; OSD Reset works; some MZ-1500 Quick
+Disks load and some don't (21 images in ~/Downloads/qd.zip).
 
-1. [ ] Tiny Xevious, panel on the right: letters in the wrong order (should say TINY XEVIOUS / NAMCO). Same in
-   mz800emu (a European MZ-700). Lead: the game prints through the monitor (CALL 0015 MSG, 001B, 003E, 04D8); MSG turns
-   ASCII into display codes with the monitor's table, and the Japanese MZ-700 had monitor 1Z-009B, not 1Z-013A
-   (1,170 bytes differ). The core already has 1Z-009B: the MZ-1500 monitor (bank 23h) is 1Z-009B with 2 bytes changed
-   (reset jumps to the IPL); software/idealine/mz-800/1z-009b.zip has the ROM and its disassembly.
-   Plan: try Tiny Xevious on 1Z-009B in the sim; if it fixes the panel, make the option "MZ-700 Region: Europe /
-   Japan" (CG + monitor 1Z-009B, and 60 Hz, item 2).
-2. [ ] 50 Hz everywhere on the MZ-700/1500: the Japanese MZ-700 and the MZ-1500 were NTSC 60 Hz machines; the core
-   gives the MZ-1500 the European MZ-700's 50 Hz (video_vc VIDEO_50HZ from CONFIG(MZ700)), so games paced by vertical
-   blanking run at 5/6 speed. Plan: MZ-1500 at 60 Hz, MZ-700 Japan at 60 Hz; reference mz800emu's mz700-ntsc build
-   and mz1500. Check the v2 video controller's MZ-700 60 Hz timing (262 lines) first.
-3. [ ] MZ-1500 sound: PSG games very quiet and left only; the beeper is stereo. The port decode looks right (mz80c.vhd:
-   F2 left, F3 right, E9 both; sharpmz_top mixes audio_psg_r into the right), so the loss is further on. Measure both
-   channels in the sim (the WAV writer only records the left) and on hardware; compare levels with mz1500emu (the PSGs
-   sit at a quarter of full scale: 14 bits into 16).
-4. [ ] OSD: "Load Tape to CMT" (F1) is redundant with Tape Image (S0 takes MZF and MZT, many records, saves). Remove
-   F1 (or move it under Tape), keep Load Direct. Tests using ('f', 1) move to the tape image.
-5. [ ] Bacterianns: type 02, load A215, like Zulpoko and Techno City Cars: a Quick Disk BASIC (MZ-5Z001) program
-   dumped to tape (item C). Door Door: side A is the "DATA" loader of a Quick Disk product and asks for side B on QD
-   (see "two-tape DATA titles" below); it needs side B as a Quick Disk (tools/mzf2qdf.py). Both work once on a QD.
-   Plan: let the Quick Disk slot take .mzt/.mzf directly (convert the records to Quick Disk files as they are read),
-   and have the tape message say so when a tape record is a QD file ("QD FILE: mount as Quick Disk"). Investigate
-   how far mz_qdisk's .mzq support already gets.
-6. [ ] Batten Tanuki (QD): the F-keys do nothing in either layout; another Tecno Soft game's F-keys work. Our Q05
-   only checked that it reaches the title. Plan: sim with the keyboard trace (KEYDBG), press F1-F5 (and SHIFT+F for
-   F6-F10), see which rows/strobes the game reads; compare with mz1500emu.
-7. [ ] 3-D Golf (QD), and another title with the same loader: boots, loads BASIC from the disk, BASIC RUNs the next
-   file, then stops. W01 covers LOAD/SAVE from BASIC but not a chain of loads. Plan: sim with the Quick Disk trace,
-   and mz1500emu, to find where it stops.
-8. [ ] Bad dump or core bug: run every reported title in mz800emu's MZ-1500 mode (headless, on the Mac) before
-   digging; Takeda's Common Source Code Project (EmuZ-1500/700, Windows; Wine on the Mac) as a second reference.
+Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap FRAME:FILE` (refs/mz800emu, ours);
+`.qdf` images go through `tools/qdf2mzq.py`. `mister_test.py --sweep MZ1500 3 WAIT GLOB` presses Q at the IPL.
+
+1. [x] Tiny Xevious panel: the game prints through the monitor (CALL 0015); with the Japanese monitor 1Z-009B it reads
+   "tiny XEVIOUS mz-700 / (c)namco / By.K.F." (sim). OSD "Region: Europe / Japan" (status 56) replaces MZ-700 Char
+   Set: on the MZ-700, Japan is the Japanese CG (bank Ah), monitor 1Z-009B (banks 34h/35h, MZ700J_1Z009B.rom from
+   idealine's 1z-009b.zip; the MZ-1500 monitor is the same ROM with reset to the IPL), and 60 Hz. Changing it resets.
+   Sim: boot_mz700j (1Z-009B; 59072 cycles a frame = 60.04 Hz, against 70887 = 50.04 Hz).
+2. [x] 60 Hz: the MZ-1500 and the Japanese MZ-700 use the 60 Hz colour timing (568 x 260, 15.6 kHz); European
+   MZ-700/800 stay 50 Hz.
+   - [ ] On hardware: timing, picture, and that games run at their original speed.
+3. [ ] MZ-1500 sound. Measured: the sim (new `--wav-out`: the core's final stereo output) and the hardware (capture
+   card, `('audio', label)` steps; mister126 needed `dvi_mode=0` in MiSTer.ini, backup MiSTer.ini.bak_dvi, and the
+   card's "Digital In" capture switched on) both give left 440 Hz / right 880 Hz for tests/mz1500/psgstereo.mzf
+   (test A01, sim psg_mz1500): the stereo works. The level was 4095 of 65535 peak to peak for one channel at full
+   volume (1/16 of full scale). Now 3x on the MZ-800/1500 (PSGs and beeper): 12285.
+   - [ ] "Left only" in some games: ask Danjuro which games (the ones that show "Stereo sound!").
+   - [ ] Hardware level check of the new build (A01).
+4. [x] Load Tape to CMT removed from the OSD (Tape Image does it all). The core still takes file index 1 (the sim's
+   `--mzf` uses it). T07 and Z02 use the tape image.
+5. [x] Tapes in the Quick Disk slot: S3 takes .mzt/.mzf; mz_qdisk shows the tape as the disk tools/mzf2qdf.py makes
+   (byte-identical stream: tests/qd_tape, a testbench of mz_qdisk, run by run_tests.sh). Read only. Tape message
+   "QD:" (in place of "TAPE") for an MZ-5Z001 Quick Disk BASIC file (type 02 at A215) on an MZ-1500 tape. Hardware: N01-N05 (tapes
+   mounted as the QD), Z04 (MZ-5Z001 + Zulpoko as one tape in the QD slot, LOAD, RUN).
+   - Door Door and the other two-tape titles: side A from the tape image, side B mounted as the Quick Disk.
+   - Bacterianns, Zulpoko, Techno City Cars: BASIC from its disk or tape, then the program's tape in the QD slot, LOAD.
+6. [ ] Batten Tanuki (QD): F-keys do nothing (the only key problem Danjuro found). The .qdf has no A5 block marks
+   (another dumping tool), so qdinfo/qdf2mzq can't read it and mz800emu can't run it; the core boots it. Next: the
+   sim with KEYDBG, pressing F1-F5.
+7. [x] 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
+   next program doesn't run. mz800emu stops at the same place on all three, so it is not the core:
+   - 3-D Golf: black after RUN "AUTO RUN" (a machine-code BASIC extension; the game is all on side B).
+   - Earthbound: "JUST A MOMENT PLEASE", RUN"EARTH" (the file on the disk is " EARTH", with a leading space).
+   - Nobunaga: "press F1; with a RAM FILE, INIT "RAM:$FFFF" first"; F1 types RUN"TITLE and stops, in mz800emu too.
+     The RAM file is the MZ-1R12 (or similar) battery RAM board, not in the core.
+   - [ ] Ask the testers for other dumps; a CPU trace of Nobunaga's RUN"TITLE" in mz800emu if it matters.
+8. [x] EeDee's 21 QD images (14 disks/side A) on mister126: every one ends where mz800emu ends. Run: Diamond Chase,
+   Excite 4-nin Mahjong, Nonbarla Panic, Sonic Birds, Zexas. Ask for side B (correct): Dig Dug, New Rally-X, Flappy.
+   "QD:File mode error": Cockpit and Sparrow are BASIC programs (type 02) on disks without BASIC: boot MZ-5Z001 first
+   (now: its tape in the QD slot), then this disk, RUN"COCKPIT". T.N.T. Bomb Bomb loads its PCG data (slow).
+9. [ ] Cybernoid (MZ-800, Profi, 4 files: loader 4F00, CYB1-3): a core bug. mz800emu (the four files as one tape, C at
+   the IPL) shows the Cybernoid loading picture with a counter and reaches the game's menu at about frame 20000
+   (real tape speed). On mister126 (H06 real speed, H07 Fastest, H08 VRAM Wait On) the picture comes out scrambled
+   (the artwork's outline, garbled) and the counter stops at 979. The loader is packed (no plain ROM calls): likely
+   its own tape routine, drawing while it loads, misreading bits. Next: CPU traces of the sim and mz800emu from the
+   loader's start, first divergence (tape bit timing, wait states, the 8253/PIO it may use for timing).
+10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
+   not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
+11. [ ] Tape image: EeDee is still working it out (item B): a README walkthrough.
 
 ### Tester reports 2026-10-13 (on SharpMZ_20261012/12b)
 Confirmed fixed by testers: replacement ROMs persist, MZ-80A floppy, OSD Reset. Tester 2 suspects their own MiSTer is faulty,

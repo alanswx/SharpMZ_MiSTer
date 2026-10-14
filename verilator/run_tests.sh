@@ -24,6 +24,11 @@
 #   tape_mz2000   MZ-2000: the MZ-2200 IPL loads Gang Man (../software/mz2200) to its title; frame hash.
 #                 Both skipped when the tapes aren't there, and with QUICK=1 (the MZ-80B model is slow to simulate).
 #   ipl_mz1500    MZ-1500: the 9Z-502M IPL menu ("Make ready QD"); frame hash at 150.
+#   psg_mz1500    MZ-1500: tests/mz1500/psgstereo.mzf, 440 Hz on the left PSG (F2), 880 Hz on the right (F3); the core's
+#                 stereo output (--wav-out): each channel's frequency and peak-to-peak level (tests/wav_stereo.py)
+#   qd_tape       a tape mounted as the Quick Disk gives the stream tools/mzf2qdf.py writes (tests/qd_tape, its own
+#                 testbench of rtl/mz_qdisk.sv)
+#   boot_mz700j   MZ-700, OSD Region: Japan: the 1Z-009B monitor (and the Japanese CG, 60 Hz)
 #   pcg700_mz700  MZ-700: tests/mz700/pcg700.mzf programs code EF in both sets of a HAL PCG-700 (E010-E012) and
 #                 switches its display on; frame hash (the two EFs show the two patterns, the cursor the first)
 #   e2scroll_mz700 MZ-700: tests/mz700/e2scroll.mzf reads E250 in a loop; the MZ-80A scroll must not act; hash
@@ -104,6 +109,16 @@ pids+=($!); names+=("ipl_mz2000")
 ( $BIN --model mz1500 --stop-at-frame 151 --frame-log "$OUT/ipl_mz1500.csv" --quiet > /dev/null 2> "$OUT/ipl_mz1500.log"
   awk -F, '$1==150 {print $2}' "$OUT/ipl_mz1500.csv" > "$OUT/ipl_mz1500.txt" ) &
 pids+=($!); names+=("ipl_mz1500")
+( $BIN --model mz1500 --mzf tests/mz1500/psgstereo.mzf --mzf-direct --mzf-direct-frame 20 --direct-start --stop-at-frame 330 \
+      --wav-out "$OUT/psg_mz1500.wav" --quiet > /dev/null 2> "$OUT/psg_mz1500.log"
+  python3 tests/wav_stereo.py "$OUT/psg_mz1500.wav" 3.5 1.0 > "$OUT/psg_mz1500.txt" ) &
+pids+=($!); names+=("psg_mz1500")
+( tests/qd_tape/run.sh tests/mz700/pcg700.mzf > "$OUT/qd_tape.log" 2>&1 && \
+  tests/qd_tape/run.sh "tests/mz1500/psgstereo.mzf" >> "$OUT/qd_tape.log" 2>&1; \
+  grep -c "^PASS" "$OUT/qd_tape.log" > "$OUT/qd_tape.txt" ) &
+pids+=($!); names+=("qd_tape")
+( $BIN --model mz700 --osd "Region=Japan" --stop-at-frame 150 --ascii-end --quiet > "$OUT/boot_mz700j.txt" 2> "$OUT/boot_mz700j.log" ) &
+pids+=($!); names+=("boot_mz700j")
 for t in pcg700 e2scroll; do
     ( $BIN --model mz700 --mzf tests/mz700/$t.mzf --mzf-direct --mzf-direct-frame 30 --direct-start --stop-at-frame 181 \
           --frame-log "$OUT/${t}_mz700.csv" --quiet > /dev/null 2> "$OUT/${t}_mz700.log"
