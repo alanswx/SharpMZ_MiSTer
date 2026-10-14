@@ -628,6 +628,16 @@ void Sim::clock()
             fprintf(fio, "%u,%04X,mem,R,%04X\n", frame, top->cpu_pc, a);
         if (mw && !prev_mw && a >= 0xE010 && a <= 0xE012)
             fprintf(fio, "%u,%04X,mem,W,%04X,%02X\n", frame, top->cpu_pc, a, top->dbg_wdata);
+        // The keyboard (8255 at E000-E003): row selects written to E000, key data read from E001, once the read's
+        // data is on the bus (a few clocks into the read).
+        static int kr = 0;
+        // (E000-E00F: the 8255, 8253 and E008, with any mirrors a program may use.)
+        static uint16_t ka = 0;
+        if (mw && !prev_mw && (a & 0xFFF0) == 0xE000)
+            fprintf(fio, "%u,%04X,mem,W,%04X,%02X\n", frame, top->cpu_pc, a, top->dbg_wdata);
+        if (mr && !prev_mr && (a & 0xFFF0) == 0xE000) { kr = 8; ka = a; }
+        if (kr && --kr == 0)
+            fprintf(fio, "%u,%04X,mem,R,%04X,%02X\n", frame, top->cpu_pc, ka, top->dbg_rdata);
         prev_mr = mr; prev_mw = mw;
     }
 

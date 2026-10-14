@@ -123,6 +123,7 @@ module top(
    output        dbg_memrd /*verilator public_flat*/,
    output [15:0] dbg_addr /*verilator public_flat*/,
    output [7:0]  dbg_wdata /*verilator public_flat*/,
+   output [7:0]  dbg_rdata /*verilator public_flat*/,   // CPU data in
    output [1:0]  dbg_cse /*verilator public_flat*/,
 
    // Backdoor reads of internal memories for --ascii-end and --dump-mem.
@@ -249,6 +250,7 @@ module top(
 `endif
    assign dbg_addr   = sm.core.t80_a16;
    assign dbg_wdata  = sm.core.t80_do;
+   assign dbg_rdata  = sm.core.t80_di;
    assign dbg_cse    = {sm.core.mz80hw.cs_e_ni, sm.core.mz80hw.cs_e2_n};
    assign dbg_map    = {sm.core.mz80hw.mz_gram_enable, sm.core.mz80hw.mz_high_ram_inhibit, sm.core.mz80hw.mz_high_ram_enable};
    assign dbg_io_port = sm.core.t80_a16[7:0];

@@ -81,11 +81,18 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    mounted as the QD), Z04 (MZ-5Z001 + Zulpoko as one tape in the QD slot, LOAD, RUN).
    - Door Door and the other two-tape titles: side A from the tape image, side B mounted as the Quick Disk.
    - Bacterianns, Zulpoko, Techno City Cars: BASIC from its disk or tape, then the program's tape in the QD slot, LOAD.
-6. [ ] Batten Tanuki (QD): F-keys do nothing (the only key problem Danjuro found). The .qdf has no A5 block marks
-   (another dumping tool), so qdinfo/qdf2mzq can't read it and mz800emu can't run it; the core boots it. Next: the
-   sim with KEYDBG, pressing F1-F5.
-7. [x] 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
-   next program doesn't run. mz800emu stops at the same place on all three, so it is not the core:
+6. [ ] Batten Tanuki (QD): F-keys do nothing (the only key problem Danjuro found; they work in his emulator). The
+   .qdf has no A5 block marks (another dumping tool), so qdinfo/qdf2mzq can't read it and mz800emu can't run it.
+   Reproduced in the sim: side A, Q, side B at frame 500, Return at 650; "F1 -- START  F5 -- KEYINPUT  PUSH KEY !!"
+   at about frame 1100-1300, then the demo. F1 ({SC05}) at 1250: frames 1400 and 1600 identical to a run without
+   it. The keymap is right (F1-F5 = row 9 bits 7-3, as mz800emu). `--trace-io` (now also E000-E00F reads/writes
+   with data) shows no keyboard access and no I/O write at all after frame 923 while the prompt is up; the code at
+   5A00-5A9F is its text printer. Next: --trace-cpu around frames 1150-1300 to see how it polls (I/O reads are not
+   logged; an interrupt; the PIO), then compare with what the core answers.
+7. [ ] 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
+   next program doesn't run. mz800emu stops at the same place on all three, but Danjuro's emulator (Takeda's
+   EmuZ-1500, Common Source Code Project) runs them ("the BASIC loader games all work"): a gap that the core and
+   mz800emu share. Reopened; find what the BASIC's RUN"…" needs (QD timing after a file, the RAM file board?):
    - 3-D Golf: black after RUN "AUTO RUN" (a machine-code BASIC extension; the game is all on side B).
    - Earthbound: "JUST A MOMENT PLEASE", RUN"EARTH" (the file on the disk is " EARTH", with a leading space).
    - Nobunaga: "press F1; with a RAM FILE, INIT "RAM:$FFFF" first"; F1 types RUN"TITLE and stops, in mz800emu too.
@@ -104,6 +111,15 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
 11. [ ] Tape image: EeDee is still working it out (item B): a README walkthrough.
+12. [ ] Danjuro (later, with emulators): "a lot of games, even text adventures, had a sort of lag (sometimes key
+   input would be skipped), which didn't happen in the emulators". Check on 20261014b (60 Hz MZ-1500): keyboard
+   scan vs. PS/2 key timing (keymatrix hold, the PC layout's forced SHIFT lead/tail), with mister_keys typing fast.
+   Lead: keymatrix's key hold keeps every pressed key in the matrix until 50 ms after the latest press, so two keys
+   pressed within 50 ms are both down at once (the first even if already released); routines that ignore two keys
+   down would skip one. Ask Danjuro for a title and test typing on hardware.
+13. Danjuro's emulator notes: Tiny Xevious's side panel is right in the emulators (it is on 20261014b with Region
+   Japan); MZ-800 was 50 Hz only (kept); Bacterianns fails there too; Door Door works; Batten Tanuki's F-keys work
+   there (so item 6 is the core's: reproduced in the sim, F1 at the prompt changes nothing).
 
 ### Tester reports 2026-10-13 (on SharpMZ_20261012/12b)
 Confirmed fixed by testers: replacement ROMs persist, MZ-80A floppy, OSD Reset. Tester 2 suspects their own MiSTer is faulty,
