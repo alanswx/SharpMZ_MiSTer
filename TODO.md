@@ -64,7 +64,10 @@ TF-DOS the same way). Sim: `--fdd-frame N` (mount later), `--boot-reset`. Test t
 `('keys', '29+56+100')` steps. Fresh-core sweep of the idealine MZ-80B disks: DISK06 and DISK10 report "Repeated read
 error" (check against MAME or their CRCs).
 - [ ] Sim regression test for Boot Reset + disk (fdd_mz80b_br).
-- [ ] DISK06 / DISK10 read errors on the MZ-80B.
+- [x] DISK06 / DISK10 read errors on the MZ-80B: bad dumps, not the core. Both images lack track 0 sector 19 (9 of the 10
+      sectors; every other track and DISK05 have 10), and that sector holds system data on the other disks, so a real
+      MZ-80B would report the same error. DISK06 also has a duplicate sector 11 on track 12 (harmless). No other copies
+      in the collection.
 
 **B. Tape Image is hard to follow (EeDee).** Already improved in 20261012b by Tape Messages (TAPE n/total NAME).
 - [ ] Check with EeDee once on 12b; consider a README walkthrough (mount, C/L, how records advance, Rewind).
