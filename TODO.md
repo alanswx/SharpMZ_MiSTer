@@ -126,8 +126,9 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    (the artwork's outline, garbled) and the counter stops at 979. The loader is packed (no plain ROM calls): likely
    its own tape routine, drawing while it loads, misreading bits. Next: CPU traces of the sim and mz800emu from the
    loader's start, first divergence (tape bit timing, wait states, the 8253/PIO it may use for timing).)
-9b. [ ] W02 (MZ-1500 Druaga tape installer onto a blank QD): after "set side B and press a key" it returns to the IPL
-   with "QD:Unformat err". The same on 20261013, so not a recent change; find out what the installer writes.
+9b. [x] W02 (Druaga tape with a blank QD) ending in "QD:Unformat err" is the expected result, not a bug: the Druaga
+   tape is a Quick Disk product dumped to tape (see 2026-10-02 below), whose side A asks for the original disk's side
+   B. mz800emu's MZ-1500 ends the same way. (Play it from tools/mzf2qdf.py disks: test G01.)
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
 11. [ ] Tape image: EeDee is still working it out (item B): a README walkthrough.

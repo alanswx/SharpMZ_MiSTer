@@ -151,7 +151,7 @@ test('W01', 'MZ1500', 'MZ-1500 Quick Disk write: BASIC INIT, SAVE, LOAD', files=
             ('wait', 3), ('shot', 'loaded'), ('fetch', 0)])
 
 # A tape installer: Druaga no Tou loads its DATA file from tape and copies the game onto a blank Quick Disk.
-test('W02', 'MZ1500', 'MZ-1500 tape installer onto a blank Quick Disk: Druaga no Tou',
+test('W02', 'MZ1500', 'MZ-1500 Druaga tape with a blank Quick Disk: not an installer, asks for QD side B, then QD:Unformat err (as mz800emu)',
      files=[('s', 0, f'{M15}/Druaga no Tou (1984)(Dempa Shimbunsha)(Namco)(Masami Nakamura) Side A.mzt'), ('s', 3, 'gen:qd_blank')],
      opts=[FAST_TAPE(6)], reset=True,
      steps=[('wait', 8), ('shot', 'menu'), ('type', 'C'), ('wait', 5), ('type', 'C'), ('wait', 10), ('shot', 'loading'),
