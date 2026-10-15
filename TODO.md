@@ -109,9 +109,12 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    - CPU trace after TITLE loads (sim, frames 2936-2965): TITLE runs in BASIC for two frames, then the INPUT KNJ
      machine code (3Fxx, loaded from side A) calls the ROM (E8xx, EFxx, F5-FE) and the ROM's QD routines (FDxx/FExx)
      read side A over and over. TITLE's text: "CRT:G", "SIMULATION WAR GAME SERIES", "BY KOEI", "ODA1" (side B),
-     "< QD >", "INPUT KNJ". INPUT KNJ is presumably kanji input: the game may need the kanji ROM board (MZ-1R23,
-     and MZ-1R24 dictionary), which EmuZ-1500 emulates and the core doesn't. Next: what INPUT KNJ reads from (the
-     kanji ROM ports?) and whether Danjuro's EmuZ-1500 has a KANJI.ROM; ask him for his exact procedure.
+     "< QD >", "INPUT KNJ". Not the kanji ROM board: between TITLE and the search INPUT KNJ only uses the PCG
+     window (OUT E5/E6, F0: it writes its kanji as PCG patterns), E000-E012, F2 and the QD ports, never the board's
+     ports. mz800emu stops earlier: in an endless JR loop at 3A6A-3A83 that only an interrupt can leave, and its
+     MZ-1500 PIO interrupts don't fire (the inverted PA4 fixed in the core); the core gets past it, into the
+     ROM's QD search. So mz800emu can't be the reference past this point; EmuZ-1500 (Takeda) is. Next: which file
+     the ROM's loader is asked for, and Danjuro's procedure (when he turns the disk to side B).
    - Intermittent: one W01 run on mister126 typed garbage into MZ-5Z001 (graphic characters, syntax errors);
      reruns on both builds were fine. Compare with Danjuro's skipped keys.
 8. [x] EeDee's 21 QD images (14 disks/side A) on mister126: every one ends where mz800emu ends. Run: Diamond Chase,
