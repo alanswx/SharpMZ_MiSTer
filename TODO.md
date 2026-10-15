@@ -87,7 +87,7 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    MZ-1500 PA4 is now OUT0 itself (mz80c.vhd); the MZ-800 keeps the inverse. tests/mz1500/pioint.mzf (sim
    pio_mz1500): 3785 interrupts by frame 300 (was 1; mz800emu gives 1). Hardware Q06: F1 starts the game.
    May also be behind Danjuro's skipped keys and some sound on other MZ-1500 titles: retest those.
-7. [ ] (Not the PIO fix: Q07-Q09 still stop on 20261014c.) 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
+7. [ ] (Not the PIO fix, nor the end-of-disk restart: Q07-Q09 still stop.) 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
    next program doesn't run. mz800emu stops at the same place on all three, but Danjuro's emulator (Takeda's
    EmuZ-1500, Common Source Code Project) runs them ("the BASIC loader games all work"): a gap that the core and
    mz800emu share. Reopened; find what the BASIC's RUN"…" needs (QD timing after a file, the RAM file board?):
@@ -95,7 +95,15 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    - Earthbound: "JUST A MOMENT PLEASE", RUN"EARTH" (the file on the disk is " EARTH", with a leading space).
    - Nobunaga: "press F1; with a RAM FILE, INIT "RAM:$FFFF" first"; F1 types RUN"TITLE and stops, in mz800emu too.
      The RAM file is the MZ-1R12 (or similar) battery RAM board, not in the core.
-   - [ ] Ask the testers for other dumps; a CPU trace of Nobunaga's RUN"TITLE" in mz800emu if it matters.
+   - [x] The end of the medium: Takeda's drive (CSCP vm/mz700/quickdisk.cpp) sends the head home and plays the
+     disk again while MTON is on and WRGA reads; the core ran off the end into FF (as mz800emu). mz_qdisk now
+     restarts at the end of the image (tape mode: 255 zeros after the last file). Not the cause here.
+   - Sim trace (Nobunaga, F1 at 2600): BASIC's own QD driver (2E91-3000) hunts (WR3 D3), reads blocks (RR0 4D),
+     toggles WR5B 80/82, turns the motor off sometimes (2F45: WR5B 00); channel B RR0 is read only twice.
+   - [ ] Takeda's drive also pauses at each block boundary until the SIO hunts again (DATA_BREAK); the core's
+     disk turns in real time. Compare where BASIC misses TITLE (which block it last read) with a longer trace.
+   - Intermittent: one W01 run on mister126 typed garbage into MZ-5Z001 (graphic characters, syntax errors);
+     reruns on both builds were fine. Compare with Danjuro's skipped keys.
 8. [x] EeDee's 21 QD images (14 disks/side A) on mister126: every one ends where mz800emu ends. Run: Diamond Chase,
    Excite 4-nin Mahjong, Nonbarla Panic, Sonic Birds, Zexas. Ask for side B (correct): Dig Dug, New Rally-X, Flappy.
    "QD:File mode error": Cockpit and Sparrow are BASIC programs (type 02) on disks without BASIC: boot MZ-5Z001 first
