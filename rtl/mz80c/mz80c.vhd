@@ -492,7 +492,10 @@ begin
         );
     M8_PIO_CS                <= '1' when (M8 = '1' or M15 = '1') and M8_IO(7 downto 2) = "111111" else '0';   -- MZ-800 and MZ-1500
     -- PA0 RDA: always ready with no printer (as before), the printer's acknowledge with one. PA1 STA high: paper.
-    M8_PIO_PA                <= "11" & (not VBLANK) & (not SOUND_PULSE_X2) & "001" & (PRN_RDA and PRN_EN);
+    -- PA4: the 8253's OUT0. Inverted on the MZ-800 (/CTC0, as mz800emu); on the MZ-1500 as it is: games there
+    -- (Batten Tanuki: counter 0 mode 0, PA4 interrupt active high, the handler reloads the count) take an interrupt
+    -- at each terminal count, which only works this way (EmuZ-1500 runs it; mz800emu's MZ-1500 inverts and stops).
+    M8_PIO_PA                <= "11" & (not VBLANK) & (SOUND_PULSE_X2 xor not M15) & "001" & (PRN_RDA and PRN_EN);
 
     -- Printer port. MZ-800/1500: Z80 PIO port B data, PA7 RDP. MZ-700: the plotter/printer port at I/O FF (data)
     -- and FE (write: 7 RDP, 6 IRT; read: 0 RDA, 1 STA, 2-3 low), as MZ-700 BASIC 1Z-013B drives it (2871): wait

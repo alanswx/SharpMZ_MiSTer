@@ -81,15 +81,13 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    mounted as the QD), Z04 (MZ-5Z001 + Zulpoko as one tape in the QD slot, LOAD, RUN).
    - Door Door and the other two-tape titles: side A from the tape image, side B mounted as the Quick Disk.
    - Bacterianns, Zulpoko, Techno City Cars: BASIC from its disk or tape, then the program's tape in the QD slot, LOAD.
-6. [ ] Batten Tanuki (QD): F-keys do nothing (the only key problem Danjuro found; they work in his emulator). The
-   .qdf has no A5 block marks (another dumping tool), so qdinfo/qdf2mzq can't read it and mz800emu can't run it.
-   Reproduced in the sim: side A, Q, side B at frame 500, Return at 650; "F1 -- START  F5 -- KEYINPUT  PUSH KEY !!"
-   at about frame 1100-1300, then the demo. F1 ({SC05}) at 1250: frames 1400 and 1600 identical to a run without
-   it. The keymap is right (F1-F5 = row 9 bits 7-3, as mz800emu). `--trace-io` (now also E000-E00F reads/writes
-   with data) shows no keyboard access and no I/O write at all after frame 923 while the prompt is up; the code at
-   5A00-5A9F is its text printer. Next: --trace-cpu around frames 1150-1300 to see how it polls (I/O reads are not
-   logged; an interrupt; the PIO), then compare with what the core answers.
-7. [ ] 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
+6. [x] Batten Tanuki (QD): F-keys did nothing. The game scans the keyboard in a Z80 PIO interrupt (IM 2, PIO port A
+   bit 4 = the 8253's OUT0, active high) taken at each terminal count of counter 0 (mode 0, reloaded by the handler).
+   The core, like mz800emu, gave the PIO the inverse of OUT0 (the MZ-800's /CTC0): one interrupt, then none. On the
+   MZ-1500 PA4 is now OUT0 itself (mz80c.vhd); the MZ-800 keeps the inverse. tests/mz1500/pioint.mzf (sim
+   pio_mz1500): 3785 interrupts by frame 300 (was 1; mz800emu gives 1). Hardware Q06: F1 starts the game.
+   May also be behind Danjuro's skipped keys and some sound on other MZ-1500 titles: retest those.
+7. [ ] (Not the PIO fix: Q07-Q09 still stop on 20261014c.) 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
    next program doesn't run. mz800emu stops at the same place on all three, but Danjuro's emulator (Takeda's
    EmuZ-1500, Common Source Code Project) runs them ("the BASIC loader games all work"): a gap that the core and
    mz800emu share. Reopened; find what the BASIC's RUN"…" needs (QD timing after a file, the RAM file board?):

@@ -53,6 +53,7 @@ module top(
    output        cpu_ce /*verilator public_flat*/,
    output        cpu_m1_n /*verilator public_flat*/,
    output        dbg_io_wr /*verilator public_flat*/,
+   output        dbg_io_rd /*verilator public_flat*/,
    output [7:0]  dbg_io_port /*verilator public_flat*/,
    output [7:0]  dbg_io_data /*verilator public_flat*/,
    output [3:0]  dbg_m8_dmd /*verilator public_flat*/,
@@ -124,6 +125,7 @@ module top(
    output [15:0] dbg_addr /*verilator public_flat*/,
    output [7:0]  dbg_wdata /*verilator public_flat*/,
    output [7:0]  dbg_rdata /*verilator public_flat*/,   // CPU data in
+   output [1:0]  dbg_m8map /*verilator public_flat*/,   // MZ-800 map: {CG-RAM/VRAM in (CGV), ROM at E000 (ROME)}
    output [1:0]  dbg_cse /*verilator public_flat*/,
 
    // Backdoor reads of internal memories for --ascii-end and --dump-mem.
@@ -229,6 +231,7 @@ module top(
    assign cpu_m1_n = sm.core.cpu0.u0.m1_n;
    assign dbg_tape_rs = {sm.core.tape0.xmit_ram_type, sm.core.tape0.tape_read_state};
    assign dbg_io_wr = ~sm.core.t80_iorq_n & ~sm.core.t80_wr_n;
+   assign dbg_io_rd = ~sm.core.t80_iorq_n & ~sm.core.t80_rd_n;
    wire bdr_hb, bdr_vb;
    mz800_border bdr(.clk(clk_sys), .ce_pix(ce_pix), .enable(1'b1), .hblank(sm.hblank_emu), .vblank(sm.vblank_emu), .bcol(4'd1),
                     .r_in(8'd0), .g_in(8'd0), .b_in(8'd0), .r_out(), .g_out(), .b_out(), .hblank_out(bdr_hb), .vblank_out(bdr_vb));
@@ -251,6 +254,7 @@ module top(
    assign dbg_addr   = sm.core.t80_a16;
    assign dbg_wdata  = sm.core.t80_do;
    assign dbg_rdata  = sm.core.t80_di;
+   assign dbg_m8map  = {sm.core.mz80hw.m8_cgv, sm.core.mz80hw.m8_rome};
    assign dbg_cse    = {sm.core.mz80hw.cs_e_ni, sm.core.mz80hw.cs_e2_n};
    assign dbg_map    = {sm.core.mz80hw.mz_gram_enable, sm.core.mz80hw.mz_high_ram_inhibit, sm.core.mz80hw.mz_high_ram_enable};
    assign dbg_io_port = sm.core.t80_a16[7:0];

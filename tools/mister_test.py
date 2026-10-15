@@ -395,6 +395,22 @@ test('H08', 'MZ800', 'MZ-800 Cybernoid (Profi), four files, real speed, VRAM Wai
 test('H07', 'MZ800', 'MZ-800 Cybernoid (Profi), four files, Fast Tape Fastest',
      files=[('s', 0, f'{TESTERS}/Cybernoid (Profi) 4 parts.mzt')], opts=[FAST_TAPE(0)], reset=True,
      steps=[('wait', 6), ('type', 'C'), ('wait', 30), ('shot', 'a'), ('wait', 60), ('shot', 'b'), ('wait', 60), ('shot', 'c')])
+# MZ-1500 programs that scan the keyboard (and more) from Z80 PIO interrupts on PA4 = the 8253's OUT0 (2026-10-14).
+test('Q06', 'MZ1500', 'MZ-1500 Batten Tanuki: side B, Return, then F1 at "F1 -- START" starts the game (was ignored)',
+     files=[('s', 3, f'{TESTERS}/Batten Tanuki no Daibouken (Side A)(1986)(Tecno Soft).qdf')],
+     late=[('s', 3, f'{TESTERS}/Batten Tanuki no Daibouken (Side B)(1986)(Tecno Soft).qdf', 14)], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 14), ('type', '\n'), ('wait', 10), ('shot', 'prompt'), ('keys', '59'),
+            ('wait', 8), ('shot', 'f1')])
+test('Q07', 'MZ1500', 'MZ-1500 Nobunaga no Yabou: F1 at its prompt loads TITLE (stopped in the core and mz800emu)',
+     files=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side A)(1984)(Koei).qdf')], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('shot', 'prompt'), ('keys', '59'), ('wait', 40), ('shot', 'f1')])
+test('Q08', 'MZ1500', 'MZ-1500 Earthbound: BASIC boots and RUNs EARTH',
+     files=[('s', 3, f'{TESTERS}/Earthbound (Side A)(1984)(Xtalsoft).qdf')], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 50), ('shot', 'a'), ('wait', 40), ('shot', 'b')])
+test('Q09', 'MZ1500', 'MZ-1500 3-D Golf: BASIC and AUTO RUN from side A, side B mounted',
+     files=[('s', 3, f'{TESTERS}/3-D Golf Simulation (Side A)(1984)(T&E Soft).qdf')],
+     late=[('s', 3, f'{TESTERS}/3-D Golf Simulation (Side B)(1984)(T&E Soft).qdf', 45)], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('shot', 'a'), ('wait', 30), ('type', '\n'), ('wait', 40), ('shot', 'b')])
 test('Z04', 'MZ1500', 'MZ-1500: MZ-5Z001 and Zulpoko as one tape in the Quick Disk slot: Q, LOAD "ZULPOKO", RUN',
      files=[('s', 3, 'gen:qdtape_zulpoko')], reset=True,
      steps=[('wait', 4), ('type', 'Q'), ('wait', 30), ('shot', 'basic'), ('type', 'LOAD "ZULPOKO"\n'), ('wait', 15),

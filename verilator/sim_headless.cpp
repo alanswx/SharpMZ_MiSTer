@@ -75,7 +75,8 @@ struct Options {
     std::map<uint32_t, std::string> qd_swaps;   // frame -> Quick Disk image to mount then (side B etc.)
     std::string trace_file;
     std::string wav_file;
-    std::string wav_out_file;                // --wav-out: the core's final stereo output (sharpmz_top audio_l/r)
+    std::string wav_out_file;
+    bool        trace_cxxx = false;                // --wav-out: the core's final stereo output (sharpmz_top audio_l/r)
     std::string io_file;
     uint32_t trace_from = 0, trace_to = UINT32_MAX;
     bool     quiet = false;
@@ -286,6 +287,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--wav") o.wav_file = next();
         else if (a == "--wav-out") o.wav_out_file = next();
         else if (a == "--trace-io") o.io_file = next();
+        else if (a == "--trace-cxxx") o.trace_cxxx = true;
         else if (a == "--trace-from") o.trace_from = parse_num(next());
         else if (a == "--trace-to") o.trace_to = parse_num(next());
         else { fprintf(stderr, "unknown option %s (try --help)\n", a.c_str()); return false; }
@@ -626,6 +628,8 @@ void Sim::clock()
         uint16_t a = top->dbg_addr;
         if (mr && !prev_mr && ((a & 0xFF00) == 0xE200 || a == 0xE014 || a == 0xE015))
             fprintf(fio, "%u,%04X,mem,R,%04X\n", frame, top->cpu_pc, a);
+        if (mw && !prev_mw && (a & 0xF000) == 0xC000 && opt.trace_cxxx)   // --trace-cxxx: C000-CFFF writes, with the MZ-800 map
+            fprintf(fio, "%u,%04X,mem,W,%04X,%02X,map%d\n", frame, top->cpu_pc, a, top->dbg_wdata, top->dbg_m8map);
         if (mw && !prev_mw && a >= 0xE010 && a <= 0xE012)
             fprintf(fio, "%u,%04X,mem,W,%04X,%02X\n", frame, top->cpu_pc, a, top->dbg_wdata);
         // The keyboard (8255 at E000-E003): row selects written to E000, key data read from E001, once the read's
@@ -633,6 +637,12 @@ void Sim::clock()
         static int kr = 0;
         // (E000-E00F: the 8255, 8253 and E008, with any mirrors a program may use.)
         static uint16_t ka = 0;
+        // I/O reads: "io,R,port,data" (the data once on the bus).
+        static bool prev_ir = false; static int ir = 0; static uint8_t ip = 0;
+        bool irq_rd = top->dbg_io_rd;
+        if (irq_rd && !prev_ir) { ir = 8; ip = top->dbg_io_port; }
+        if (ir && --ir == 0) fprintf(fio, "%u,%04X,io,R,%02X,%02X\n", frame, top->cpu_pc, ip, top->dbg_rdata);
+        prev_ir = irq_rd;
         if (mw && !prev_mw && (a & 0xFFF0) == 0xE000)
             fprintf(fio, "%u,%04X,mem,W,%04X,%02X\n", frame, top->cpu_pc, a, top->dbg_wdata);
         if (mr && !prev_mr && (a & 0xFFF0) == 0xE000) { kr = 8; ka = a; }

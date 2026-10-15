@@ -29,6 +29,8 @@
 #   qd_tape       a tape mounted as the Quick Disk gives the stream tools/mzf2qdf.py writes (tests/qd_tape, its own
 #                 testbench of rtl/mz_qdisk.sv)
 #   boot_mz700j   MZ-700, OSD Region: Japan: the 1Z-009B monitor (and the Japanese CG, 60 Hz)
+#   pio_mz1500    MZ-1500: tests/mz1500/pioint.mzf, Z80 PIO interrupts on PA4 from the 8253's OUT0 (counter 0 mode 0,
+#                 reloaded by the handler, as Batten Tanuki's keyboard): the interrupt count at frame 300
 #   pcg700_mz700  MZ-700: tests/mz700/pcg700.mzf programs code EF in both sets of a HAL PCG-700 (E010-E012) and
 #                 switches its display on; frame hash (the two EFs show the two patterns, the cursor the first)
 #   e2scroll_mz700 MZ-700: tests/mz700/e2scroll.mzf reads E250 in a loop; the MZ-80A scroll must not act; hash
@@ -119,6 +121,9 @@ pids+=($!); names+=("psg_mz1500")
 pids+=($!); names+=("qd_tape")
 ( $BIN --model mz700 --osd "Region=Japan" --stop-at-frame 150 --ascii-end --quiet > "$OUT/boot_mz700j.txt" 2> "$OUT/boot_mz700j.log" ) &
 pids+=($!); names+=("boot_mz700j")
+( $BIN --model mz1500 --mzf tests/mz1500/pioint.mzf --mzf-direct --mzf-direct-frame 20 --direct-start --stop-at-frame 300 \
+      --dump-mem B800:2:"$OUT/pio_mz1500.bin" --quiet > /dev/null 2> "$OUT/pio_mz1500.log"; xxd -p "$OUT/pio_mz1500.bin" > "$OUT/pio_mz1500.txt" ) &
+pids+=($!); names+=("pio_mz1500")
 for t in pcg700 e2scroll; do
     ( $BIN --model mz700 --mzf tests/mz700/$t.mzf --mzf-direct --mzf-direct-frame 30 --direct-start --stop-at-frame 181 \
           --frame-log "$OUT/${t}_mz700.csv" --quiet > /dev/null 2> "$OUT/${t}_mz700.log"
