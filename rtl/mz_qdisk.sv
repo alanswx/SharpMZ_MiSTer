@@ -28,6 +28,12 @@
 //  (Door Door, Rally-X, Zulpoko's BASIC files); they load this way without converting them. Such a disk
 //  is read only. At mount the records are counted for the disk's first block.
 //
+//  The end of the medium: while the motor is on and the drive reads (RTS A off), the head goes back to the start
+//  when it passes the end of the image and the disk plays again from the beginning, as Takeda's EmuZ-1500
+//  (vm/mz700/quickdisk.cpp: end_of_disk restores while MTON is on and WRGA reads). MZ-5Z001 BASIC loading a
+//  second program with RUN"…" (Nobunaga no Yabou, Earthbound, 3-D Golf) searches on with the motor on; it used
+//  to run off the end into FF and never find the file (mz800emu does the same).
+//
 //  Writing follows the Z80 SIO in bisync mode as the MZ-1500 ROM drives it (FD4D-FDD9): WR5 b1 (RTS) is
 //  the write gate. With it and Tx enable (b3) on, every byte time the transmitter puts one byte on the disk:
 //  00 while WR5 b4 (break) is set, else the Tx buffer (F4), else on an underrun the CRC-16 of the bytes
@@ -227,6 +233,7 @@ assign io_din = rd_data;
 reg [7:0] last_b;                                // hunt: previous byte
 reg       consume;                               // the head moved on to the next byte
 reg       grewind = 0;                           // tape as Quick Disk: back to the start of the stream
+reg [8:0] gendc   = 0;                           // tape as Quick Disk: zero bytes passed after the last file
 reg       gseg_body = 0;                         // the CRC / gap being sent is the body's (else the header's)
 
 always @(posedge clk_sys) begin
@@ -335,6 +342,14 @@ always @(posedge clk_sys) begin
 
 	if (consume) pos <= pos + 1'd1;
 
+	// End of the medium while reading with the motor on: back to the start (the byte that just passed was the last).
+	if (consume & ~wgate & (tmode ? (gend & (gendc == 9'd255)) : (abs + 1'd1 >= size)) | (consume & ~wgate & (pos >= QD_MAX))) begin
+		pos       <= 0;
+		head_home <= 1;
+		grewind   <= 1;
+	end
+	if (consume & tmode & gend & (gendc != 9'd511)) gendc <= gendc + 1'd1;
+
 	// Tape as Quick Disk: the generator follows the head (consume is the byte that just passed).
 	if (consume & tmode & ~gend) begin
 		if (gseg == G_CMARK || gseg == F_HMARK || gseg == F_BMARK) gcrc <= crc16(16'd0, 8'hA5);
@@ -369,6 +384,7 @@ always @(posedge clk_sys) begin
 	end
 	if (img_mounted) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; dirty <= 0; end
 	if (grewind | reset | img_mounted) begin
+		gendc <= 0;
 		gseg <= G_LEAD; gcnt <= 0; gcrc <= 0; gro <= 0; grsize <= 0; gfile <= 0; gend <= 0; gseg_body <= 0;
 	end
 	if (wb_clear) dirty[wb_buf] <= 0;

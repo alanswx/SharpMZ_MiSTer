@@ -13,7 +13,7 @@ PY
 python3 ../../../tools/mzf2qdf.py out/expected.qdf "$T" > /dev/null
 python3 - <<'PY'
 d = open('out/expected.qdf', 'rb').read()[16:]
-end = len(d.rstrip(b'\x00')) + 300                   # the used part and some of the zeros after it
+end = len(d.rstrip(b"\x00")) + 200                   # the used part and some of the zeros after it (the head goes home 255 zeros after the last file)
 open('out/expected.hex', 'w').write(''.join(f'{b:02x}\n' for b in d[:end]))
 open('out/bytes', 'w').write(str(end))
 PY
