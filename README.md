@@ -132,7 +132,7 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). Side A loads from the tape image; when it asks for side B ("SET PROGRAM QD ?"), mount side B's `.mzt` as the Quick Disk and answer `Y`. (`tools/mzf2qdf.py OUT.qdf SIDE.mzt` still makes a real Quick Disk image of a tape, the same disk the core shows.) `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.
 * Reset: OSD Reset (or Reset and close OSD), the MiSTer's USER button and LCtrl+LAlt+RAlt reset the machine; the physical reset button reloads it from cold. Before 2026-10-09 the OSD Reset entries did nothing.
-* MZ-1500 BASIC programs need MZ-5Z001 BASIC loaded first. Some tape images in the year-based collection say file type 02, which MZ-5Z001 rejects ("Illegal filemode"); Zulpoko Daisakusen is one, and it fails the same way in mz1500emu.
+* MZ-1500 BASIC programs need MZ-5Z001 BASIC loaded first. Some tape images in the year-based collection say file type 02 (Zulpoko Daisakusen, Techno City Cars, Bacterianns): they are Quick Disk BASIC files dumped to tape, and MZ-5Z001 only loads them from a Quick Disk ("Illegal filemode" from tape). Mount the BASIC tape and then the program's tape in the Quick Disk slot (see Quick Disk above); Zulpoko runs that way.
 * Tape recordings (the No-Intro "Waveform" sets, `.wav`/`.flac`) convert to MZF with `tools/wav2mzf.py RECORDING [OUTDIR]` (standard Sharp format only, not turbo loaders).
 
 ## Design Summary

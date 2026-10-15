@@ -87,36 +87,18 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    MZ-1500 PA4 is now OUT0 itself (mz80c.vhd); the MZ-800 keeps the inverse. tests/mz1500/pioint.mzf (sim
    pio_mz1500): 3785 interrupts by frame 300 (was 1; mz800emu gives 1). Hardware Q06: F1 starts the game.
    May also be behind Danjuro's skipped keys and some sound on other MZ-1500 titles: retest those.
-7. [ ] (Not the PIO fix, nor the end-of-disk restart: Q07-Q09 still stop.) 3-D Golf, Earthbound, Nobunaga no Yabou (Danjuro, and EeDee's disks): MZ-5Z001 boots from the disk, then the
-   next program doesn't run. mz800emu stops at the same place on all three, but Danjuro's emulator (Takeda's
-   EmuZ-1500, Common Source Code Project) runs them ("the BASIC loader games all work"): a gap that the core and
-   mz800emu share. Reopened; find what the BASIC's RUN"…" needs (QD timing after a file, the RAM file board?):
-   - 3-D Golf: black after RUN "AUTO RUN" (a machine-code BASIC extension; the game is all on side B).
-   - Earthbound: "JUST A MOMENT PLEASE", RUN"EARTH" (the file on the disk is " EARTH", with a leading space).
-   - Nobunaga: "press F1; with a RAM FILE, INIT "RAM:$FFFF" first"; F1 types RUN"TITLE and stops, in mz800emu too.
-     The RAM file is the MZ-1R12 (or similar) battery RAM board, not in the core.
-   - [x] The end of the medium: Takeda's drive (CSCP vm/mz700/quickdisk.cpp) sends the head home and plays the
-     disk again while MTON is on and WRGA reads; the core ran off the end into FF (as mz800emu). mz_qdisk now
-     restarts at the end of the image (tape mode: 255 zeros after the last file). Not the cause here.
-   - Sim trace (Nobunaga, F1 at 2600): BASIC's own QD driver (2E91-3000) hunts (WR3 D3), reads blocks (RR0 4D),
-     toggles WR5B 80/82, turns the motor off sometimes (2F45: WR5B 00); channel B RR0 is read only twice.
-   - [x] Stale overrun: BASIC resets the channel (WR0 18h) before each block and checks RR1 after it; the core's
-     channel reset didn't clear the overrun flag (the Z80 SIO does), so one overrun at boot made every later block
-     look bad. Fixed, with a 3-byte receive FIFO as the SIO's. Sim: RR1 reads 00, and BASIC reads TITLE whole.
-   - [ ] After TITLE loads, the screen doesn't change; the ROM's QD loader (FDBC) reads side A from the start again
-     and again (BASIC, AUTO RUN, INPUT KNJ, TITLE). Side B (KOEI, CNTRY VW, ODA ...) mounted later (Q07) changes
-     nothing; Earthbound (side B: EB1, EB2) and 3-D Golf the same.
-   - CPU trace after TITLE loads (sim, frames 2936-2965): TITLE runs in BASIC for two frames, then the INPUT KNJ
-     machine code (3Fxx, loaded from side A) calls the ROM (E8xx, EFxx, F5-FE) and the ROM's QD routines (FDxx/FExx)
-     read side A over and over. TITLE's text: "CRT:G", "SIMULATION WAR GAME SERIES", "BY KOEI", "ODA1" (side B),
-     "< QD >", "INPUT KNJ". Not the kanji ROM board: between TITLE and the search INPUT KNJ only uses the PCG
-     window (OUT E5/E6, F0: it writes its kanji as PCG patterns), E000-E012, F2 and the QD ports, never the board's
-     ports. mz800emu stops earlier: in an endless JR loop at 3A6A-3A83 that only an interrupt can leave, and its
-     MZ-1500 PIO interrupts don't fire (the inverted PA4 fixed in the core); the core gets past it, into the
-     ROM's QD search. So mz800emu can't be the reference past this point; EmuZ-1500 (Takeda) is. Next: which file
-     the ROM's loader is asked for, and Danjuro's procedure (when he turns the disk to side B).
-   - Intermittent: one W01 run on mister126 typed garbage into MZ-5Z001 (graphic characters, syntax errors);
-     reruns on both builds were fine. Compare with Danjuro's skipped keys.
+7. [x] 3-D Golf, Earthbound, Nobunaga no Yabou (and Zulpoko's "Illegal data error in 150"): fixed. On the MZ-1500,
+   OUT E5 (open the CG/PCG window) also switched D000-FFFF from RAM to ROM in the core (mz80c.vhd, as mz800emu), so
+   after OUT E6 a program that had mapped RAM with E1 found ROM there: Nobunaga's INPUT KNJ returned through its stack
+   at FDxx into the ROM (F6DB) and the ROM's QD loader searched side A forever. In Takeda's EmuZ-1500 E5 only opens
+   the window (it covers D000-EFFF, F000-FFFF empty) and E6/E4 close it; the bank choice is kept. Found by comparing
+   CPU traces with the macOS port of CSCP (~/dev2/common_source_code, scripted mode added: --script, --qd,
+   --qd-swap, --type, --screenshot, --dump-every, --trace-cpu). Also fixed on the way, as the Z80 SIO / EmuZ-1500:
+   the QD SIO's 3-byte receive FIFO, a channel reset clears overrun, the head goes home at the end of the disk.
+   mister126: Q07 Nobunaga title ("HIT ANY KEY"), Q08 Earthbound title, side B, part 1, Q09 3-D Golf title, side
+   B, F1, the game; Z04 Zulpoko's title; no change to Q01-Q06, W01, C01-C03, N01.
+   (The kanji ROM board was a wrong guess: the game never touches its ports. mz800emu stops earlier, on its PIO
+   interrupts.)
 8. [x] EeDee's 21 QD images (14 disks/side A) on mister126: every one ends where mz800emu ends. Run: Diamond Chase,
    Excite 4-nin Mahjong, Nonbarla Panic, Sonic Birds, Zexas. Ask for side B (correct): Dig Dug, New Rally-X, Flappy.
    "QD:File mode error": Cockpit and Sparrow are BASIC programs (type 02) on disks without BASIC: boot MZ-5Z001 first

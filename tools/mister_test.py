@@ -406,15 +406,16 @@ test('Q07', 'MZ1500', 'MZ-1500 Nobunaga no Yabou: F1 loads TITLE, which wants si
      late=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side B)(1984)(Koei).qdf', 75)], reset=True,
      steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('shot', 'prompt'), ('keys', '59'), ('wait', 25), ('shot', 'f1'),
             ('wait', 45), ('shot', 'sideb')])
-test('Q08', 'MZ1500', 'MZ-1500 Earthbound: BASIC boots and RUNs EARTH, which wants side B (EB1, EB2): side B mounted',
+test('Q08', 'MZ1500', 'MZ-1500 Earthbound: title (PCG), then side B and SPACE: part 1 (EmuZ-1500 the same)',
      files=[('s', 3, f'{TESTERS}/Earthbound (Side A)(1984)(Xtalsoft).qdf')],
-     late=[('s', 3, f'{TESTERS}/Earthbound (Side B)(1984)(Xtalsoft).qdf', 60)], reset=True,
-     steps=[('wait', 4), ('type', 'Q'), ('wait', 50), ('shot', 'a'), ('wait', 50), ('shot', 'b')])
-test('Q09', 'MZ1500', 'MZ-1500 3-D Golf: BASIC and AUTO RUN from side A, side B mounted',
+     late=[('s', 3, f'{TESTERS}/Earthbound (Side B)(1984)(Xtalsoft).qdf', 120)], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 50), ('shot', 'title'), ('wait', 70), ('shot', 'sideb'), ('type', ' '),
+            ('wait', 40), ('shot', 'part1')])
+test('Q09', 'MZ1500', 'MZ-1500 3-D Golf: title, "turn the QD to side B and press F1": side B, F1, the game',
      files=[('s', 3, f'{TESTERS}/3-D Golf Simulation (Side A)(1984)(T&E Soft).qdf')],
-     late=[('s', 3, f'{TESTERS}/3-D Golf Simulation (Side B)(1984)(T&E Soft).qdf', 45)], reset=True,
-     steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('shot', 'a'), ('wait', 30), ('type', '\n'), ('wait', 40), ('shot', 'b')])
-test('Z04', 'MZ1500', 'MZ-1500: MZ-5Z001 and Zulpoko as one tape in the Quick Disk slot: Q, LOAD "ZULPOKO", RUN',
+     late=[('s', 3, f'{TESTERS}/3-D Golf Simulation (Side B)(1984)(T&E Soft).qdf', 60)], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 45), ('shot', 'a'), ('wait', 20), ('keys', '59'), ('wait', 40), ('shot', 'b')])
+test('Z04', 'MZ1500', 'MZ-1500: MZ-5Z001 and Zulpoko as one tape in the Quick Disk slot: Q, LOAD "ZULPOKO", RUN: its title',
      files=[('s', 3, 'gen:qdtape_zulpoko')], reset=True,
      steps=[('wait', 4), ('type', 'Q'), ('wait', 30), ('shot', 'basic'), ('type', 'LOAD "ZULPOKO"\n'), ('wait', 15),
             ('type', 'RUN\n'), ('wait', 30), ('shot', 'run')])

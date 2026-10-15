@@ -711,6 +711,8 @@ begin
                                          and
                                          (CONFIG(FDCROM) and CONFIG(CURRENTMACHINE)) /= "00000000"                                        -- Active machine has the fdc rom enabled.
                                          and
+                                         M15_SPEC_ON = '0'                                                                                -- MZ-1500: F000-FFFF is empty under the window.
+                                         and
                                          MZ_GRAM_ENABLE = '0'                                                                             -- Graphics RAM is not enabled.
                                          and
                                          (MZ_HIGH_RAM_ENABLE = '0' or (MZ_HIGH_RAM_ENABLE = '1' and MZ_HIGH_RAM_INHIBIT = '1'))           -- F000 -> FFFF FDC ROM memory.
@@ -747,7 +749,7 @@ begin
                                              )
                                            )
                                            or
-                                           ( (CONFIG(MZ700)='1' and MZ_HIGH_RAM_ENABLE='1' and MZ_HIGH_RAM_INHIBIT='0')                   -- D000 -> FFFF MZ700 Ram Enabled.
+                                           ( (CONFIG(MZ700)='1' and MZ_HIGH_RAM_ENABLE='1' and MZ_HIGH_RAM_INHIBIT='0' and M15_SPEC_ON = '0')   -- D000 -> FFFF MZ700 Ram Enabled (not under the MZ-1500 window).
                                              and
                                              ( (T80_A16(15 downto 12)="1101" or T80_A16(15 downto 12)="1110"
                                                or
@@ -817,10 +819,13 @@ begin
     M8                  <= CONFIG(MZ800);
     M15                 <= CONFIG(IS_MZ1500);
 
-    -- MZ-1500 special window (mz800emu mz1500_memory.c): OUT E5 n maps the CG ROM (n=0) or PCG plane n (1-3) over
-    -- D000-EFFF while the upper ROM area is mapped, hiding VRAM, the E000 ports and the E800 ROM; E3, E4 and E6 unmap it.
+    -- MZ-1500 special window (Takeda's EmuZ-1500, vm/mz700/memory.cpp update_map_high): OUT E5 n maps the CG ROM (n=0)
+    -- or PCG plane n (1-3) over D000-EFFF whatever the bank switch (OUT E1 RAM or the ROM), and F000-FFFF reads FF and
+    -- ignores writes; only E4 and E6 close it. (mz800emu opened it only with the upper ROM mapped and closed it on E3
+    -- too: Nobunaga no Yabou's INPUT KNJ maps RAM with E1, opens plane 1 and clears it with PUSHes from EF40; with the
+    -- window shut those cleared BASIC's RAM and the program crashed into the ROM.)
     -- F0 is the display mode (0: PCG on, 1: priority), F1 the PCG palette (bits 6-4 index, 2-0 colour).
-    M15_SPEC_ON         <= '1' when M15 = '1' and M15_SPEC /= "000" and MZ_HIGH_RAM_ENABLE = '0' else '0';
+    M15_SPEC_ON         <= '1' when M15 = '1' and M15_SPEC /= "000" else '0';
     M15_WIN             <= '1' when M15_SPEC_ON = '1' and T80_MREQ_n = '0' and (T80_A16(15 downto 12) = "1101" or T80_A16(15 downto 12) = "1110") else '0';
     M15_PCG_CS          <= '1' when M15_WIN = '1' and M15_SPEC(2 downto 1) /= "00" else '0';
     M15_CG_CS           <= '1' when M15_WIN = '1' and M15_SPEC = "001" else '0';
@@ -837,7 +842,7 @@ begin
             if CLKBUS(CKENCPU) = '1' and M15 = '1' then
                 if CS_IO_E5_n = '0' then
                     M15_SPEC <= std_logic_vector(unsigned('0' & T80_DO(1 downto 0)) + 1);
-                elsif CS_IO_E6_n = '0' or CS_IO_E3_n = '0' or CS_IO_E4_n = '0' then
+                elsif CS_IO_E6_n = '0' or CS_IO_E4_n = '0' then
                     M15_SPEC <= "000";
                 end if;
                 if T80_IORQ_n = '0' and T80_WR_n = '0' and T80_M1_n = '1' then
@@ -993,9 +998,9 @@ begin
                     MZ_HIGH_RAM_ENABLE  <= '0';
                     MZ_INHIBIT_RESET    <= '1';
 
-                elsif(CS_IO_E5_n = '0' and M15 = '1') then                  -- MZ-1500: E5 also maps the upper ROM area.
-                    MZ_HIGH_RAM_ENABLE  <= '0';
-    
+                -- (MZ-1500: E5 only opens the CG/PCG window, which covers D000-FFFF while it is open; the RAM/ROM choice
+                -- stays as it was, so E6 brings back RAM if E1 had mapped it, as Takeda's EmuZ-1500. Turning it to ROM
+                -- here made Nobunaga no Yabou's INPUT KNJ return through a stack in RAM at FDxx into the ROM.)
                 elsif(MZ_HIGH_RAM_INHIBIT = '0' and MZ_INHIBIT_RESET = '1') then
                     MZ_INHIBIT_RESET    <= '0';
                 end if;
