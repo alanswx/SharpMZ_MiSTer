@@ -105,8 +105,13 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
      look bad. Fixed, with a 3-byte receive FIFO as the SIO's. Sim: RR1 reads 00, and BASIC reads TITLE whole.
    - [ ] After TITLE loads, the screen doesn't change; the ROM's QD loader (FDBC) reads side A from the start again
      and again (BASIC, AUTO RUN, INPUT KNJ, TITLE). Side B (KOEI, CNTRY VW, ODA ...) mounted later (Q07) changes
-     nothing; Earthbound (side B: EB1, EB2) and 3-D Golf the same. Next: --trace-cpu after TITLE loads (what does
-     it call? a reset to the IPL?), and Danjuro's exact procedure in EmuZ-1500 (when he swaps sides).
+     nothing; Earthbound (side B: EB1, EB2) and 3-D Golf the same.
+   - CPU trace after TITLE loads (sim, frames 2936-2965): TITLE runs in BASIC for two frames, then the INPUT KNJ
+     machine code (3Fxx, loaded from side A) calls the ROM (E8xx, EFxx, F5-FE) and the ROM's QD routines (FDxx/FExx)
+     read side A over and over. TITLE's text: "CRT:G", "SIMULATION WAR GAME SERIES", "BY KOEI", "ODA1" (side B),
+     "< QD >", "INPUT KNJ". INPUT KNJ is presumably kanji input: the game may need the kanji ROM board (MZ-1R23,
+     and MZ-1R24 dictionary), which EmuZ-1500 emulates and the core doesn't. Next: what INPUT KNJ reads from (the
+     kanji ROM ports?) and whether Danjuro's EmuZ-1500 has a KANJI.ROM; ask him for his exact procedure.
    - Intermittent: one W01 run on mister126 typed garbage into MZ-5Z001 (graphic characters, syntax errors);
      reruns on both builds were fine. Compare with Danjuro's skipped keys.
 8. [x] EeDee's 21 QD images (14 disks/side A) on mister126: every one ends where mz800emu ends. Run: Diamond Chase,
