@@ -401,12 +401,15 @@ test('Q06', 'MZ1500', 'MZ-1500 Batten Tanuki: side B, Return, then F1 at "F1 -- 
      late=[('s', 3, f'{TESTERS}/Batten Tanuki no Daibouken (Side B)(1986)(Tecno Soft).qdf', 14)], reset=True,
      steps=[('wait', 4), ('type', 'Q'), ('wait', 14), ('type', '\n'), ('wait', 10), ('shot', 'prompt'), ('keys', '59'),
             ('wait', 8), ('shot', 'f1')])
-test('Q07', 'MZ1500', 'MZ-1500 Nobunaga no Yabou: F1 at its prompt loads TITLE (stopped in the core and mz800emu)',
-     files=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side A)(1984)(Koei).qdf')], reset=True,
-     steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('shot', 'prompt'), ('keys', '59'), ('wait', 40), ('shot', 'f1')])
-test('Q08', 'MZ1500', 'MZ-1500 Earthbound: BASIC boots and RUNs EARTH',
-     files=[('s', 3, f'{TESTERS}/Earthbound (Side A)(1984)(Xtalsoft).qdf')], reset=True,
-     steps=[('wait', 4), ('type', 'Q'), ('wait', 50), ('shot', 'a'), ('wait', 40), ('shot', 'b')])
+test('Q07', 'MZ1500', 'MZ-1500 Nobunaga no Yabou: F1 loads TITLE, which wants side B (KOEI ...): side B mounted, the game',
+     files=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side A)(1984)(Koei).qdf')],
+     late=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side B)(1984)(Koei).qdf', 75)], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 40), ('shot', 'prompt'), ('keys', '59'), ('wait', 25), ('shot', 'f1'),
+            ('wait', 45), ('shot', 'sideb')])
+test('Q08', 'MZ1500', 'MZ-1500 Earthbound: BASIC boots and RUNs EARTH, which wants side B (EB1, EB2): side B mounted',
+     files=[('s', 3, f'{TESTERS}/Earthbound (Side A)(1984)(Xtalsoft).qdf')],
+     late=[('s', 3, f'{TESTERS}/Earthbound (Side B)(1984)(Xtalsoft).qdf', 60)], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 50), ('shot', 'a'), ('wait', 50), ('shot', 'b')])
 test('Q09', 'MZ1500', 'MZ-1500 3-D Golf: BASIC and AUTO RUN from side A, side B mounted',
      files=[('s', 3, f'{TESTERS}/3-D Golf Simulation (Side A)(1984)(T&E Soft).qdf')],
      late=[('s', 3, f'{TESTERS}/3-D Golf Simulation (Side B)(1984)(T&E Soft).qdf', 45)], reset=True,

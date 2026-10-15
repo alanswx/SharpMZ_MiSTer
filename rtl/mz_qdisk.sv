@@ -197,7 +197,7 @@ reg  [7:0] rx_q[3];
 reg  [1:0] rx_cnt   = 0;
 wire       rx_avail = (rx_cnt != 0);              // RR0 b0
 reg        overrun  = 0;                         // RR1 b5
-reg        rx_push, rx_pop, rx_clear;            // this clock (blocking, below)
+reg        rx_push, rx_pop, rx_clear, overrun_clr; // this clock (blocking, below)
 reg  [7:0] rx_new;
 reg        strip    = 0;                         // dropping sync characters after hunt (WR3 b1)
 reg [12:0] tick     = 0;
@@ -251,6 +251,7 @@ always @(posedge clk_sys) begin
 	rx_push  = 0;
 	rx_pop   = 0;
 	rx_clear = 0;
+	overrun_clr = 0;
 	hd_we   <= 0;
 
 	// --- the disk: one byte every BYTE_CLKS while the motor runs (waits for a late sector) ---
@@ -323,7 +324,7 @@ always @(posedge clk_sys) begin
 				wa[pa] <= io_dout;
 				if (pa == 0) begin
 					pa <= io_dout[2:0];
-					if (io_dout[5:3] == 3'd3) begin wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0; hunt <= 0; rx_clear = 1; tx_full <= 0; eom <= 1; end
+					if (io_dout[5:3] == 3'd3) begin wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0; hunt <= 0; rx_clear = 1; tx_full <= 0; eom <= 1; overrun_clr = 1; end   // channel reset: errors too
 					if (io_dout[5:3] == 3'd6) overrun <= 0;     // error reset
 					if (io_dout[7:6] == 2'd2) begin crc <= 0; crc_arm <= 0; end   // reset Tx CRC generator
 					if (io_dout[7:6] == 2'd3) begin eom <= 0; crc_hi <= 0; end   // reset Tx underrun/EOM latch
@@ -351,6 +352,8 @@ always @(posedge clk_sys) begin
 
 	// Receive FIFO: the read pops the oldest byte, the disk pushes the new one.
 	if (rx_pop && rx_cnt != 0) begin rx_q[0] <= rx_q[1]; rx_q[1] <= rx_q[2]; end
+	if (overrun_clr) overrun <= 0;                          // channel reset (the Z80 SIO clears its errors; MZ-5Z001 BASIC
+	                                                        // resets the channel before each block and then checks RR1)
 	if (rx_push) begin
 		if (rx_cnt == 2'd3 && !rx_pop) begin overrun <= 1; rx_q[2] <= rx_new; end
 		else rx_q[rx_cnt - ((rx_pop && rx_cnt != 0) ? 2'd1 : 2'd0)] <= rx_new;

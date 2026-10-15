@@ -649,6 +649,11 @@ void Sim::clock()
                 fprintf(fio, "%u,%04X,io,R,%02X,%02X\n", frame, top->cpu_pc, ip, top->dbg_rdata);
         }
         prev_ir = irq_rd;
+        static bool prev_ovr = false;                           // Quick Disk: when the SIO overrun flag is set
+        if (top->dbg_qdovr && !prev_ovr)
+            fprintf(fio, "%u,%04X,qd,OVERRUN,pos=%u,fifo=%u,wr3=%02X,cyc=%llu\n", frame, top->cpu_pc, (unsigned)top->dbg_qdpos,
+                    (unsigned)top->dbg_qdfifo, (unsigned)top->dbg_qdwr3, (unsigned long long)cpu_cycles);
+        prev_ovr = top->dbg_qdovr;
         if (mw && !prev_mw && (a & 0xFFF0) == 0xE000)
             fprintf(fio, "%u,%04X,mem,W,%04X,%02X\n", frame, top->cpu_pc, a, top->dbg_wdata);
         if (mr && !prev_mr && (a & 0xFFF0) == 0xE000) { kr = 8; ka = a; }

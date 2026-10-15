@@ -100,8 +100,13 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
      restarts at the end of the image (tape mode: 255 zeros after the last file). Not the cause here.
    - Sim trace (Nobunaga, F1 at 2600): BASIC's own QD driver (2E91-3000) hunts (WR3 D3), reads blocks (RR0 4D),
      toggles WR5B 80/82, turns the motor off sometimes (2F45: WR5B 00); channel B RR0 is read only twice.
-   - [ ] Takeda's drive also pauses at each block boundary until the SIO hunts again (DATA_BREAK); the core's
-     disk turns in real time. Compare where BASIC misses TITLE (which block it last read) with a longer trace.
+   - [x] Stale overrun: BASIC resets the channel (WR0 18h) before each block and checks RR1 after it; the core's
+     channel reset didn't clear the overrun flag (the Z80 SIO does), so one overrun at boot made every later block
+     look bad. Fixed, with a 3-byte receive FIFO as the SIO's. Sim: RR1 reads 00, and BASIC reads TITLE whole.
+   - [ ] After TITLE loads, the screen doesn't change; the ROM's QD loader (FDBC) reads side A from the start again
+     and again (BASIC, AUTO RUN, INPUT KNJ, TITLE). Side B (KOEI, CNTRY VW, ODA ...) mounted later (Q07) changes
+     nothing; Earthbound (side B: EB1, EB2) and 3-D Golf the same. Next: --trace-cpu after TITLE loads (what does
+     it call? a reset to the IPL?), and Danjuro's exact procedure in EmuZ-1500 (when he swaps sides).
    - Intermittent: one W01 run on mister126 typed garbage into MZ-5Z001 (graphic characters, syntax errors);
      reruns on both builds were fine. Compare with Danjuro's skipped keys.
 8. [x] EeDee's 21 QD images (14 disks/side A) on mister126: every one ends where mz800emu ends. Run: Diamond Chase,
