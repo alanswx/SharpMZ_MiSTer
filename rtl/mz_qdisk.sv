@@ -189,9 +189,16 @@ wire       gready = (gseg == G_CNT & ~gend) ? scan_done : (~need_src | ~in_img |
 wire [7:0] next_byte = (pos > QD_MAX) ? 8'hFF : tmode ? gbyte : in_img ? head_byte : 8'hFF;
 wire       spinning  = mounted & motor & base_known;
 
-reg  [7:0] rx_buf;
-reg        rx_avail = 0;                         // RR0 b0
+// Receive FIFO: the Z80 SIO holds three received bytes (plus the one in its shift register), so a CPU that
+// lags a byte or two behind the disk (an interrupt, a slow loop) loses nothing; overrun only when a byte arrives
+// with all three full (it then replaces the newest). With one byte, MZ-5Z001 BASIC loading TITLE (Nobunaga no
+// Yabou) saw an overrun after every block and read the disk again and again.
+reg  [7:0] rx_q[3];
+reg  [1:0] rx_cnt   = 0;
+wire       rx_avail = (rx_cnt != 0);              // RR0 b0
 reg        overrun  = 0;                         // RR1 b5
+reg        rx_push, rx_pop, rx_clear;            // this clock (blocking, below)
+reg  [7:0] rx_new;
 reg        strip    = 0;                         // dropping sync characters after hunt (WR3 b1)
 reg [12:0] tick     = 0;
 
@@ -241,6 +248,9 @@ always @(posedge clk_sys) begin
 	wr_last <= io_wr & sel;
 	consume <= 0;
 	grewind <= 0;
+	rx_push  = 0;
+	rx_pop   = 0;
+	rx_clear = 0;
 	hd_we   <= 0;
 
 	// --- the disk: one byte every BYTE_CLKS while the motor runs (waits for a late sector) ---
@@ -276,9 +286,8 @@ always @(posedge clk_sys) begin
 			if (strip && (next_byte == wa[6] || next_byte == wa[7])) begin end
 			else begin
 				strip   <= 0;
-				rx_buf  <= next_byte;
-				if (rx_avail) overrun <= 1;
-				rx_avail <= 1;
+				rx_push = 1;
+				rx_new  = next_byte;
 			end
 		end
 	end
@@ -288,8 +297,8 @@ always @(posedge clk_sys) begin
 		case (io_addr[1:0])
 			2'd0: begin                                     // data A
 				head_home <= 0;
-				rd_data   <= rx_avail ? rx_buf : 8'hFF;
-				rx_avail  <= 0;
+				rd_data   <= rx_avail ? rx_q[0] : 8'hFF;
+				rx_pop    = 1;
 			end
 			2'd1: rd_data <= 8'hFF;                         // data B
 			2'd2: begin                                     // ctrl A
@@ -314,13 +323,13 @@ always @(posedge clk_sys) begin
 				wa[pa] <= io_dout;
 				if (pa == 0) begin
 					pa <= io_dout[2:0];
-					if (io_dout[5:3] == 3'd3) begin wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0; hunt <= 0; rx_avail <= 0; tx_full <= 0; eom <= 1; end
+					if (io_dout[5:3] == 3'd3) begin wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0; hunt <= 0; rx_clear = 1; tx_full <= 0; eom <= 1; end
 					if (io_dout[5:3] == 3'd6) overrun <= 0;     // error reset
 					if (io_dout[7:6] == 2'd2) begin crc <= 0; crc_arm <= 0; end   // reset Tx CRC generator
 					if (io_dout[7:6] == 2'd3) begin eom <= 0; crc_hi <= 0; end   // reset Tx underrun/EOM latch
 				end
 				else begin
-					if (pa == 3 && io_dout[4] && io_dout[0]) begin hunt <= 1; last_b <= 8'h00; rx_avail <= 0; end
+					if (pa == 3 && io_dout[4] && io_dout[0]) begin hunt <= 1; last_b <= 8'h00; rx_clear = 1; end
 					pa <= 0;
 				end
 			end
@@ -332,13 +341,22 @@ always @(posedge clk_sys) begin
 				end
 				else begin
 					if (pb == 2) rb2 <= io_dout;
-					if (pb == 5 && ~io_dout[7]) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; grewind <= 1; end   // motor off: rewind
+					if (pb == 5 && ~io_dout[7]) begin pos <= 0; head_home <= 1; hunt <= 0; rx_clear = 1; grewind <= 1; end   // motor off: rewind
 					pb <= 0;
 				end
 			end
 		end
 		else if (~io_addr[0]) begin tx_buf <= io_dout; tx_full <= 1; end   // data A
 	end
+
+	// Receive FIFO: the read pops the oldest byte, the disk pushes the new one.
+	if (rx_pop && rx_cnt != 0) begin rx_q[0] <= rx_q[1]; rx_q[1] <= rx_q[2]; end
+	if (rx_push) begin
+		if (rx_cnt == 2'd3 && !rx_pop) begin overrun <= 1; rx_q[2] <= rx_new; end
+		else rx_q[rx_cnt - ((rx_pop && rx_cnt != 0) ? 2'd1 : 2'd0)] <= rx_new;
+	end
+	if (rx_clear) rx_cnt <= 0;                              // channel reset, enter hunt, motor off
+	else rx_cnt <= rx_cnt - ((rx_pop && rx_cnt != 0) ? 2'd1 : 2'd0) + ((rx_push && !(rx_cnt == 2'd3 && !rx_pop)) ? 2'd1 : 2'd0);
 
 	if (consume) pos <= pos + 1'd1;
 
@@ -379,10 +397,10 @@ always @(posedge clk_sys) begin
 	if (reset) begin
 		wa[0] <= 0; wa[1] <= 0; wa[2] <= 0; wa[3] <= 0; wa[4] <= 0; wa[5] <= 0; wa[6] <= 0; wa[7] <= 0;
 		wb[0] <= 0; wb[1] <= 0; wb[2] <= 0; wb[3] <= 0; wb[4] <= 0; wb[5] <= 0; wb[6] <= 0; wb[7] <= 0;
-		pa <= 0; pb <= 0; hunt <= 0; pos <= 0; head_home <= 1; rx_avail <= 0; overrun <= 0;
+		pa <= 0; pb <= 0; hunt <= 0; pos <= 0; head_home <= 1; rx_cnt <= 0; overrun <= 0;
 		tx_full <= 0; eom <= 1; crc <= 0;
 	end
-	if (img_mounted) begin pos <= 0; head_home <= 1; hunt <= 0; rx_avail <= 0; dirty <= 0; end
+	if (img_mounted) begin pos <= 0; head_home <= 1; hunt <= 0; rx_cnt <= 0; dirty <= 0; end
 	if (grewind | reset | img_mounted) begin
 		gendc <= 0;
 		gseg <= G_LEAD; gcnt <= 0; gcrc <= 0; gro <= 0; grsize <= 0; gfile <= 0; gend <= 0; gseg_body <= 0;

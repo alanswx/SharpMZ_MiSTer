@@ -641,7 +641,13 @@ void Sim::clock()
         static bool prev_ir = false; static int ir = 0; static uint8_t ip = 0;
         bool irq_rd = top->dbg_io_rd;
         if (irq_rd && !prev_ir) { ir = 8; ip = top->dbg_io_port; }
-        if (ir && --ir == 0) fprintf(fio, "%u,%04X,io,R,%02X,%02X\n", frame, top->cpu_pc, ip, top->dbg_rdata);
+        if (ir && --ir == 0) {
+            if (ip >= 0xF4 && ip <= 0xF7)        // Quick Disk: also the CPU cycle, the head position and the FIFO count
+                fprintf(fio, "%u,%04X,io,R,%02X,%02X,%llu,%u,%u\n", frame, top->cpu_pc, ip, top->dbg_rdata,
+                        (unsigned long long)cpu_cycles, (unsigned)top->dbg_qdpos, (unsigned)top->dbg_qdfifo);
+            else
+                fprintf(fio, "%u,%04X,io,R,%02X,%02X\n", frame, top->cpu_pc, ip, top->dbg_rdata);
+        }
         prev_ir = irq_rd;
         if (mw && !prev_mw && (a & 0xFFF0) == 0xE000)
             fprintf(fio, "%u,%04X,mem,W,%04X,%02X\n", frame, top->cpu_pc, a, top->dbg_wdata);

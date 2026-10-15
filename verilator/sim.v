@@ -125,7 +125,9 @@ module top(
    output [15:0] dbg_addr /*verilator public_flat*/,
    output [7:0]  dbg_wdata /*verilator public_flat*/,
    output [7:0]  dbg_rdata /*verilator public_flat*/,   // CPU data in
-   output [1:0]  dbg_m8map /*verilator public_flat*/,   // MZ-800 map: {CG-RAM/VRAM in (CGV), ROM at E000 (ROME)}
+   output [1:0]  dbg_m8map /*verilator public_flat*/,
+   output [16:0] dbg_qdpos /*verilator public_flat*/,   // Quick Disk head position
+   output [1:0]  dbg_qdfifo /*verilator public_flat*/,  // Quick Disk SIO receive FIFO count   // MZ-800 map: {CG-RAM/VRAM in (CGV), ROM at E000 (ROME)}
    output [1:0]  dbg_cse /*verilator public_flat*/,
 
    // Backdoor reads of internal memories for --ascii-end and --dump-mem.
@@ -255,6 +257,8 @@ module top(
    assign dbg_wdata  = sm.core.t80_do;
    assign dbg_rdata  = sm.core.t80_di;
    assign dbg_m8map  = {sm.core.mz80hw.m8_cgv, sm.core.mz80hw.m8_rome};
+   assign dbg_qdpos  = sm.mz_qdisk.pos;
+   assign dbg_qdfifo = sm.mz_qdisk.rx_cnt;
    assign dbg_cse    = {sm.core.mz80hw.cs_e_ni, sm.core.mz80hw.cs_e2_n};
    assign dbg_map    = {sm.core.mz80hw.mz_gram_enable, sm.core.mz80hw.mz_high_ram_inhibit, sm.core.mz80hw.mz_high_ram_enable};
    assign dbg_io_port = sm.core.t80_a16[7:0];
