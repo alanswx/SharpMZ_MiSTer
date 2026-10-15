@@ -66,6 +66,15 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
 2. [x] 60 Hz: the MZ-1500 and the Japanese MZ-700 use the 60 Hz colour timing (568 x 260, 15.6 kHz); European
    MZ-700/800 stay 50 Hz.
    - [ ] On hardware: timing, picture, and that games run at their original speed.
+   - [x] Danjuro (2026-10-15): "games run too fast at 60 Hz, right at 50 Hz". Japanese (NTSC) machines run the 8253's
+     counter 0 at 14.31818 MHz / 16 = 894.9 kHz, not the European 1.1088 MHz: the 1Z-009B and MZ-1500 monitors load
+     03F8h for the 880 Hz beep where 1Z-013A loads 04ECh (EmuZ-700/1500: PHI_CLOCKS / 16 for NTSC; mz800emu's
+     MZ-1500: 896 kHz). The core gave them 1.1088 MHz: music 24% high and counter-0 timing (PIO interrupts, tempo
+     loops) 24% fast. Fixed in clkgen.vhd for the MZ-1500 and Region Japan. Games that wait for VBLANK do run 20%
+     faster at 60 Hz, as on a Japanese machine (both reference emulators run the MZ-1500 at 60 Hz).
+   - [ ] Ask Danjuro which games, and retest them on the fixed build.
+   - [ ] Smaller: the NTSC CPU clock is 3.579545 MHz (14.31818 / 4), 0.9% above the European 3.546895; counter 1
+     (the clock) counts the 15.73 kHz line rate. The core keeps the European rates for both.
 3. [ ] MZ-1500 sound. Measured: the sim (new `--wav-out`: the core's final stereo output) and the hardware (capture
    card, `('audio', label)` steps; mister126 needed `dvi_mode=0` in MiSTer.ini, backup MiSTer.ini.bak_dvi, and the
    card's "Digital In" capture switched on) both give left 440 Hz / right 880 Hz for tests/mz1500/psgstereo.mzf
@@ -85,7 +94,7 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    bit 4 = the 8253's OUT0, active high) taken at each terminal count of counter 0 (mode 0, reloaded by the handler).
    The core, like mz800emu, gave the PIO the inverse of OUT0 (the MZ-800's /CTC0): one interrupt, then none. On the
    MZ-1500 PA4 is now OUT0 itself (mz80c.vhd); the MZ-800 keeps the inverse. tests/mz1500/pioint.mzf (sim
-   pio_mz1500): 3785 interrupts by frame 300 (was 1; mz800emu gives 1). Hardware Q06: F1 starts the game.
+   pio_mz1500): 3785 interrupts by frame 300 (was 1; mz800emu gives 1); 3070 (0BFEh) with the NTSC 894.9 kHz counter 0 clock. Hardware Q06: F1 starts the game.
    May also be behind Danjuro's skipped keys and some sound on other MZ-1500 titles: retest those.
 7. [x] 3-D Golf, Earthbound, Nobunaga no Yabou (and Zulpoko's "Illegal data error in 150"): fixed. On the MZ-1500,
    OUT E5 (open the CG/PCG window) also switched D000-FFFF from RAM to ROM in the core (mz80c.vhd, as mz800emu), so
@@ -103,12 +112,22 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    Excite 4-nin Mahjong, Nonbarla Panic, Sonic Birds, Zexas. Ask for side B (correct): Dig Dug, New Rally-X, Flappy.
    "QD:File mode error": Cockpit and Sparrow are BASIC programs (type 02) on disks without BASIC: boot MZ-5Z001 first
    (now: its tape in the QD slot), then this disk, RUN"COCKPIT". T.N.T. Bomb Bomb loads its PCG data (slow).
-9. [ ] Cybernoid (MZ-800, Profi, 4 files: loader 4F00, CYB1-3): a core bug. mz800emu (the four files as one tape, C at
+9. [x] Cybernoid (MZ-800, Profi, 4 files): fixed in the CMT (cmt.vhd), not the CPU. The loader reads each file with
+   the monitor's tape routine (its RAM copy, patched to call 50A0) and stops and restarts the motor between files. (1)
+   A motor restart before the tape image had replaced the record played the finished record again: CYB1 was read
+   twice, so the picture came out scrambled. Now a played record is not replayed; the next one follows when it is
+   loaded, as on a real tape. (2) When the release timer fired with the motor running, PLAY_READY dropping looked
+   like a motor stop and restarted the timer while PLAY_READY_CLR was still high, so the next release had no edge
+   and CYB3 never came. Found by comparing the bytes passing 50A3 (OUT (E1),A) with mz800emu. Hardware: H06 (real
+   speed) and H07 (Fastest) reach the Profi menu.
+   Earlier notes: (Cybernoid (MZ-800, Profi, 4 files: loader 4F00, CYB1-3): a core bug. mz800emu (the four files as one tape, C at
    the IPL) shows the Cybernoid loading picture with a counter and reaches the game's menu at about frame 20000
    (real tape speed). On mister126 (H06 real speed, H07 Fastest, H08 VRAM Wait On) the picture comes out scrambled
    (the artwork's outline, garbled) and the counter stops at 979. The loader is packed (no plain ROM calls): likely
    its own tape routine, drawing while it loads, misreading bits. Next: CPU traces of the sim and mz800emu from the
-   loader's start, first divergence (tape bit timing, wait states, the 8253/PIO it may use for timing).
+   loader's start, first divergence (tape bit timing, wait states, the 8253/PIO it may use for timing).)
+9b. [ ] W02 (MZ-1500 Druaga tape installer onto a blank QD): after "set side B and press a key" it returns to the IPL
+   with "QD:Unformat err". The same on 20261013, so not a recent change; find out what the installer writes.
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
 11. [ ] Tape image: EeDee is still working it out (item B): a README walkthrough.
@@ -254,7 +273,18 @@ Working well for testers: Snake & Snake (MZ-700), Donkey Gorilla in play, MZ-80K
 - [x] Audio mixing: OSD Tape Sound mixes the tape signal in quietly while it moves. Not yet heard on hardware.
 - [x] Joystick mapping in the OSD (Fire 1, Fire 2).
 - [x] Analog video: native 15.6 kHz on every model; video_mixer adds the 31 kHz scandoubler (MiSTer.ini forced_scandoubler, OSD Scandoubler Fx with HQ2x and scanlines). The MZ-80K/80A/80B 60 Hz modes now use clk_sys / 8 (/ 4) pixel clocks with a 568 (1136) pixel line, like the MZ-700: their 8/16 MHz enables were uneven and the scandoubler cut lines short. Checked through the scaler on hardware (V01-V05); not yet seen on a real CRT or VGA monitor.
-- [ ] Show tape status (record number, tape full) in the OSD.
+- [x] Show tape status (record number, tape full): Tape Messages (rtl/tape_osd.sv) shows TAPE n/total NAME, END,
+  SAVED, FULL.
+- [ ] Tape details, as the v2 core's Main-drawn "Tape Details" OSD page (size, type, name, load and exec address;
+  "Not a m/code program" for BASIC). A standard core can't add OSD pages without Main, so draw it in the picture with
+  tape_osd: a box of five lines for a few seconds after mounting (and on an OSD "Tape details" button). tape_image
+  already reads each header; the overlay needs more rows and a hex printer. Small (a day).
+- [ ] Auto-type the load command (OSD option, off by default): after mounting a tape at the monitor/IPL, a key
+  sequencer types what the model needs (MZ-80K/C/1200 and MZ-80A `LOAD`+CR, MZ-700/1500 `L`+CR, MZ-800 IPL `C`,
+  MZ-80B/2000 nothing: the IPL loads by itself), and for a BASIC file (type 02) on a BASIC tape `LOAD`+CR then
+  `RUN`+CR. Drives keymatrix through the same path as the PS/2 keys (the sim's --type shows the timing it needs:
+  hold about 2 frames, release about 2). Medium: per-model key codes and knowing that the machine is at its prompt
+  (wait a fixed time after reset, or start on an OSD action). Load Direct / Start Direct already cover machine code.
 - [x] Tape PLAY_READY delay: half a second of clk_sys (`CLK_SYS_HZ` in clkgen_pkg), was a bare 32,000,000.
 - [ ] Optional 64 MHz clock for the MZ-80K/80A/80B family, so their clock enables are exact (±1 clk_sys jitter now).
 - [x] Unit testbenches for `cmt.vhd` and the i8254 (`make test-cmt`, `make test-i8254`).
