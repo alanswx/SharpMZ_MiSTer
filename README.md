@@ -66,6 +66,13 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Tape Sound | Off (default); Mix: the tape signal mixed in quietly while the tape plays or records, as the machines' own tape monitor would; Only: the tape signal instead of the machine's sound. |
 | Load Direct Start | Program (default): after Load Direct to RAM the machine boots for about 1.5 s, then the core puts back what the load wrote to 10F0-11FF (the boot uses that area), sets the memory map and jumps to the exec address with SP at 10F0, as after a tape load. Only machine-code files (MZF type 01) are started; BASIC programs and data just reset. Reset Only: just reset, then start it yourself with `J` and the exec address in the monitor; the MZF header is in RAM at 10F0 as after a tape load (load address at 10F0+20, exec at 10F0+22, low byte first). The MZ-80B and MZ-2000 always reset only. |
 
+**Using the tape image, step by step.**
+1. Pick the model in the OSD (Machine page), then on the Tape page mount the `.mzt` or `.mzf` as **Tape Image**. The cassette is now in the deck, at its first program. (With Tape Messages on you see `TAPE 1/3 NAME`; with Tape Details on, the program's header.)
+2. Load it as on the real machine: `L` Return at the MZ-700/MZ-80A monitor, `LOAD` Return on the MZ-80K/C/1200, `C` at the MZ-800/MZ-1500 IPL menu; the MZ-80B/2000 IPL loads it by itself. Or turn on **Auto Load Tape** and the core types it for you.
+3. When the machine has read a program and stopped the tape, the tape moves on: the next program is ready (`TAPE 2/3 NAME`). A loader that reads several parts gets them in order; a BASIC tape with programs after it is used by typing `LOAD` Return in BASIC for the next one.
+4. To start again from the first program, use **Rewind Tape Image** (or mount the image again). On the MZ-80B/2000 the deck's own fast forward, rewind and eject work too.
+5. To run the first program without loading it from tape, use **Load Direct to RAM** for a single `.mzf`, or set **Tape Image Start: Direct** before mounting a multi-part tape (the first part starts at once, the rest stays on the tape).
+
 **Saving programs.** MiSTer can't grow a mounted file, so saving needs a tape image with spare room. Make a blank one with `tools/make_blank_tape.py` (default 1 MB, zero-filled), mount it as the Tape Image, and SAVE as usual (for example `S120012FF1200` then a file name in the MZ-700 monitor). Each program is appended after the last one. If the image is read-only or full, the save is skipped.
 
 ### Floppy

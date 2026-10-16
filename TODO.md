@@ -131,7 +131,7 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    B. mz800emu's MZ-1500 ends the same way. (Play it from tools/mzf2qdf.py disks: test G01.)
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
-11. [ ] Tape image: EeDee is still working it out (item B): a README walkthrough.
+11. [x] Tape image: EeDee is still working it out (item B): README "Using the tape image, step by step" (2026-10-15).
 12. [ ] Danjuro (later, with emulators): "a lot of games, even text adventures, had a sort of lag (sometimes key
    input would be skipped), which didn't happen in the emulators". Check on 20261014b (60 Hz MZ-1500): keyboard
    scan vs. PS/2 key timing (keymatrix hold, the PC layout's forced SHIFT lead/tail), with mister_keys typing fast.
@@ -162,7 +162,7 @@ error" (check against MAME or their CRCs).
       in the collection.
 
 **B. Tape Image is hard to follow (EeDee).** Already improved in 20261012b by Tape Messages (TAPE n/total NAME).
-- [ ] Check with EeDee once on 12b; consider a README walkthrough (mount, C/L, how records advance, Rewind).
+- [x] README walkthrough (mount, C/L, how records advance, Rewind): "Using the tape image, step by step".
 
 **C. MZ-1500 BASIC: "CMT: Illegal filemode error" at the end of loading BASIC; then LOAD fails (tester 3).**
 BASIC mz-5z001.mzt (A216 bytes + a type 02 AUTO RUN record), Zulpoko Daisakusen and Techno City Cars (type 02, load A215).
