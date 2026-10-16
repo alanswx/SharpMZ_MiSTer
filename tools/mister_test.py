@@ -274,6 +274,9 @@ test('L20', 'MZ1500', 'Auto Load Tape: the MZ-1500 IPL gets C, Pac-Man loads',
      files=[('s', 0, f'{M15}/Pac-Man (1984)(Dempa Shimbunsha)(Namco)(Noboru Gankou).mzt')],
      opts=[FAST_TAPE(6)] + osd('Auto Load Tape=On'), reset=True, steps=[('wait', 45), ('shot', 'game')])
 TESTERS16 = f'{SW}/testers-2026-10-16'
+test('S04', 'MZ80K', 'MZ-80K SP-5030 + Supergolf with Tape Details: after BASIC loads, record 2 is SUPERGOLF, type 02 (the stray byte skipped)',
+     files=[('s', 0, f'{TESTERS16}/SP-5030 + Supergolf.mzt')], opts=osd('Fast Tape=Fastest, Keyboard Layout=PC, Tape Details=On'), reset=True,
+     steps=[('wait', 3), ('type', 'LOAD\n')] + [s for k in range(10) for s in (('wait', 4), ('shot', f'{k:02d}'))])
 for n, ft in (('S01', 'Off'), ('S02', 'Fastest'), ('S03', 'Fastest')):    # EeDee: BASIC SP-5030 then Supergolf on one tape image (MZ-80K)
     test(n, 'MZ80K', f'MZ-80K tape image SP-5030 + Supergolf, Fast Tape {ft}: LOAD (BASIC), LOAD (the next program), RUN',
          files=[('s', 0, f'{TESTERS16}/SP-5030 + Supergolf.mzt')], opts=osd(f'Fast Tape={ft}, Keyboard Layout=PC'), reset=True,

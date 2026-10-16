@@ -145,6 +145,13 @@ reg [31:0] pos;            // Scratch offset.
 reg [16:0] len;            // Bytes of the current copy.
 reg [16:0] cnt;
 // rec_size: data size of the record at rpos (header bytes 18-19).
+// Junk between records: many .mzf files carry bytes after their program (padding, a checksum; about a quarter of
+// the collections), so .mzf files joined into one tape put them where the next header should be (EeDee: BASIC
+// SP-5030, 3601h bytes for a 3600h program, then Supergolf: the second header was read one byte early, type 1E, and
+// BASIC waited for another header forever). A record whose type is not 01-05 and whose size runs past the end of the
+// image can't be one: the header is looked for again one byte further on, up to 255 bytes.
+reg  [7:0] attr_q;
+reg  [7:0] skip = 0;
 reg        loaded;         // The CMT buffer holds the record at rpos.
 reg        direct_pending = 0;  // Start direct: the first record goes to RAM when it is loaded.
 // load_addr, exec_addr: its load and exec addresses (header bytes 20-23); rec_type: its type (header byte 0).
@@ -293,6 +300,7 @@ always @(posedge clk) begin
 		end
 	end
 	S_SCAN_ATTR: begin
+		attr_q <= img_byte;
 		if (img_byte == 8'h00) begin
 			wpos  <= pos;
 			state <= S_LOAD;
@@ -305,8 +313,14 @@ always @(posedge clk) begin
 		img_off  <= pos + 32'd19; ret <= S_SCAN_HI; state <= S_IMG_RD;
 	end
 	S_SCAN_HI: begin
-		rec_total <= rec_total + 1'd1;
-		pos   <= pos + 32'd128 + {img_byte, len[7:0]};
+		if ((attr_q == 8'h00 || attr_q > 8'h05) && pos + 32'd128 + {img_byte, len[7:0]} > size && skip != 8'd255) begin
+			skip  <= skip + 1'd1;                               // junk: look one byte further on
+			pos   <= pos + 32'd1;
+		end else begin
+			skip      <= 0;
+			rec_total <= rec_total + 1'd1;
+			pos       <= pos + 32'd128 + {img_byte, len[7:0]};
+		end
 		state <= S_SCAN;
 	end
 
@@ -322,6 +336,7 @@ always @(posedge clk) begin
 		end
 	end
 	S_LOAD_ATTR: begin
+		attr_q <= img_byte;
 		if (img_byte == 8'h00) begin                            // End of tape.
 			msg <= 1; msg_kind <= 2'd1;
 			state <= S_IDLE;
@@ -334,7 +349,12 @@ always @(posedge clk) begin
 		rec_size[7:0] <= img_byte;
 		img_off <= rpos + 32'd19; ret <= S_LOAD_HI; state <= S_IMG_RD;
 	end
-	S_LOAD_HI: begin
+	S_LOAD_HI: if ((attr_q == 8'h00 || attr_q > 8'h05) && rpos + 32'd128 + {img_byte, rec_size[7:0]} > size && skip != 8'd255) begin
+		skip  <= skip + 1'd1;                                   // junk before the header: look one byte further on
+		rpos  <= rpos + 32'd1;
+		state <= S_LOAD;
+	end else begin
+		skip  <= 0;
 		rec_size[15:8] <= img_byte;
 		cnt   <= 0;
 		if (direct_pending & rpos == 0) ram_load <= 1;          // start direct: this record goes to RAM

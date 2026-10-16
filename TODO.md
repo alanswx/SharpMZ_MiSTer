@@ -138,10 +138,12 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    B. mz800emu's MZ-1500 ends the same way. (Play it from tools/mzf2qdf.py disks: test G01.)
 9c. [x] EeDee: machine order by date (MZ-80K, MZ-80C, MZ-80A, MZ-1200, MZ-80B, MZ-2000, MZ-700, MZ-800, MZ-1500).
    The default model is now the MZ-80K, and a saved model setting points at a different machine after updating.
-9d. [ ] EeDee: tape image with BASIC SP-5030 then Supergolf (MZ-80K): LOAD (BASIC) works, LOAD "SUPERGOLF" prints FOUND
-   SUPERGOLF and hangs (hardware S01-S03, sim; also with the CMT before 8d53646, so not that change). SP-5030 then
-   checks the header type at 10F0, finds it is not 02 and reads the next header forever: the header in RAM is one byte
-   late (10F0: 1E 02 'SUPERGOLF'...) with a good checksum, so the CMT sent it shifted. Record 1 (BASIC) is fine.
+9d. [x] EeDee: tape image with BASIC SP-5030 then Supergolf (MZ-80K) hung after FOUND SUPERGOLF. Not the core: EeDee's
+   sp-5030.mzf is 3601h bytes for a 3600h program (1080 of 4212 .mzf files in the collections carry extra bytes),
+   so joined into one tape its last byte (1E) sat where the next header starts; SP-5030 read type 1E and waited for
+   another header. tape_image.sv now skips such bytes: a record whose type is not 01-05 and whose size runs past
+   the end of the image is junk, and the header is looked for one byte further on (up to 255). Sim and mister126
+   (S01 real speed, S02 Fastest): Super Golf loads and starts. Full sim regression: 59 pass.
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
 11. [x] Tape image: EeDee is still working it out (item B): README "Using the tape image, step by step" (2026-10-15).
