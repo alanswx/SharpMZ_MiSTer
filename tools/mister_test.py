@@ -32,7 +32,7 @@ HW = f'{FAT}/games/SharpMZ/HWTest'
 CFG_VER = '_v5'           # CONF_STR "v,5"
 
 # Model menu entries (status[38:35]), in CONF_STR order.
-MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5, 'MZ2000': 6, 'MZ800': 7, 'MZ1500': 8}
+MODEL = {'MZ80K': 0, 'MZ80C': 1, 'MZ80A': 2, 'MZ1200': 3, 'MZ80B': 4, 'MZ2000': 5, 'MZ700': 6, 'MZ800': 7, 'MZ1500': 8}
 
 
 # The tests' baseline, where it differs from the core's defaults: Keyboard Layout Sharp (KEYS below types by position),
@@ -273,6 +273,13 @@ test('L19', 'MZ800', 'Auto Load Tape: the IPL gets C, Cauldron II loads', files=
 test('L20', 'MZ1500', 'Auto Load Tape: the MZ-1500 IPL gets C, Pac-Man loads',
      files=[('s', 0, f'{M15}/Pac-Man (1984)(Dempa Shimbunsha)(Namco)(Noboru Gankou).mzt')],
      opts=[FAST_TAPE(6)] + osd('Auto Load Tape=On'), reset=True, steps=[('wait', 45), ('shot', 'game')])
+TESTERS16 = f'{SW}/testers-2026-10-16'
+for n, ft in (('S01', 'Off'), ('S02', 'Fastest'), ('S03', 'Fastest')):    # EeDee: BASIC SP-5030 then Supergolf on one tape image (MZ-80K)
+    test(n, 'MZ80K', f'MZ-80K tape image SP-5030 + Supergolf, Fast Tape {ft}: LOAD (BASIC), LOAD (the next program), RUN',
+         files=[('s', 0, f'{TESTERS16}/SP-5030 + Supergolf.mzt')], opts=osd(f'Fast Tape={ft}, Keyboard Layout=PC'), reset=True,
+         steps=[('wait', 3), ('type', 'LOAD\n'), ('wait', 150 if ft == 'Off' else 40), ('shot', 'basic'),
+                ('type', 'LOAD\n'), ('wait', 200 if ft == 'Off' else 240 if n == 'S03' else 60), ('shot', 'loaded'), ('type', 'RUN\n'),
+                ('wait', 10), ('shot', 'run')])
 test('L16', 'MZ700', 'Tape Messages overlay: after L loads BASIC, TAPE 2/2 R.P.S. at the bottom for 3 s',
      files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6)] + osd('Tape Messages=On'), reset=True,
      steps=[('type', 'L\n')] + [s for k in range(24) for s in (('wait', 0.3), ('shot', f'{k:02d}'))])

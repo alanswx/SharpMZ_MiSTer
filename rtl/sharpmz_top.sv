@@ -112,13 +112,14 @@ assign hps_ioctl_wait = hps_ioctl_download & tape_b_busy;   // Only while a byte
 function automatic [2:0] mz_model_code(input [3:0] menu_sel);
 	begin
 		case(menu_sel)
-			4'd0: mz_model_code = 3'd3; // MZ80A
-			4'd1: mz_model_code = 3'd0; // MZ80K
-			4'd2: mz_model_code = 3'd1; // MZ80C
+			// OSD order by date (EeDee): MZ-80K, MZ-80C, MZ-80A, MZ-1200, MZ-80B, MZ-2000, MZ-700, MZ-800, MZ-1500.
+			4'd0: mz_model_code = 3'd0; // MZ80K
+			4'd1: mz_model_code = 3'd1; // MZ80C
+			4'd2: mz_model_code = 3'd3; // MZ80A
 			4'd3: mz_model_code = 3'd2; // MZ1200
-			4'd4: mz_model_code = 3'd4; // MZ700
-			4'd5: mz_model_code = 3'd6; // MZ80B
-			4'd6: mz_model_code = 3'd7; // MZ2000
+			4'd4: mz_model_code = 3'd6; // MZ80B
+			4'd5: mz_model_code = 3'd7; // MZ2000
+			4'd6: mz_model_code = 3'd4; // MZ700
 			4'd8: mz_model_code = 3'd4; // MZ1500: an MZ-700 plus cfg_mz1500
 			default: mz_model_code = 3'd5; // MZ800
 		endcase
@@ -179,7 +180,7 @@ wire       fdc_present;
 wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & (cfg_model == 3'b100 | cfg_model == 3'b011))) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700 / MZ-80A: the interface brings its ROM at F000 (MZ-1E05 / the MZ-80A interface ROM; the MZ-1500 has its own F000 ROM)
 
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
-wire [7:0] cfg_reg1_display = {1'b0, status[18], 1'b0, 1'b0, 1'b0, cfg_display};  // video and graphics always on  // PCG is software controlled (E010-E012).
+wire [7:0] cfg_reg1_display = {1'b0, ~status[18] & (cfg_model == 3'd4), 1'b0, 1'b0, 1'b0, cfg_display};  // VRAM Wait (default On): the MZ-700/1500 GDG wait. Off on the other models, as before (the MZ-800's graphics wait, the MZ-80A's one-cycle wait).  // PCG is software controlled (E010-E012).
 wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
 wire       cfg_japan = status[56] & (cfg_model == 3'b100) & ~cfg_mz1500;   // OSD Region: Japan (MZ-700: Japanese CG, monitor 1Z-009B, 60 Hz)
 wire [7:0] cfg_reg3_display = {3'd0, cfg_japan, cfg_mz1500, status[32], 2'b00};   // 4: Japanese MZ-700. 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).

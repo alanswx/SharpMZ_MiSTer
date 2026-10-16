@@ -72,7 +72,13 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
      MZ-1500: 896 kHz). The core gave them 1.1088 MHz: music 24% high and counter-0 timing (PIO interrupts, tempo
      loops) 24% fast. Fixed in clkgen.vhd for the MZ-1500 and Region Japan. Games that wait for VBLANK do run 20%
      faster at 60 Hz, as on a Japanese machine (both reference emulators run the MZ-1500 at 60 Hz).
-   - [ ] Ask Danjuro which games, and retest them on the fixed build.
+   - [x] Danjuro (2026-10-16, on 15b and 15d): Tiny Xevious still far too fast against two emulators and a video of a
+     real Japanese machine; PAL even faster than NTSC. The core's MZ-700 had no real VRAM wait: on the GDG a VRAM
+     access while a line is drawn waits until that line's blanking (Takeda's EmuZ-700; mz800emu's mz700_vramctrl.h,
+     from a gate-level simulation of the GDG). Now in video_vc.vhd, VRAM Wait On by default (MZ-700/1500 only).
+     tests/mz700/vbench.mzf: 30000 VRAM writes take 1.71 M clocks (mz800emu 1.70 M; 1.20 M without the wait).
+     PAL faster than NTSC is expected for a game timed by 8253 counter 0 (1.1088 MHz against 894.9 kHz).
+   - [ ] Danjuro to retest Tiny Xevious on the new build.
    - [ ] Smaller: the NTSC CPU clock is 3.579545 MHz (14.31818 / 4), 0.9% above the European 3.546895; counter 1
      (the clock) counts the 15.73 kHz line rate. The core keeps the European rates for both.
 3. [ ] MZ-1500 sound. Measured: the sim (new `--wav-out`: the core's final stereo output) and the hardware (capture
@@ -80,7 +86,8 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    card's "Digital In" capture switched on) both give left 440 Hz / right 880 Hz for tests/mz1500/psgstereo.mzf
    (test A01, sim psg_mz1500): the stereo works. The level was 4095 of 65535 peak to peak for one channel at full
    volume (1/16 of full scale). Now 3x on the MZ-800/1500 (PSGs and beeper): 12285.
-   - [ ] "Left only" in some games: ask Danjuro which games (the ones that show "Stereo sound!").
+   - [x] "Left only": Danjuro (2026-10-16): only that the sound was very low; with the 3x level it is fixed (the
+     "stereo sound" game was Thunder Force).
    - [ ] Hardware level check of the new build (A01).
 4. [x] Load Tape to CMT removed from the OSD (Tape Image does it all). The core still takes file index 1 (the sim's
    `--mzf` uses it). T07 and Z02 use the tape image.
@@ -129,10 +136,17 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
 9b. [x] W02 (Druaga tape with a blank QD) ending in "QD:Unformat err" is the expected result, not a bug: the Druaga
    tape is a Quick Disk product dumped to tape (see 2026-10-02 below), whose side A asks for the original disk's side
    B. mz800emu's MZ-1500 ends the same way. (Play it from tools/mzf2qdf.py disks: test G01.)
+9c. [x] EeDee: machine order by date (MZ-80K, MZ-80C, MZ-80A, MZ-1200, MZ-80B, MZ-2000, MZ-700, MZ-800, MZ-1500).
+   The default model is now the MZ-80K, and a saved model setting points at a different machine after updating.
+9d. [ ] EeDee: tape image with BASIC SP-5030 then Supergolf (MZ-80K): LOAD (BASIC) works, LOAD "SUPERGOLF" prints FOUND
+   SUPERGOLF and hangs (hardware S01-S03, sim; also with the CMT before 8d53646, so not that change). SP-5030 then
+   checks the header type at 10F0, finds it is not 02 and reads the next header forever: the header in RAM is one byte
+   late (10F0: 1E 02 'SUPERGOLF'...) with a good checksum, so the CMT sent it shifted. Record 1 (BASIC) is fine.
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
 11. [x] Tape image: EeDee is still working it out (item B): README "Using the tape image, step by step" (2026-10-15).
-12. [ ] Danjuro (later, with emulators): "a lot of games, even text adventures, had a sort of lag (sometimes key
+12. [x] Closed (Danjuro, 2026-10-16): "just a computer issue: you can't type two letters at once, only space,
+   shift and control with another key", as on the real keyboard. Original report: Danjuro (later, with emulators): "a lot of games, even text adventures, had a sort of lag (sometimes key
    input would be skipped), which didn't happen in the emulators". Check on 20261014b (60 Hz MZ-1500): keyboard
    scan vs. PS/2 key timing (keymatrix hold, the PC layout's forced SHIFT lead/tail), with mister_keys typing fast.
    Lead: keymatrix's key hold keeps every pressed key in the matrix until 50 ms after the latest press, so two keys

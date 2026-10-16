@@ -906,7 +906,7 @@ bool Sim::apply_osd(const std::string &assignments)
 void Sim::write_config()
 {
     static const struct { const char *name; int menu; } MODEL_MENU[] = {
-        {"mz80a", 0}, {"mz80k", 1}, {"mz80c", 2}, {"mz1200", 3}, {"mz700", 4}, {"mz80b", 5}, {"mz2000", 6}, {"mz800", 7},
+        {"mz80k", 0}, {"mz80c", 1}, {"mz80a", 2}, {"mz1200", 3}, {"mz80b", 4}, {"mz2000", 5}, {"mz700", 6}, {"mz800", 7},
         {"mz1500", 8}};
     for (auto &m : MODEL_MENU) if (opt.model == m.name) set_status(35, 4, (uint32_t)m.menu);
     set_status(4, 3, (uint32_t)(opt.turbo & 7));             // CPU Speed

@@ -125,6 +125,8 @@ architecture rtl of video_vc is
     signal VIDEO_DATA_OUT    : std_logic_vector(31 downto 0);
     signal VGA_R, VGA_G, VGA_B : std_logic_vector(3 downto 0);
     signal HBLANKi           : std_logic;
+    signal VBLANKi           : std_logic;
+    signal M7_WAIT_n         : std_logic;
     signal CG_BANK           : std_logic_vector(3 downto 0);
     signal CG_4K             : std_logic;
     signal CG_IOCTL_WR       : std_logic;
@@ -243,7 +245,7 @@ begin
             HSYNC_OUTn       => HSYNC_n,
             VSYNC_OUTn       => VSYNC_n,
             HBLANK_OUT       => HBLANKi,
-            VBLANK_OUT       => VBLANK,
+            VBLANK_OUT       => VBLANKi,
             COLR_OUT         => CSYNC_UNUSED(0),
             CSYNC_OUTn       => CSYNC_UNUSED(1),
             CSYNC_OUT        => CSYNC_UNUSED(2),
@@ -270,6 +272,7 @@ begin
         );
 
     HBLANK    <= HBLANKi;
+    VBLANK    <= VBLANKi;
     T80_DO    <= VIDEO_DATA_OUT(7 downto 0);
     ROUT      <= VGA_R & VGA_R;
     GOUT      <= VGA_G & VGA_G;
@@ -290,7 +293,15 @@ begin
             end if;
         end if;
     end process;
-    WAITi_n    <= '0' when CS_VRAM_n = '0' and VRAM_WAIT = '0' and HBLANKi = '0' and (CONFIG(MZ_A) = '1' or CONFIG(MZ700) = '1') else '1';
-    T80_WAIT_n <= WAITi_n and WAITii_n when CONFIG(VRAMWAIT) = '1' else '1';
+    WAITi_n    <= '0' when CS_VRAM_n = '0' and VRAM_WAIT = '0' and HBLANKi = '0' and CONFIG(MZ_A) = '1' else '1';
+
+    -- MZ-700 / MZ-1500 (the GDG): a VRAM access while a line is being drawn waits until the line's blanking, so the
+    -- CPU gets the screen only between lines (Takeda's EmuZ-700: blank_vram; mz800emu's mz700_vramctrl.h, from a
+    -- gate-level simulation of the GDG, lets the first access of a line through, and measures the same: 30000
+    -- writes in a loop take 1.70 M clocks there against 1.20 M with no wait; tests/mz700/vbench.mzf). Without it a
+    -- game that writes the screen a lot (Tiny Xevious) ran far too fast.
+    M7_WAIT_n  <= '0' when CONFIG(MZ700) = '1' and CS_VRAM_n = '0' and T80_MREQ_n = '0' and HBLANKi = '0' and VBLANKi = '0'
+                  else '1';
+    T80_WAIT_n <= (WAITi_n and WAITii_n and M7_WAIT_n) when CONFIG(VRAMWAIT) = '1' else '1';
 
 end rtl;

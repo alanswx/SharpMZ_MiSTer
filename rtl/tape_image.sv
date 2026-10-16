@@ -185,6 +185,8 @@ always @(posedge clk) begin
 	if (host_busy) loaded <= 0;
 
 `ifdef TAPE_IMAGE_DEBUG
+	if (cmt_status[5:0] != cmt_last[5:0])
+		$display("tape_image: cmt %b (sense active rec recrdy playing ready)", cmt_status[5:0]);
 	if (cmt_status[PLAY_READY] != cmt_last[PLAY_READY])
 		$display("tape_image: PLAY_READY %b loaded %b state %0d mounted %b host_busy %b status %04x",
 		         cmt_status[PLAY_READY], loaded, state, mounted, host_busy, cmt_status);
