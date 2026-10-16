@@ -276,10 +276,11 @@ Working well for testers: Snake & Snake (MZ-700), Donkey Gorilla in play, MZ-80K
 - [x] Analog video: native 15.6 kHz on every model; video_mixer adds the 31 kHz scandoubler (MiSTer.ini forced_scandoubler, OSD Scandoubler Fx with HQ2x and scanlines). The MZ-80K/80A/80B 60 Hz modes now use clk_sys / 8 (/ 4) pixel clocks with a 568 (1136) pixel line, like the MZ-700: their 8/16 MHz enables were uneven and the scandoubler cut lines short. Checked through the scaler on hardware (V01-V05); not yet seen on a real CRT or VGA monitor.
 - [x] Show tape status (record number, tape full): Tape Messages (rtl/tape_osd.sv) shows TAPE n/total NAME, END,
   SAVED, FULL.
-- [ ] Tape details, as the v2 core's Main-drawn "Tape Details" OSD page (size, type, name, load and exec address;
-  "Not a m/code program" for BASIC). A standard core can't add OSD pages without Main, so draw it in the picture with
-  tape_osd: a box of five lines for a few seconds after mounting (and on an OSD "Tape details" button). tape_image
-  already reads each header; the overlay needs more rows and a hex printer. Small (a day).
+- [x] Tape details (OSD Tape Details, status 57): the v2 core's Main-drawn "Tape Details" page, drawn in the picture by
+  tape_osd (six rows: TAPE n/total, NAME, TYPE, SIZE, LOAD/EXEC, NOT A MACHINE CODE PROGRAM) for five seconds when a
+  record is ready. Hardware L17 (after L: R.P.S., 05 BASIC, 04FA, 6BCF). Sim: shown at frame 50 after mounting.
+  - [x] OSD Show Tape Details (status 58, closes the OSD): the details of the record at the tape position, five
+    seconds, whatever the options (sim: --osd-pulse 400:58).
 - [ ] Auto-type the load command (OSD option, off by default): after mounting a tape at the monitor/IPL, a key
   sequencer types what the model needs (MZ-80K/C/1200 and MZ-80A `LOAD`+CR, MZ-700/1500 `L`+CR, MZ-800 IPL `C`,
   MZ-80B/2000 nothing: the IPL loads by itself), and for a BASIC file (type 02) on a BASIC tape `LOAD`+CR then

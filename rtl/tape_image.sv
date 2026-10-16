@@ -84,7 +84,11 @@ module tape_image
 	output reg  [1:0] msg_kind,        // 0 record ready (record_no), 1 end of tape, 2 saved, 3 full
 	output reg  [7:0] rec_total = 0,   // records on the tape
 	output reg[127:0] rec_name,        // header bytes 1-16 of the record (byte 1 in bits 7:0)
-	output            rec_qd           // the record is an MZ-5Z001 Quick Disk BASIC file (type 02 loading at A215)
+	output            rec_qd,          // the record is an MZ-5Z001 Quick Disk BASIC file (type 02 loading at A215)
+	output reg  [7:0] rec_type,        // its header: type (byte 0), data size, load and exec addresses (OSD Tape Details)
+	output reg [15:0] rec_size,
+	output reg [15:0] load_addr,
+	output reg [15:0] exec_addr
 );
 
 // CMT_BUS_OUT bit positions (mctrl_pkg.vhd).
@@ -140,11 +144,10 @@ reg [31:0] wpos;           // Offset after the last record (where saves go).
 reg [31:0] pos;            // Scratch offset.
 reg [16:0] len;            // Bytes of the current copy.
 reg [16:0] cnt;
-reg [15:0] rec_size;       // Data size of the record at rpos.
+// rec_size: data size of the record at rpos (header bytes 18-19).
 reg        loaded;         // The CMT buffer holds the record at rpos.
 reg        direct_pending = 0;  // Start direct: the first record goes to RAM when it is loaded.
-reg [15:0] load_addr;      // Its load address (header bytes 20-21).
-reg  [7:0] rec_type;       // Its type (header byte 0).
+// load_addr, exec_addr: its load and exec addresses (header bytes 20-23); rec_type: its type (header byte 0).
 assign rec_qd = (rec_type == 8'h02) & (load_addr == 16'hA215);
 
 // Previous record offsets, for APSS seek back.
@@ -349,6 +352,8 @@ always @(posedge clk) begin
 		if (cnt == 17'd0)  rec_type <= img_byte;
 		if (cnt == 17'd20) load_addr[7:0]  <= img_byte;
 		if (cnt == 17'd21) load_addr[15:8] <= img_byte;
+		if (cnt == 17'd22) exec_addr[7:0]  <= img_byte;
+		if (cnt == 17'd23) exec_addr[15:8] <= img_byte;
 		bus_addr <= ram_load ? SYSRAM + 25'h10F0 + cnt[6:0] : CMT_HDR + cnt[6:0];
 		bus_dout <= img_byte;
 		bus_wr   <= 1;

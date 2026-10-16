@@ -102,6 +102,7 @@ struct Options {
     int         fdc_mode = 0;
     bool     tape_readonly = false;
     std::set<uint32_t> tape_rewinds;
+    std::map<uint32_t, int> osd_pulses;          // --osd-pulse FRAME:BIT
 };
 
 static void usage()
@@ -147,6 +148,7 @@ static void usage()
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
 "  --tape-rewind N        pulse Rewind Tape Image at frame N (repeatable)\n"
+"  --osd-pulse FRAME:BIT  set OSD status bit BIT for one frame (a T/R button; 58 = Show Tape Details)\n"
 "Typing:\n"
 "  --type FRAME:TEXT      type TEXT from FRAME; \\n or {RETURN}, {BREAK}, {DEL}, {INS},\n"
 "                         {HOME}, {CLR}, {UP}, {DOWN}, {LEFT}, {RIGHT}, {WAIT n}\n"
@@ -283,6 +285,11 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
         else if (a == "--tape-readonly") o.tape_readonly = true;
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
+        else if (a == "--osd-pulse") {
+            std::string v = next(); size_t c = v.find(':');
+            if (c == std::string::npos) { fprintf(stderr, "--osd-pulse wants FRAME:BIT\n"); return false; }
+            o.osd_pulses[parse_num(v.substr(0, c))] = atoi(v.substr(c + 1).c_str());
+        }
         else if (a == "--trace-cpu") o.trace_file = next();
         else if (a == "--wav") o.wav_file = next();
         else if (a == "--wav-out") o.wav_out_file = next();
@@ -829,6 +836,8 @@ void Sim::on_frame_end()
     }
 
     top->tape_rewind = opt.tape_rewinds.count(frame) ? 1 : 0;   // Held for one frame.
+    { auto pu = opt.osd_pulses.find(frame);                      // --osd-pulse: one frame
+      top->osd_pulse = pu != opt.osd_pulses.end(); top->osd_pulse_bit = pu != opt.osd_pulses.end() ? pu->second : 0; }
     auto rl = opt.rom_loads.equal_range(frame);
     for (auto it = rl.first; it != rl.second; ++it) load_rom(it->second.first, it->second.second);
     if (opt.fast_tape_at.count(frame))

@@ -37,7 +37,7 @@ MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5
 
 # The tests' baseline, where it differs from the core's defaults: Keyboard Layout Sharp (KEYS below types by position),
 # Fast Tape Off (the waits were made at real speed), Tape Messages Off (the overlay would change screenshots).
-BASELINE = 'Keyboard Layout=Sharp, Fast Tape=Off, Tape Messages=Off'
+BASELINE = 'Keyboard Layout=Sharp, Fast Tape=Off, Tape Messages=Off, Tape Details=Off'
 
 
 def status_bytes(model, opts=()):
@@ -261,6 +261,9 @@ test('F04', 'MZ2000', 'MZ-2000 Boot Reset: TF-DOS disk mounted at the IPL, reset
 
 # OSD Tape Messages: the overlay names the record the tape image is at (TAPE 1/2 S-BASIC on mounting, TAPE 2/2 R.P.S.
 # once BASIC is in and the tape has stopped).
+test('L17', 'MZ700', 'Tape Details: on mounting, record 1 (S-BASIC, 01 machine code, 6BA0, 1200, 7D79); after L, record 2 (02 BASIC, not machine code)',
+     files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6)] + osd('Tape Details=On'), reset=True,
+     steps=[('wait', 1), ('shot', 'rec1'), ('type', 'L\n')] + [s for k in range(12) for s in (('wait', 0.6), ('shot', f'{k:02d}'))])
 test('L16', 'MZ700', 'Tape Messages overlay: after L loads BASIC, TAPE 2/2 R.P.S. at the bottom for 3 s',
      files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6)] + osd('Tape Messages=On'), reset=True,
      steps=[('type', 'L\n')] + [s for k in range(24) for s in (('wait', 0.3), ('shot', f'{k:02d}'))])

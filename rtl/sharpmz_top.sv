@@ -94,6 +94,8 @@ wire  [1:0] tape_msg_kind;
 wire  [7:0] tape_rec_total;
 wire[127:0] tape_rec_name;
 wire        tape_rec_qd;                            // the record is a Quick Disk BASIC file (tape_osd: "QD:")
+wire  [7:0] tape_rec_type;                          // its header (tape_osd: Tape Details)
+wire [15:0] tape_rec_size, tape_rec_load, tape_rec_exec;
 wire        warm_reset_user;                        // the resets that also reset the tape engine (below)
 reg         tape_ram_load_d = 0;
 wire        ds_bus_active, ds_bus_wr, ds_inj_go;   // Load Direct start (direct_start, below)
@@ -323,6 +325,7 @@ tape_image tape_image
 	.mounted(tape_mounted),
 	.tape_full(tape_full),
 	.msg(tape_msg), .msg_kind(tape_msg_kind), .rec_total(tape_rec_total), .rec_name(tape_rec_name), .rec_qd(tape_rec_qd),
+	.rec_type(tape_rec_type), .rec_size(tape_rec_size), .load_addr(tape_rec_load), .exec_addr(tape_rec_exec),
 	.record_no(tape_record)
 );
 
@@ -644,21 +647,30 @@ mz800_border mz800_border
 );
 
 // Tape image messages over the picture (OSD Tape Messages): where the tape is, for three seconds after it moves.
+// OSD Show Tape Details (status 58, closes the OSD): the details of the record at the tape position, once more.
+reg  tape_show_req = 0, tape_show_last = 0;
+always @(posedge clk_sys) begin
+	tape_show_last <= status[58];
+	tape_show_req  <= status[58] & ~tape_show_last & tape_mounted;
+end
 wire [7:0] R_osd, G_osd, B_osd;
 tape_osd #(.CLK_HZ(CLK_HZ), .FONT_FILE(FONT_FILE), .A2D_FILE(A2D_FILE)) tape_osd
 (
 	.clk(clk_sys),
 	.ce_pix(clk_video_in),
-	.enable(~status[55]),
+	.enable(~status[55] | status[57]),
+	.details(status[57]),
+	.show_details(tape_show_req),
 	.hblank(hblank_brd), .vblank(vblank_brd),
 	.r_in(R_brd), .g_in(G_brd), .b_in(B_brd),
 	.r_out(R_osd), .g_out(G_osd), .b_out(B_osd),
 	.show(tape_msg),
-	.kind(tape_msg_kind),
-	.rec_no(tape_msg_kind == 2'd2 ? tape_rec_total - 1'd1 : tape_record),
+	.kind(tape_show_req ? 2'd0 : tape_msg_kind),
+	.rec_no((tape_msg_kind == 2'd2 && !tape_show_req) ? tape_rec_total - 1'd1 : tape_record),
 	.rec_total(tape_rec_total),
 	.name(tape_rec_name),
-	.qd_file(tape_rec_qd & cfg_mz1500)
+	.qd_file(tape_rec_qd & cfg_mz1500),
+	.rec_type(tape_rec_type), .rec_size(tape_rec_size), .rec_load(tape_rec_load), .rec_exec(tape_rec_exec)
 );
 
 

@@ -105,6 +105,8 @@ localparam CONF_STR =
 	"P2O[49],Load Direct Start,Program,Reset Only;",
 	"P2O[52],Tape Image Start,Tape,Direct;",
 	"P2O[55],Tape Messages,On,Off;",
+	"P2O[57],Tape Details,Off,On;",
+	"P2R[58],Show Tape Details;",
 	"-;",
 	"P3,Display;",
 	"P3O[8:7],Display Type,Default,Mono 80x25,Colour 40x25,Colour 80x25;",

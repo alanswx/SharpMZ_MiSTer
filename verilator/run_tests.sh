@@ -50,7 +50,8 @@
 #                 machine's SHIFT: @ is unshifted on the MZ-80A, ' is SHIFT 7 on the MZ-700)
 #   cg_mz1500     MZ-1500: tests/mz1500/cgread.mzf reads the CG ROM through OUT E5 0 and prints the 8 bytes of 'F' in
 #                 hex, bit 7 = left pixel as the PCG (MAME's mz700fon.jpn bit-reversed: 7E40407840404000)
-#   qd_mz1500     MZ-1500: Q loads Lode Runner from a Quick Disk dump (../software/mz1500); PCG title, frame hash at 600
+#   qd_mz1500     MZ-1500: Q loads Lode Runner from a Quick Disk dump (../software/mz1500); PCG title, frame hash at 800 (the title is up at 719 = 12 s at 60 Hz;
+#                 it was 600 when the MZ-1500 ran at 50 Hz)
 #                 (pixel-identical to mz1500emu). Skipped without the image and with QUICK=1.
 #   fdd_mz700     MZ-700: boot a disk made by tools/make_boot_disk.py from ramtest.mzf with J F000 (MZ-1E05 ROM)
 #   tape_mz800    MZ-800: the IPL (C) loads ramtest from the same tape image
@@ -174,9 +175,9 @@ pids+=($!); names+=("cg_mz1500")
 QDF="../software/mz1500/Lode Runner (1985)(Broderbund Software)(Universe) Side A.qdf"
 if [ -z "${QUICK:-}" ] && [ -f "$QDF" ]; then
     cp "$QDF" "$OUT/qd_mz1500.qdf"
-    ( $BIN --model mz1500 --qd "$OUT/qd_mz1500.qdf" --type '150:Q' --stop-at-frame 601 \
+    ( $BIN --model mz1500 --qd "$OUT/qd_mz1500.qdf" --type '150:Q' --stop-at-frame 801 \
           --frame-log "$OUT/qd_mz1500.csv" --quiet > /dev/null 2> "$OUT/qd_mz1500.log"
-      awk -F, '$1==600 {print $2}' "$OUT/qd_mz1500.csv" > "$OUT/qd_mz1500.txt" ) &
+      awk -F, '$1==800 {print $2}' "$OUT/qd_mz1500.csv" > "$OUT/qd_mz1500.txt" ) &
     pids+=($!); names+=("qd_mz1500")
 fi
 python3 ../tools/make_boot_disk.py ../rtl/software/mzf/ramtest.mzf "$OUT/fdd_mz700.dsk" > /dev/null
