@@ -37,7 +37,7 @@ MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5
 
 # The tests' baseline, where it differs from the core's defaults: Keyboard Layout Sharp (KEYS below types by position),
 # Fast Tape Off (the waits were made at real speed), Tape Messages Off (the overlay would change screenshots).
-BASELINE = 'Keyboard Layout=Sharp, Fast Tape=Off, Tape Messages=Off, Tape Details=Off'
+BASELINE = 'Keyboard Layout=Sharp, Fast Tape=Off, Tape Messages=Off, Tape Details=Off, Auto Load Tape=Off'
 
 
 def status_bytes(model, opts=()):
@@ -264,6 +264,15 @@ test('F04', 'MZ2000', 'MZ-2000 Boot Reset: TF-DOS disk mounted at the IPL, reset
 test('L17', 'MZ700', 'Tape Details: on mounting, record 1 (S-BASIC, 01 machine code, 6BA0, 1200, 7D79); after L, record 2 (02 BASIC, not machine code)',
      files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6)] + osd('Tape Details=On'), reset=True,
      steps=[('wait', 1), ('shot', 'rec1'), ('type', 'L\n')] + [s for k in range(12) for s in (('wait', 0.6), ('shot', f'{k:02d}'))])
+# Auto Load Tape: nothing is typed by the test; the core types L / LOAD / C itself after the tape is mounted.
+test('L18', 'MZ700', 'Auto Load Tape: the core types L, BASIC 1Z-013B loads from the tape image',
+     files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6)] + osd('Auto Load Tape=On'), reset=True,
+     steps=[('wait', 30), ('shot', 'basic')])
+test('L19', 'MZ800', 'Auto Load Tape: the IPL gets C, Cauldron II loads', files=[('s', 0, f'{GAMES800}/Cauldron.mzf')],
+     opts=[FAST_TAPE(5)] + osd('Auto Load Tape=On'), reset=True, steps=[('wait', 55), ('shot', 'game')])
+test('L20', 'MZ1500', 'Auto Load Tape: the MZ-1500 IPL gets C, Pac-Man loads',
+     files=[('s', 0, f'{M15}/Pac-Man (1984)(Dempa Shimbunsha)(Namco)(Noboru Gankou).mzt')],
+     opts=[FAST_TAPE(6)] + osd('Auto Load Tape=On'), reset=True, steps=[('wait', 45), ('shot', 'game')])
 test('L16', 'MZ700', 'Tape Messages overlay: after L loads BASIC, TAPE 2/2 R.P.S. at the bottom for 3 s',
      files=[('s', 0, 'gen:td_basic')], opts=[FAST_TAPE(6)] + osd('Tape Messages=On'), reset=True,
      steps=[('type', 'L\n')] + [s for k in range(24) for s in (('wait', 0.3), ('shot', f'{k:02d}'))])

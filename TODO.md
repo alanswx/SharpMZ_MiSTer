@@ -281,12 +281,11 @@ Working well for testers: Snake & Snake (MZ-700), Donkey Gorilla in play, MZ-80K
   record is ready. Hardware L17 (after L: R.P.S., 05 BASIC, 04FA, 6BCF). Sim: shown at frame 50 after mounting.
   - [x] OSD Show Tape Details (status 58, closes the OSD): the details of the record at the tape position, five
     seconds, whatever the options (sim: --osd-pulse 400:58).
-- [ ] Auto-type the load command (OSD option, off by default): after mounting a tape at the monitor/IPL, a key
-  sequencer types what the model needs (MZ-80K/C/1200 and MZ-80A `LOAD`+CR, MZ-700/1500 `L`+CR, MZ-800 IPL `C`,
-  MZ-80B/2000 nothing: the IPL loads by itself), and for a BASIC file (type 02) on a BASIC tape `LOAD`+CR then
-  `RUN`+CR. Drives keymatrix through the same path as the PS/2 keys (the sim's --type shows the timing it needs:
-  hold about 2 frames, release about 2). Medium: per-model key codes and knowing that the machine is at its prompt
-  (wait a fixed time after reset, or start on an OSD action). Load Direct / Start Direct already cover machine code.
+- [x] Auto Load Tape (OSD, status 59; rtl/tape_autotype.sv): armed by a mount, it types the model's command about 2 s
+  after the first record is ready (counted from the end of any reset): MZ-80K/C/1200 LOAD+CR, MZ-80A/700 L+CR,
+  MZ-800/1500 C; nothing on the MZ-80B/2000. PS/2 events in place of the keyboard's. Sim: all four kinds load.
+  Hardware L18 (MZ-700 BASIC), L19 (MZ-800 Cauldron II), L20 (MZ-1500 Pac-Man), nothing typed by the test.
+  - [ ] BASIC programs: after the BASIC tape, LOAD and RUN the next record (needs knowing BASIC is at Ready).
 - [x] Tape PLAY_READY delay: half a second of clk_sys (`CLK_SYS_HZ` in clkgen_pkg), was a bare 32,000,000.
 - [ ] Optional 64 MHz clock for the MZ-80K/80A/80B family, so their clock enables are exact (±1 clk_sys jitter now).
 - [x] Unit testbenches for `cmt.vhd` and the i8254 (`make test-cmt`, `make test-i8254`).

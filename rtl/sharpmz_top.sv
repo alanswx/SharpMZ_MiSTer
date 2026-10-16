@@ -543,6 +543,23 @@ assign sd_lba[2] = fdc_lba[1];
 assign sd_buff_din[1] = fdc_buff_din[0];
 assign sd_buff_din[2] = fdc_buff_din[1];
 
+// OSD Auto Load Tape (status 59): after mounting a tape, type the model's load command (rtl/tape_autotype.sv).
+wire [10:0] ps2_key_mz;
+tape_autotype tape_autotype
+(
+	.clk(clk_sys),
+	.enable(status[59] & ~status[52]),              // not with Tape Image Start: Direct (it starts by itself)
+	.reset(reset | warm_reset),
+	.vblank(vblank_emu),
+	.mounted(img_mounted[0] & |img_size),
+	.rec_ready(tape_msg & tape_msg_kind == 2'd0),
+	.rec_no(tape_record),
+	.model(cfg_model),
+	.mz1500(cfg_mz1500),
+	.ps2_in(ps2_key),
+	.ps2_out(ps2_key_mz)
+);
+
 sharpmz core
 (
 	// System clock; the core runs everything on it with clock enables.
@@ -556,7 +573,7 @@ sharpmz core
 
 	.MAIN_LEDS(main_leds),
 
-	.PS2_KEY(ps2_key),
+	.PS2_KEY(ps2_key_mz),
 	.JOY0(joystick_0[5:0]),         // MZ-800: ports F0/F1; MZ-700/1500: MZ-1X03 on E008 when enabled.
 	.JOY1(joystick_1[5:0]),
 	.JOY_1X03(status[39]),

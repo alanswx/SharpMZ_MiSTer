@@ -104,6 +104,7 @@ localparam CONF_STR =
 	"P2O[54:53],Tape Sound,Off,Mix,Only;",
 	"P2O[49],Load Direct Start,Program,Reset Only;",
 	"P2O[52],Tape Image Start,Tape,Direct;",
+	"P2O[59],Auto Load Tape,Off,On;",
 	"P2O[55],Tape Messages,On,Off;",
 	"P2O[57],Tape Details,Off,On;",
 	"P2R[58],Show Tape Details;",
