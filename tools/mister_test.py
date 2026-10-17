@@ -423,6 +423,11 @@ test('Q06', 'MZ1500', 'MZ-1500 Batten Tanuki: side B, Return, then F1 at "F1 -- 
      late=[('s', 3, f'{TESTERS}/Batten Tanuki no Daibouken (Side B)(1986)(Tecno Soft).qdf', 14)], reset=True,
      steps=[('wait', 4), ('type', 'Q'), ('wait', 14), ('type', '\n'), ('wait', 10), ('shot', 'prompt'), ('keys', '59'),
             ('wait', 8), ('shot', 'f1')])
+test('Q10', 'MZ1500', 'MZ-1500 Batten Tanuki in play: 10 s of its sound (Danjuro: a constant buzz behind the game)',
+     files=[('s', 3, f'{TESTERS}/Batten Tanuki no Daibouken (Side A)(1986)(Tecno Soft).qdf')],
+     late=[('s', 3, f'{TESTERS}/Batten Tanuki no Daibouken (Side B)(1986)(Tecno Soft).qdf', 14)], reset=True,
+     steps=[('wait', 4), ('type', 'Q'), ('wait', 14), ('type', '\n'), ('wait', 10), ('keys', '59'), ('wait', 4),
+            ('shot', 'game'), ('audio', ('game', 10)), ('shot', 'after')])
 test('Q07', 'MZ1500', 'MZ-1500 Nobunaga no Yabou: F1 loads TITLE, which wants side B (KOEI ...): side B mounted, the game',
      files=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side A)(1984)(Koei).qdf')],
      late=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side B)(1984)(Koei).qdf', 75)], reset=True,
@@ -490,6 +495,9 @@ def sh(cmd, **kw):
 # HDMI capture card for audio steps (it shows mister126's output; tools on misterubuntu).
 CAPTURE_HOST = os.environ.get('CAPTURE_HOST', 'misterubuntu')
 CAPTURE_PCM = os.environ.get('CAPTURE_PCM', 'plughw:CARD=U25773,DEV=0')
+# MiSTerKVMS: when its CLI is installed, audio comes from its capture server's stream (the server holds the card).
+KVMS_CLI = os.environ.get('KVMS_CLI', '/Applications/MiSTerKVMS.app/Contents/MacOS/misterkvms-cli')
+KVMS_STREAM = os.environ.get('KVMS_STREAM', 'mkvm://10.0.2.128/Mister%20126')
 REFS = os.path.join(ROOT, 'tools/mister_refs.json')   # md5 of each screenshot from a good run (--update-refs)
 # One ssh connection for the whole run (each step was a new connection, about half a second).
 SSH_OPTS = ['-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/mister_test_%r@%h:%p', '-o', 'ControlPersist=120']
@@ -823,13 +831,19 @@ def main():
                     ok = got == want
                     print(f'   printer bytes {"match" if ok else "DIFFER"} {arg}' + ('' if ok else f'\n     got  {got}\n     want {want}'))
                     results.append((t['name'], f'printer bytes vs {arg}: {"match" if ok else "DIFFER"}', '', ok))
-            elif op == 'audio':             # record the HDMI audio from the capture card (on CAPTURE_HOST) for 4 s
-                wav = f'/tmp/{t["name"]}_{arg}.wav'
-                subprocess.run(['ssh', CAPTURE_HOST, f'arecord -q -D {CAPTURE_PCM} -f S16_LE -c 2 -r 48000 -d 4 {wav}'],
-                               check=True)
-                local = os.path.join(a.out, 'shots', os.path.basename(wav))
+            elif op == 'audio':             # record the HDMI audio from the capture card: ('audio', label[, seconds])
+                label, secs = (arg, 4) if isinstance(arg, str) else arg
+                local = os.path.join(a.out, 'shots', f'{t["name"]}_{label}.wav')
                 os.makedirs(os.path.dirname(local), exist_ok=True)
-                subprocess.run(['scp', '-q', f'{CAPTURE_HOST}:{wav}', local], check=True)
+                if os.path.exists(KVMS_CLI):
+                    subprocess.run([KVMS_CLI, '--stream', KVMS_STREAM, 'record', f'{secs}s', local],
+                                   check=True, capture_output=True)
+                else:
+                    wav = f'/tmp/{t["name"]}_{label}.wav'
+                    subprocess.run(['ssh', CAPTURE_HOST, f'arecord -q -D {CAPTURE_PCM} -f S16_LE -c 2 -r 48000 -d {secs} {wav}'],
+                                   check=True)
+                    subprocess.run(['scp', '-q', f'{CAPTURE_HOST}:{wav}', local], check=True)
+                arg = label
                 lvl = subprocess.run(['python3', os.path.join(ROOT, 'verilator/tests/wav_stereo.py'), local, '0.5', '3'],
                                      capture_output=True, text=True).stdout.strip()
                 print(f'   audio {arg}: {lvl} (Hz, peak-to-peak of 65536)')
