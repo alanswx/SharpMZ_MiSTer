@@ -126,6 +126,9 @@ architecture rtl of video_vc is
     signal VGA_R, VGA_G, VGA_B : std_logic_vector(3 downto 0);
     signal HBLANKi           : std_logic;
     signal VBLANKi           : std_logic;
+    signal M7_HB_LAST        : std_logic := '0';
+    signal M7_CNT            : unsigned(7 downto 0) := (others => '1');          -- CPU clocks since this line's blanking began.
+    signal M7_FREE           : std_logic;
     signal M7_WAIT_n         : std_logic;
     signal CG_BANK           : std_logic_vector(3 downto 0);
     signal CG_4K             : std_logic;
@@ -295,13 +298,28 @@ begin
     end process;
     WAITi_n    <= '0' when CS_VRAM_n = '0' and VRAM_WAIT = '0' and HBLANKi = '0' and CONFIG(MZ_A) = '1' else '1';
 
-    -- MZ-700 / MZ-1500 (the GDG): a VRAM access while a line is being drawn waits until the line's blanking, so the
-    -- CPU gets the screen only between lines (Takeda's EmuZ-700: blank_vram; mz800emu's mz700_vramctrl.h, from a
-    -- gate-level simulation of the GDG, lets the first access of a line through, and measures the same: 30000
-    -- writes in a loop take 1.70 M clocks there against 1.20 M with no wait; tests/mz700/vbench.mzf). Without it a
-    -- game that writes the screen a lot (Tiny Xevious) ran far too fast.
-    M7_WAIT_n  <= '0' when CONFIG(MZ700) = '1' and CS_VRAM_n = '0' and T80_MREQ_n = '0' and HBLANKi = '0' and VBLANKi = '0'
-                  else '1';
+    -- MZ-700 / MZ-1500 (the GDG): the CPU gets VRAM only in a short window at the start of each line's horizontal
+    -- blanking, on every line (vertical blanking too); an access at any other time waits for the next window. As
+    -- Takeda's EmuZ-700/1500 (vm/mz700/memory.cpp: blank_vram, set at BLANK_CLK_S, cleared at BLANK_CLK_E): PAL free
+    -- from 128 to 208 of 227 CPU clocks (80), NTSC (the Japanese MZ-700 and the MZ-1500) from 160 to 220 of 228
+    -- (60). Tiny Xevious, play screen to the first road: EmuZ-700 282 frames NTSC, 202 PAL; the core with the
+    -- earlier rule (wait only while a line is drawn, none in vertical blanking, as mz800emu) took 186 NTSC; Danjuro
+    -- found it still too fast against the emulators and a real machine.
+    process( CLKBUS(CKMASTER) )
+    begin
+        if rising_edge(CLKBUS(CKMASTER)) then
+            M7_HB_LAST <= HBLANKi;
+            if HBLANKi = '1' and M7_HB_LAST = '0' then
+                M7_CNT <= (others => '0');                                     -- blanking starts: the window opens
+            elsif CLKBUS(CKENCPU) = '1' and M7_CNT /= 255 then
+                M7_CNT <= M7_CNT + 1;
+            end if;
+        end if;
+    end process;
+    M7_FREE    <= '1' when (CONFIG(IS_MZ1500) = '1' or CONFIG(REGION_JAPAN) = '1') and M7_CNT < 60 else
+                  '1' when CONFIG(IS_MZ1500) = '0' and CONFIG(REGION_JAPAN) = '0' and M7_CNT < 80 else
+                  '0';
+    M7_WAIT_n  <= '0' when CONFIG(MZ700) = '1' and CS_VRAM_n = '0' and T80_MREQ_n = '0' and M7_FREE = '0' else '1';
     T80_WAIT_n <= (WAITi_n and WAITii_n and M7_WAIT_n) when CONFIG(VRAMWAIT) = '1' else '1';
 
 end rtl;

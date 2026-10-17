@@ -78,7 +78,13 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
      from a gate-level simulation of the GDG). Now in video_vc.vhd, VRAM Wait On by default (MZ-700/1500 only).
      tests/mz700/vbench.mzf: 30000 VRAM writes take 1.71 M clocks (mz800emu 1.70 M; 1.20 M without the wait).
      PAL faster than NTSC is expected for a game timed by 8253 counter 0 (1.1088 MHz against 894.9 kHz).
-   - [ ] Danjuro to retest Tiny Xevious on the new build.
+   - [x] Danjuro (2026-10-17): still too fast on 20261016b. Measured against Takeda's EmuZ-700 (the Mac port): play
+     screen to the first road in Tiny Xevious, EmuZ-700 282 frames NTSC / 202 PAL, mz800emu 160 (PAL), the core 186
+     (NTSC, the mz800emu-style wait). EmuZ-700's GDG wait applies on every line, vertical blanking too, with the CPU
+     free only from the start of each line's blanking for 80 CPU clocks (PAL) or 60 (NTSC). video_vc.vhd now does
+     that: 278 frames NTSC, 198 PAL (within 2%). mz800emu disagrees by about 25%; Danjuro's real-machine video agrees
+     with the EmuZ emulators.
+   - [ ] Danjuro to retest on the new build.
    - [ ] Smaller: the NTSC CPU clock is 3.579545 MHz (14.31818 / 4), 0.9% above the European 3.546895; counter 1
      (the clock) counts the 15.73 kHz line rate. The core keeps the European rates for both.
 3. [ ] MZ-1500 sound. Measured: the sim (new `--wav-out`: the core's final stereo output) and the hardware (capture

@@ -95,7 +95,7 @@ Writes go back to the image; mount a copy if you want to keep the original.
 | Display Type | Default follows the model (MZ-700/800 colour 40x25, MZ-80B/2000 mono 80x25, others mono 40x25). |
 | Scandoubler Fx | None (native 15 kHz), HQ2x or CRT scanlines 25/50/75%: doubles the picture to 31 kHz for VGA monitors. MiSTer.ini `forced_scandoubler=1` doubles it too. |
 | MZ-800 Border | Show the MZ-800 border colour around the picture (464 x 288 instead of 320 x 200). |
-| VRAM Wait | On (default): the original wait states when the CPU accesses video RAM while the screen is drawn. On the MZ-700 and MZ-1500 an access during a drawn line waits until that line's blanking, as the real GDG does, so games that write the screen a lot run at their original speed (Tiny Xevious ran far too fast without it); Off: no waits (faster). MZ-700 and MZ-1500 only. |
+| VRAM Wait | On (default): the original wait states when the CPU accesses video RAM while the screen is drawn. On the MZ-700 and MZ-1500 the CPU gets video RAM only in a short window at the start of each line's blanking (80 CPU clocks of 227 on PAL, 60 of 228 on NTSC), on every line, as the real GDG and Takeda's EmuZ-700/1500 do; so games that write the screen a lot run at their original speed (Tiny Xevious ran far too fast without it); Off: no waits (faster). MZ-700 and MZ-1500 only. |
 | Aspect ratio | Original, full screen, or the custom ratios from `MiSTer.ini`. |
 
 ### ROM and RAM
