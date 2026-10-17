@@ -33,6 +33,8 @@ CFG_VER = '_v5'           # CONF_STR "v,5"
 
 # Model menu entries (status[38:35]), in CONF_STR order.
 MODEL = {'MZ80K': 0, 'MZ80C': 1, 'MZ80A': 2, 'MZ1200': 3, 'MZ80B': 4, 'MZ2000': 5, 'MZ700': 6, 'MZ800': 7, 'MZ1500': 8}
+if os.environ.get('MODEL_ORDER') == 'old':   # builds before 20261016 (the old Model order)
+    MODEL = {'MZ80A': 0, 'MZ80K': 1, 'MZ80C': 2, 'MZ1200': 3, 'MZ700': 4, 'MZ80B': 5, 'MZ2000': 6, 'MZ800': 7, 'MZ1500': 8}
 
 
 # The tests' baseline, where it differs from the core's defaults: Keyboard Layout Sharp (KEYS below types by position),
@@ -428,6 +430,13 @@ test('Q10', 'MZ1500', 'MZ-1500 Batten Tanuki in play: 10 s of its sound (Danjuro
      late=[('s', 3, f'{TESTERS}/Batten Tanuki no Daibouken (Side B)(1986)(Tecno Soft).qdf', 14)], reset=True,
      steps=[('wait', 4), ('type', 'Q'), ('wait', 14), ('type', '\n'), ('wait', 10), ('keys', '59'), ('wait', 4),
             ('shot', 'game'), ('audio', ('game', 10)), ('shot', 'after')])
+test('X07', 'MZ700', 'MZ-700 Region Japan: Snake & Snake by Load Direct (the title, as in Europe)',
+     files=[('f', 2, yb('1982', 'MZ-700', 'Snake & Snake (1982)(Tecno Soft).mzf'))], opts=osd('Region=Japan'), reset=True,
+     steps=[('wait', 12), ('shot', 'title')])
+for n, r in (('X05', 'Japan'), ('X06', 'Europe')):   # Danjuro: Snake & Snake stopped loading in NTSC with 20261015
+    test(n, 'MZ700', f'MZ-700 Region {r}: Snake & Snake (Tecno Soft) from the tape image (L)',
+         files=[('s', 0, yb('1982', 'MZ-700', 'Snake & Snake (1982)(Tecno Soft).mzf'))], opts=[FAST_TAPE(0)] + osd(f'Region={r}'),
+         reset=True, steps=[('wait', 3), ('type', 'L\n'), ('wait', 25), ('shot', 'a'), ('wait', 15), ('shot', 'b')])
 test('Q07', 'MZ1500', 'MZ-1500 Nobunaga no Yabou: F1 loads TITLE, which wants side B (KOEI ...): side B mounted, the game',
      files=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side A)(1984)(Koei).qdf')],
      late=[('s', 3, f'{TESTERS}/Nobunaga no Yabou (Side B)(1984)(Koei).qdf', 75)], reset=True,

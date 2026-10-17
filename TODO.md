@@ -90,7 +90,12 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
      PC0 (only the MZ-800 was): the game runs 8253 counter 0 as its keyboard timer with PC0 low, and that timer
      played under the music (capture card: 42.6 Hz and harmonics, near full scale on the right). mz80c.vhd gates
      the MZ-1500 as the MZ-800 (EmuZ-1500: speaker = OUT0 and PC0). Hardware Q10: the buzz is gone.
-   - [ ] Snake & Snake (Tecno Soft, MZ-700) no longer loads in NTSC since 20261015.
+   - [x] Snake & Snake (Tecno Soft, MZ-700) "doesn't load in NTSC since 20261015": not a regression. The file is
+     "SNAKE&SNAKE EXP1", an export version that calls 1Z-013A's internal routines directly (09D5h x14, 09D4h,
+     JP 00F0h); in the Japanese monitor 1Z-009B (Region Japan since 20261014b) those addresses hold other code, so
+     it stops at the monitor on every build since 14b (hardware X07 on 14c, 15, 15b and now), as it would on a real
+     Japanese MZ-700. Use Region Europe for it (X06: the title). The first 20261014 build's Japanese option only
+     changed the character set and kept 1Z-013A, which is why it worked there.
    - [ ] Smaller: the NTSC CPU clock is 3.579545 MHz (14.31818 / 4), 0.9% above the European 3.546895; counter 1
      (the clock) counts the 15.73 kHz line rate. The core keeps the European rates for both.
 3. [ ] MZ-1500 sound. Measured: the sim (new `--wav-out`: the core's final stereo output) and the hardware (capture
