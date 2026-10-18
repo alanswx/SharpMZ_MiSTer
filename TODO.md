@@ -161,6 +161,16 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
    another header. tape_image.sv now skips such bytes: a record whose type is not 01-05 and whose size runs past
    the end of the image is junk, and the header is looked for one byte further on (up to 255). Sim and mister126
    (S01 real speed, S02 Fastest): Super Golf loads and starts. Full sim regression: 59 pass.
+9e. [x] Danjuro (2026-10-17): the MZ-80K showed garbage until a ROM was loaded by hand. Load System ROM / Load CGROM
+   wrote a single ROM at the start of the combined image, the MZ-80K's monitor and character set, and Main reloads
+   the remembered file at every start. A single ROM now goes into the current model's slot (40/80 columns, Region;
+   MZ-800 16 KB, MZ-80B/2000 2 KB IPL, CG 2 or 4 KB); a longer file is a combined image as before. One remembered
+   file for the core stays (Main has only the slot digits 0-9 and the core uses six): per-model memory would need a
+   Main change. Sim: --load-rom on the MZ-700 gives "MONITOR TEST-X", the MZ-80K keeps SP-1002.
+9f. [x] Danjuro: eject media on a model change. A change of the Model option (3 s after a cold start, so the saved
+   settings and an MGL's mounts aren't affected) makes the tape image, the floppies and the Quick Disk count as
+   removed until remounted. Sim: --osd-at 400:Model=MZ-80A after mounting a tape on the MZ-700: L waits.
+   - [ ] Hardware check of 9e and 9f.
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
 11. [x] Tape image: EeDee is still working it out (item B): README "Using the tape image, step by step" (2026-10-15).

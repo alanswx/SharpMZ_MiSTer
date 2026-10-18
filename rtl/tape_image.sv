@@ -60,6 +60,7 @@ module tape_image
 
 	// Controls.
 	input             rewind,          // Pulse: go back to the start of the tape.
+	input             eject,           // Pulse: the machine model changed: the tape counts as removed until remounted.
 	input             direct_first,    // On mounting, the first record goes to RAM (Load Direct), the tape to the second.
 	output reg        ram_load = 0,    // Writing the first record to RAM: hold the machine in reset.
 	input             host_busy,       // An OSD download is using the core bus (and may be filling the CMT); the engine holds still.
@@ -212,6 +213,10 @@ always @(posedge clk) begin
 			pending_next <= 1;
 	end
 
+	if (eject & ~img_mounted) begin
+		mounted <= 0; loaded <= 0; ram_load <= 0; direct_pending <= 0; active <= 0; state <= S_IDLE;
+		pending_rewind <= 0; pending_save <= 0; pending_next <= 0; pending_prev <= 0; pending_reload <= 0;
+	end
 	if (img_mounted) begin
 		size        <= |img_size[63:32] ? 32'hFFFFFFFF : img_size[31:0];
 		readonly    <= img_readonly;

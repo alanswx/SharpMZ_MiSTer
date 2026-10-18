@@ -71,6 +71,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 2. Load it as on the real machine: `L` Return at the MZ-700/MZ-80A monitor, `LOAD` Return on the MZ-80K/C/1200, `C` at the MZ-800/MZ-1500 IPL menu; the MZ-80B/2000 IPL loads it by itself. Or turn on **Auto Load Tape** and the core types it for you.
 3. When the machine has read a program and stopped the tape, the tape moves on: the next program is ready (`TAPE 2/3 NAME`). A loader that reads several parts gets them in order; a BASIC tape with programs after it is used by typing `LOAD` Return in BASIC for the next one.
 4. To start again from the first program, use **Rewind Tape Image** (or mount the image again). On the MZ-80B/2000 the deck's own fast forward, rewind and eject work too.
+6. Changing the machine model ejects the tape, the floppies and the Quick Disk: mount them again on the new machine. (Nothing starts playing on its own after a model change.)
 5. To run the first program without loading it from tape, use **Load Direct to RAM** for a single `.mzf`, or set **Tape Image Start: Direct** before mounting a multi-part tape (the first part starts at once, the rest stays on the tape).
 
 **Saving programs.** MiSTer can't grow a mounted file, so saving needs a tape image with spare room. Make a blank one with `tools/make_blank_tape.py` (default 1 MB, zero-filled), mount it as the Tape Image, and SAVE as usual (for example `S120012FF1200` then a file name in the MZ-700 monitor). Each program is appended after the last one. If the image is read-only or full, the save is skipped.
@@ -103,22 +104,21 @@ Writes go back to the image; mount a copy if you want to keep the original.
 | Option | Description |
 | ------ | ----------- |
 | User ROM / FDC ROM | Map the user ROM (E800) or FDC ROM (F000) for the current model. |
-| Load System ROM / RAM / CGROM | Replace the built-in combined monitor ROM, the initial RAM image or the character generator ROM. The files use the same layout as `rtl/software/roms/combined_*.rom`. The System ROM and CGROM you choose are remembered: the core loads them again every time it starts (and starts on them), until you choose another. A `boot.rom` in `games/SharpMZ` is loaded at start as well. (The keymap is built in; Keyboard Layout chooses PC or Sharp.) |
+| Load System ROM / RAM / CGROM | Replace a monitor ROM, the initial RAM image or a character generator ROM. A single ROM (one monitor, up to 4 KB; 16 KB for the MZ-800; 2 KB IPL for the MZ-80B/2000; one character set, 2 or 4 KB) replaces the **current model's** ROM, for its current 40/80-column mode and Region. A longer file is taken as a combined image in the layout of `rtl/software/roms/combined_*.rom`. The System ROM and CGROM you choose are remembered: the core loads them again every time it starts (into the model selected then), until you choose another, so set the model first. A `boot.rom` in `games/SharpMZ` is loaded at start as well. (The keymap is built in; Keyboard Layout chooses PC or Sharp.) |
 
-**Alternative monitor ROMs.** Load System ROM writes the file from the start of the core's 128 KB system ROM
-(`rtl/software/roms/combined_mrom.rom`), through the normal MiSTer file download. The first 4 KB of that ROM is the
-MZ-80K's 40-column monitor, so a 4 KB MZ-80K monitor (for example `80ktc.rom`, which starts "System Monitor") can be
-loaded as it is:
+**Alternative monitor ROMs.** Load System ROM puts a single monitor into the ROM slot of the model selected when it
+loads, so a 4 KB MZ-80K monitor (for example `80ktc.rom`, which starts "System Monitor") is loaded like this:
 
-1. Machine: MZ-80K, Display: 40 columns.
+1. Machine: MZ-80K (and the display mode you use: 40 or 80 columns have separate copies).
 2. ROM and RAM > Load System ROM, pick the `.rom` file.
 3. Press Reset (OSD Reset). The CPU keeps running the old monitor until the reset, so loading alone seems to do
    nothing.
 
-The new monitor stays until the core is loaded again: the ROM is block RAM set up from the RBF, and Reset doesn't
-restore it. To go back to SP-1002, reload the core (or load a copy of `combined_mrom.rom`). Loading a monitor again
-after that works the same way. It only replaces the 40-column monitor: with an 80-column display the MZ-80K uses
-the copy at 0x1000.
+Main remembers the file and loads it again at every core start, into the model selected at that time, so keep the
+model you loaded it for, or load the original ROM back for that model. Only one System ROM (and one CGROM) is
+remembered for the whole core: for replacement ROMs on several machines at once, build a combined image in the layout
+of `combined_mrom.rom` and load that. (Before 2026-10-17 a single monitor always landed in the MZ-80K's slot.)
+
 
 For other models, or the 80-column monitor, make a full image with the monitor at that model's offset and load it
 instead: `tools/make_monitor_rom.py mz80c monitor.rom out.rom [--80col]` (MZ-80K, 80C, 1200, 80A and 700; the

@@ -94,6 +94,7 @@ struct Options {
     uint32_t    joy0 = 0;                // joystick 1, MiSTer bits (5 fire 2, 4 fire 1, 3 up, 2 down, 1 left, 0 right)
     std::set<uint32_t> warm_resets;
     std::map<uint32_t, int> fast_tape_at;   // --fast-tape-at FRAME:STEP
+    std::multimap<uint32_t, std::string> osd_at;   // --osd-at FRAME:"Name=Value, ..."
     std::multimap<uint32_t, std::pair<std::string, uint32_t>> rom_loads;   // --load-rom FRAME:FILE[@ADDR]
     bool        fdd_readonly = false;
     std::string fdd_b;                       // --fdd-b: drive B image
@@ -148,6 +149,7 @@ static void usage()
 "  --fdc-mode auto|on|off  floppy interface (default auto: present while a disk is mounted)\n"
 "  --tape-readonly        mount it read-only\n"
 "  --tape-rewind N        pulse Rewind Tape Image at frame N (repeatable)\n"
+"  --osd-at FRAME:\"Name=Value\"  change OSD options at FRAME (e.g. the model; repeatable)\n"
 "  --osd-pulse FRAME:BIT  set OSD status bit BIT for one frame (a T/R button; 58 = Show Tape Details)\n"
 "Typing:\n"
 "  --type FRAME:TEXT      type TEXT from FRAME; \\n or {RETURN}, {BREAK}, {DEL}, {INS},\n"
@@ -262,6 +264,11 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fdd-frame") o.fdd_frame = parse_num(next());
         else if (a == "--boot-reset") o.boot_reset = true;
         else if (a == "--osd") o.osd.push_back(next());
+        else if (a == "--osd-at") {
+            std::string v = next(); size_t c = v.find(':');
+            if (c == std::string::npos) { fprintf(stderr, "--osd-at wants FRAME:Name=Value\n"); return false; }
+            o.osd_at.insert({(uint32_t)std::stoul(v.substr(0, c)), v.substr(c + 1)});
+        }
         else if (a == "--osd-list") o.osd_list = true;
         else if (a == "--conf-str") o.conf_str_file = next();
         else if (a == "--qd") o.qd = next();
@@ -840,6 +847,8 @@ void Sim::on_frame_end()
       top->osd_pulse = pu != opt.osd_pulses.end(); top->osd_pulse_bit = pu != opt.osd_pulses.end() ? pu->second : 0; }
     auto rl = opt.rom_loads.equal_range(frame);
     for (auto it = rl.first; it != rl.second; ++it) load_rom(it->second.first, it->second.second);
+    auto oa = opt.osd_at.equal_range(frame);                    // --osd-at: change OSD options mid-run
+    for (auto it = oa.first; it != oa.second; ++it) { apply_osd(it->second); apply_status(); }
     if (opt.fast_tape_at.count(frame))
         { set_status(21, 3, (uint32_t)opt.fast_tape_at.at(frame)); apply_status(); }     // OSD Fast Tape (menu step)
     if (opt.warm_resets.count(frame)) {          // OSD Reset: Main sets status bit 0 and clears it at once
