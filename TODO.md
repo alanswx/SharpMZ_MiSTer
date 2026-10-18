@@ -170,7 +170,13 @@ Reference checks: mz800emu's headless mode now takes `--qd FILE` and `--qd-swap 
 9f. [x] Danjuro: eject media on a model change. A change of the Model option (3 s after a cold start, so the saved
    settings and an MGL's mounts aren't affected) makes the tape image, the floppies and the Quick Disk count as
    removed until remounted. Sim: --osd-at 400:Model=MZ-80A after mounting a tape on the MZ-700: L waits.
-   - [ ] Hardware check of 9e and 9f.
+   - [x] Hardware (2026-10-18): Main sends the remembered System ROM / CGROM at core start before the saved settings
+     (status still 0 = MZ-80K; test R03 put a remembered MZ-700 monitor on the MZ-80K). A ROM that arrives in the first
+     3 s is now staged (system ROM banks 54-55, CG banks 12-13) and moved to the selected model's slot once the
+     settings are in, then the machine resets. R01 (remembered TEST-X 1Z-013A, MZ-700): starts on it; every model's
+     boot (T01-T06, T25) and the tape/game tests unchanged. Limit: a remembered 16 KB MZ-800 IPL lands at the start as
+     before. (An MGL can't load files from an OSD sub-page, so R01 writes Main's config/R01.f3: mister_test remember=.)
+   - [ ] Eject on a model change on hardware (sim only so far: mister_test can't change the model mid-test).
 10. [ ] EeDee: "ROMs persistent for one machine at a time": Load System ROM is one remembered file (FC) for the core,
    not per model. Explain; a per-model ROM would need one CONF_STR entry per model.
 11. [x] Tape image: EeDee is still working it out (item B): README "Using the tape image, step by step" (2026-10-15).

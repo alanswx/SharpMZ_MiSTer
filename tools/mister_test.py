@@ -58,9 +58,10 @@ MZ800_MODE = osd('MZ-800 Mode=MZ-800')[0]   # rear switch in the MZ-800 position
 # mounting, then steps: ('wait', s) / ('type', text) / ('shot', label).
 # kind: 's' = image slot (S0 tape, S1/S2 floppy), 'f' = file load (F1 tape to CMT, F2 direct).
 T = []
-def test(name, model, desc, files=(), opts=(), reset=False, steps=(), late=()):
+def test(name, model, desc, files=(), opts=(), reset=False, steps=(), late=(), remember=()):
     # late: [(kind, index, source, delay)] mounted by the MGL after the reset, e.g. a disk's side B.
-    T.append(dict(name=name, model=model, desc=desc, files=list(files), opts=list(opts), reset=reset, steps=list(steps), late=list(late)))
+    T.append(dict(name=name, model=model, desc=desc, files=list(files), opts=list(opts), reset=reset, steps=list(steps), late=list(late),
+                  remember=list(remember)))
 
 test('T01', 'MZ80K', 'MZ-80K boots to the SP-1002 monitor', steps=[('wait', 4), ('shot', 'boot')])
 test('T02', 'MZ80A', 'MZ-80A boots to the SA-1510 monitor', steps=[('wait', 4), ('shot', 'boot')])
@@ -433,6 +434,15 @@ test('Q10', 'MZ1500', 'MZ-1500 Batten Tanuki in play: 10 s of its sound (Danjuro
 test('X07', 'MZ700', 'MZ-700 Region Japan: Snake & Snake by Load Direct (the title, as in Europe)',
      files=[('f', 2, yb('1982', 'MZ-700', 'Snake & Snake (1982)(Tecno Soft).mzf'))], opts=osd('Region=Japan'), reset=True,
      steps=[('wait', 12), ('shot', 'title')])
+# R01: Main reloads the remembered Load System ROM (config/R01.f3, written before the run: an MGL can't load files from
+# an OSD sub-page) at core start, into the model selected then.
+# R01: Main reloads the remembered Load System ROM (config/R01.f3, written before the run: an MGL can't load files from
+# an OSD sub-page) at core start, into the model selected then.
+test('R03', 'MZ80K', 'Remembered System ROM (config/R03.f3, the TEST-X 1Z-013A file) with the MZ-80K: where it lands (diagnostic)',
+     reset=True, steps=[('wait', 4), ('shot', 'boot')])
+test('R01', 'MZ700', 'Remembered System ROM (one MZ-700 monitor, 1Z-013A with banner TEST-X): the MZ-700 starts on it (it used to land on the MZ-80K)',
+     remember=[(3, os.path.join(ROOT, 'verilator/tests/mz700/test_monitor_1z013a_testx.rom'))], reset=True,
+     steps=[('wait', 4), ('shot', 'boot')])
 for n, r in (('X05', 'Japan'), ('X06', 'Europe')):   # Danjuro: Snake & Snake stopped loading in NTSC with 20261015
     test(n, 'MZ700', f'MZ-700 Region {r}: Snake & Snake (Tecno Soft) from the tape image (L)',
          files=[('s', 0, yb('1982', 'MZ-700', 'Snake & Snake (1982)(Tecno Soft).mzf'))], opts=[FAST_TAPE(0)] + osd(f'Region={r}'),
@@ -798,6 +808,11 @@ def main():
         if ('capture', 'start') in t['steps']:   # listen on the UART before the core (and the program) starts
             m.ssh('killall cat 2>/dev/null; stty -F /dev/ttyS1 9600 raw -echo; '
                   '(nohup cat /dev/ttyS1 > /tmp/prn_capture.bin 2>/dev/null &); true')
+        m.ssh(f'rm -f {FAT}/config/{t["name"]}.f[0-9]')
+        for idx, src in t['remember']:          # Main's remembered file (FC) for the test's setname: loaded at core start
+            dst = f'{HW}/files/{t["name"]}_fc{idx}{os.path.splitext(src)[1]}'
+            m.put(src, dst)
+            m.ssh(f'printf "%s" "{dst[len(FAT) + 1:]}" > {FAT}/config/{t["name"]}.f{idx}')
         m.cmd(f'load_core {HW}/mgl/{t["name"]}.mgl')
         time.sleep(4 + 2 * len(t['files']) + (2 if t['reset'] else 0))
         shots = []

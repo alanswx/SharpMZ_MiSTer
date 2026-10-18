@@ -225,6 +225,18 @@ assign rom_slot = active_file_slot == FILE_SYSROM || active_file_slot == FILE_CG
 reg [15:0] mzf_size = 0;
 reg [15:0] mzf_load_addr = 0;
 reg [7:0] direct_load_reset_ctr = 0;
+// Staged ROM bookkeeping and its copy engine (below, after the download address map).
+reg        dl_early = 0;                      // this download started in the first 3 s
+reg        st_rom = 0, st_rom_comb = 0, st_cg = 0, st_cg_comb = 0;
+reg        rl_active = 0, rl_rd = 0, rl_wr = 0, rl_cg = 0;
+reg [24:0] rl_addr;
+reg  [7:0] rl_dout;
+reg [12:0] rl_i;
+reg  [2:0] rl_ph;
+reg [24:0] rl_src, rl_dst;
+reg [12:0] rl_len;
+reg       rl_active_d = 0;
+always @(posedge clk_sys) rl_active_d <= rl_active;
 
 always @(posedge clk_sys) begin
 	hps_ioctl_download_d <= hps_ioctl_download;
@@ -237,7 +249,7 @@ always @(posedge clk_sys) begin
 
 	tape_ram_load_d <= tape_ram_load;
 	if((hps_ioctl_download_d && !hps_ioctl_download && (active_file_slot == FILE_TAPE_DIRECT || rom_slot)) ||
-	   (tape_ram_load_d && !tape_ram_load)) begin
+	   (tape_ram_load_d && !tape_ram_load) || (rl_active_d && !rl_active)) begin     // also after a staged ROM is moved
 		direct_load_reset_ctr <= 8'd64;
 	end
 	else if(direct_load_reset_ctr != 0) begin
@@ -271,6 +283,12 @@ wire        mzf_direct_wr_valid = active_file_slot != FILE_TAPE_DIRECT ||
 // rest lands at its own place, which rewrites the current model's slot with its own part (only the MZ-80K's slot keeps
 // the built-in ROM then). Slots: rtl/sharpmz.vhd MROM_BANK (2 KB banks) and video_vc.vhd CG_BANK (2 KB banks).
 wire        cfg_80col = (cfg_display == 3'b001) | (cfg_display == 3'b011);
+// Main sends the remembered System ROM / CGROM at core start before the saved settings, while the status word still says
+// MZ-80K (the test R03: a remembered MZ-700 monitor started on the MZ-80K). So a ROM that arrives in the first 3 s goes
+// to a staging area (system ROM banks 54-55, 1B000; CG banks 12-13, 6000), and once the settings are in the copy engine
+// below moves it to the model selected then; a file longer than 4 KB is a combined image and its first 4 KB goes back
+// to the start (the MZ-80K). A 16 KB MZ-800 IPL remembered this way lands at the start as before.
+wire        rom_early = settle < 28'(CLK_HZ * 3);
 reg   [5:0] mrom_base;          // first 2 KB bank of the model's monitor
 reg  [14:0] mrom_area;          // its size
 reg   [3:0] cg_base;
@@ -305,12 +323,14 @@ function automatic [24:0] mz_ioctl_addr_map(
 	input [26:0] addr,
 	input [15:0] load_addr,
 	input [5:0] mbase, input [14:0] marea,
-	input [3:0] cbase, input [12:0] carea
+	input [3:0] cbase, input [12:0] carea,
+	input early
 );
 	begin
 		case(slot)
 			FILE_SYSROM:
-				mz_ioctl_addr_map = (addr < {12'd0, marea}) ? ({8'd0, mbase, 11'd0} + addr[24:0]) : addr[24:0];
+				mz_ioctl_addr_map = early ? ((addr < 27'h1000) ? (25'h001B000 + addr[24:0]) : addr[24:0]) :
+				                    (addr < {12'd0, marea}) ? ({8'd0, mbase, 11'd0} + addr[24:0]) : addr[24:0];
 			FILE_TAPE_CMT:
 				mz_ioctl_addr_map = (addr < 27'd128) ? (25'h0400000 + addr[24:0])
 				                                      : (25'h0410000 + (addr[24:0] - 25'd128));
@@ -321,14 +341,58 @@ function automatic [24:0] mz_ioctl_addr_map(
 			FILE_SYSRAM:
 				mz_ioctl_addr_map = 25'h0100000 + addr[24:0];
 			FILE_CGROM:
-				mz_ioctl_addr_map = 25'h0500000 + ((addr < {14'd0, carea}) ? ({10'd0, cbase, 11'd0} + addr[24:0]) : addr[24:0]);
+				mz_ioctl_addr_map = 25'h0500000 + (early ? ((addr < 27'h1000) ? (25'h0006000 + addr[24:0]) : addr[24:0]) :
+				                    (addr < {14'd0, carea}) ? ({10'd0, cbase, 11'd0} + addr[24:0]) : addr[24:0]);
 			default:
 				mz_ioctl_addr_map = addr[24:0];
 		endcase
 	end
 endfunction
 
-wire [24:0] hps_ioctl_addr_mapped = mz_ioctl_addr_map(active_file_slot, hps_ioctl_addr, mzf_load_addr, mrom_base, mrom_area, cg_base, cg_area);
+wire [24:0] hps_ioctl_addr_mapped = mz_ioctl_addr_map(active_file_slot, hps_ioctl_addr, mzf_load_addr, mrom_base, mrom_area, cg_base, cg_area,
+                                                      dl_early);
+
+// Staged ROM bookkeeping and the copy engine (the core download bus, while no download runs).
+always @(posedge clk_sys) begin
+	if (!hps_ioctl_download_d && hps_ioctl_download) dl_early <= rom_early;
+	if (hps_ioctl_download && hps_ioctl_wr && dl_early) begin
+		if (active_file_slot == FILE_SYSROM) begin st_rom <= 1; if (hps_ioctl_addr >= 27'h1000) st_rom_comb <= 1; end
+		if (active_file_slot == FILE_CGROM)  begin st_cg  <= 1; if (hps_ioctl_addr >= 27'h1000) st_cg_comb  <= 1; end
+	end
+	rl_rd <= 0; rl_wr <= 0;
+	if (!rl_active) begin
+		if (!rom_early && !hps_ioctl_download && !ds_bus_active && !tape_active && (st_rom || st_cg)) begin
+			rl_active <= 1; rl_i <= 0; rl_ph <= 0;
+			if (st_rom) begin
+				rl_cg  <= 0;
+				rl_src <= 25'h001B000;
+				rl_dst <= st_rom_comb ? 25'h0000000 : {14'd0, mrom_base, 11'd0};
+				rl_len <= (st_rom_comb || mrom_area > 15'h1000) ? 13'h1000 : mrom_area[12:0];
+				st_rom <= 0; st_rom_comb <= 0;
+			end else begin
+				rl_cg  <= 1;
+				rl_src <= 25'h0506000;
+				rl_dst <= st_cg_comb ? 25'h0500000 : 25'h0500000 + {14'd0, cg_base, 11'd0};
+				rl_len <= st_cg_comb ? 13'h1000 : cg_area;
+				st_cg <= 0; st_cg_comb <= 0;
+			end
+		end
+	end
+	else begin
+		case (rl_ph)
+			3'd0: begin rl_addr <= rl_src + {12'd0, rl_i}; rl_rd <= 1; rl_ph <= 3'd1; end
+			3'd1: begin rl_rd <= 1; rl_ph <= 3'd2; end
+			3'd2: begin rl_rd <= 1; rl_ph <= 3'd3; end
+			3'd3: begin rl_dout <= mz_ioctl_din[7:0]; rl_addr <= rl_dst + {12'd0, rl_i}; rl_ph <= 3'd4; end
+			3'd4: begin rl_wr <= 1; rl_ph <= 3'd5; end
+			default: begin
+				rl_ph <= 3'd0;
+				if (rl_i + 1'd1 == rl_len) begin rl_active <= 0; end
+				rl_i <= rl_i + 1'd1;
+			end
+		endcase
+	end
+end
 
 wire [31:0] mz_ioctl_din;
 
@@ -366,7 +430,7 @@ tape_image tape_image
 	.eject(media_eject),
 	.direct_first(status[52] & (cfg_model[2:1] != 2'b11)),   // Tape Image Start: Direct (not the MZ-80B/2000)
 	.ram_load(tape_ram_load),
-	.host_busy(hps_ioctl_download | ds_bus_active),
+	.host_busy(hps_ioctl_download | ds_bus_active | rl_active),
 	.cmt_status(cmt_status),
 
 	.active(tape_active),
@@ -386,9 +450,9 @@ tape_image tape_image
 
 // Core download bus: the tape engine, an OSD download, or parked on an unused address. The CMT clears
 // its record-ready flag whenever the bus points at its buffers, so it must not idle there.
-wire        mz_ioctl_wr   = hps_ioctl_download ? (hps_ioctl_wr && mzf_direct_wr_valid) : ds_bus_active ? ds_bus_wr : tape_active & tape_wr;
-wire [24:0] mz_ioctl_addr = hps_ioctl_download ? hps_ioctl_addr_mapped : ds_bus_active ? ds_bus_addr : tape_active ? tape_addr : 25'h1000000;
-wire  [7:0] mz_ioctl_dout = hps_ioctl_download ? hps_ioctl_dout : ds_bus_active ? ds_bus_dout : tape_dout;
+wire        mz_ioctl_wr   = hps_ioctl_download ? (hps_ioctl_wr && mzf_direct_wr_valid) : ds_bus_active ? ds_bus_wr : rl_active ? rl_wr : tape_active & tape_wr;
+wire [24:0] mz_ioctl_addr = hps_ioctl_download ? hps_ioctl_addr_mapped : ds_bus_active ? ds_bus_addr : rl_active ? rl_addr : tape_active ? tape_addr : 25'h1000000;
+wire  [7:0] mz_ioctl_dout = hps_ioctl_download ? hps_ioctl_dout : ds_bus_active ? ds_bus_dout : rl_active ? rl_dout : tape_dout;
 
 // Load Direct starts the program: after the machine has booted, the bytes the load put in 10F0-11FF are written
 // back and the CPU is fed DI, the bank switches the program needs, LD SP,10F0 and JP exec (rtl/direct_start.sv).
@@ -694,7 +758,7 @@ sharpmz core
 	.IOCTL_UPLOAD(hps_ioctl_upload),
 	.IOCTL_CLK(clk_sys),
 	.IOCTL_WR(mz_ioctl_wr),
-	.IOCTL_RD(hps_ioctl_rd),
+	.IOCTL_RD(hps_ioctl_rd | rl_rd),
 	.IOCTL_ADDR(mz_ioctl_addr),
 	.IOCTL_DOUT({24'd0, mz_ioctl_dout}),
 	.IOCTL_DIN(mz_ioctl_din)

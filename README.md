@@ -114,8 +114,9 @@ loads, so a 4 KB MZ-80K monitor (for example `80ktc.rom`, which starts "System M
 3. Press Reset (OSD Reset). The CPU keeps running the old monitor until the reset, so loading alone seems to do
    nothing.
 
-Main remembers the file and loads it again at every core start, into the model selected at that time, so keep the
-model you loaded it for, or load the original ROM back for that model. Only one System ROM (and one CGROM) is
+Main remembers the file and loads it again at every core start; the core holds it until the saved settings arrive and
+then puts it into the model selected at that time, so keep the model you loaded it for, or load the original ROM back
+for that model. (A remembered 16 KB MZ-800 IPL is the exception: it lands at the start of the combined image.) Only one System ROM (and one CGROM) is
 remembered for the whole core: for replacement ROMs on several machines at once, build a combined image in the layout
 of `combined_mrom.rom` and load that. (Before 2026-10-17 a single monitor always landed in the MZ-80K's slot.)
 
