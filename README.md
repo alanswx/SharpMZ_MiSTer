@@ -28,6 +28,14 @@ How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and 
 
 Copy `SharpMZ_<date>.rbf` from `releases/` to the `_Computer` folder of your MiSTer SD card, and put your tape files (`.mzf`, `.mzt`) and disk images (`.dsk`) in `games/SharpMZ/`.
 
+### One menu entry per machine
+
+`releases/` also has an MGL file for each machine (`Sharp MZ-80K.mgl` … `Sharp MZ-1500.mgl`, and `Sharp MZ-700 (Japan).mgl`).
+Copied to `_Computer` next to the core, each appears in the Computer menu as its own entry: it starts on that machine and
+keeps its own saved settings and its own remembered System ROM / CGROM, while games stay in `games/SharpMZ`. Starting on
+the right machine needs a Main (MiSTer binary) with MGL `<option>` support, newer than MiSTer_20261010; with an older Main
+the entries still work but each starts as an MZ-80K until you pick its model and save the settings once.
+
 ## Using the Emulator
 
 The core boots as an MZ-80A with the SA-1510 monitor. Press F12 for the OSD.
