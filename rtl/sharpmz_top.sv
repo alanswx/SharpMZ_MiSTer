@@ -732,6 +732,7 @@ sharpmz core
 	.CMT_STATUS(cmt_status),
 	.CMT_CTRL(cmt_ctrl),
 	.CMT_DEBUG(cmt_debug),                                // for the simulation (unused here)
+	.TAPE_CLEAR((img_mounted[0] & ~|img_size) | media_eject),   // tape removed (or model changed): the CMT drops its record
 	.EXT_IO_ADDR(ext_io_addr),
 	.EXT_IO_RD(ext_io_rd),
 	.EXT_IO_WR(ext_io_wr),

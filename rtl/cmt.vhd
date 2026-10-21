@@ -58,6 +58,7 @@ entity cmt is
         -- Cassette magnetic tape signals.
         CMT_BUS_OUT          : out std_logic_vector(CMT_BUS_OUT_WIDTH);
         CMT_BUS_IN           : in  std_logic_vector(CMT_BUS_IN_WIDTH);
+        TAPE_CLEAR           : in  std_logic;                            -- Pulse: the tape image was removed, drop the record held.
 
         -- HPS Interface
         IOCTL_DOWNLOAD       : in  std_logic;                            -- HPS Downloading to FPGA.
@@ -598,7 +599,11 @@ begin
             -- record (a 1.3 KB BASIC program after BASIC itself) was written entirely inside that window, every write
             -- was overridden by the clear, the quiet timer never started and the record never became ready.
             PLAY_READY_CLR_LAST                     <= PLAY_READY_CLR;
-            if PLAY_READY_CLR = '1' and PLAY_READY_CLR_LAST = '0' then
+            if TAPE_CLEAR = '1' then                                     -- The tape image was removed: nothing to play.
+                PLAY_READY                          <= '0';
+                PLAY_READY_SET_CNT                  <= 0;
+
+            elsif PLAY_READY_CLR = '1' and PLAY_READY_CLR_LAST = '0' then
                 PLAY_READY                          <= '0';
                 PLAY_READY_SET_CNT                  <= 0;
 

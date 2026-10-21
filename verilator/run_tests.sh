@@ -226,11 +226,11 @@ YB="../software/Year-Based Collection of Games for the Sharp MZ-80K Line of Home
 if [ -z "${QUICK:-}" ] && [ -f "$YB/BASIC/MZ-700/BASIC 1Z-013B.mzf" ]; then
     cat "$YB/BASIC/MZ-700/BASIC 1Z-013B.mzf" "$YB/19xx/MZ-700/Rock Paper Scissors (19xx).mzf" > "$OUT/tape_basic.mzt"
     ( $BIN --model mz700 --fast-tape 5 --tape-image "$OUT/tape_basic.mzt" --type '100:L\n' --type '2200:LOAD\n' \
-          --type '2700:LIST\n' --stop-at-frame 2900 --ascii-end --quiet > "$OUT/tape_basic.txt" 2> "$OUT/tape_basic.log" ) &
+          --type '2700:LIST\n' --stop-at-frame 3300 --ascii-end --quiet > "$OUT/tape_basic.txt" 2> "$OUT/tape_basic.log" ) &
     pids+=($!); names+=("tape_basic")
     # Tape Image Start: Direct: BASIC (record 1) goes to RAM and starts by itself; LOAD gets record 2.
     ( $BIN --model mz700 --fast-tape 5 --tape-direct --direct-start --tape-image "$OUT/tape_basic.mzt" --type '300:LOAD\n' \
-          --type '800:LIST\n' --stop-at-frame 1000 --ascii-end --quiet > "$OUT/tape_direct.txt" 2> "$OUT/tape_direct.log" ) &
+          --type '800:LIST\n' --stop-at-frame 1400 --ascii-end --quiet > "$OUT/tape_direct.txt" 2> "$OUT/tape_direct.log" ) &
     pids+=($!); names+=("tape_direct")
 fi
 if [ -z "${QUICK:-}" ]; then

@@ -103,6 +103,7 @@ struct Options {
     int         fdc_mode = 0;
     bool     tape_readonly = false;
     std::set<uint32_t> tape_rewinds;
+    std::set<uint32_t> tape_unmounts;            // --tape-unmount FRAME: Main's unmount (size 0 + the mount strobe)
     std::map<uint32_t, int> osd_pulses;          // --osd-pulse FRAME:BIT
 };
 
@@ -292,6 +293,7 @@ static bool parse_args(int argc, char **argv, Options &o)
         else if (a == "--fdc-mode") { std::string m = next(); o.fdc_mode = m == "on" ? 1 : m == "off" ? 2 : 0; }
         else if (a == "--tape-readonly") o.tape_readonly = true;
         else if (a == "--tape-rewind") o.tape_rewinds.insert(parse_num(next()));
+        else if (a == "--tape-unmount") o.tape_unmounts.insert(parse_num(next()));
         else if (a == "--osd-pulse") {
             std::string v = next(); size_t c = v.find(':');
             if (c == std::string::npos) { fprintf(stderr, "--osd-pulse wants FRAME:BIT\n"); return false; }
@@ -423,6 +425,7 @@ private:
     // Image slots: 0 = tape (S0), 1 = floppy drive A (S1). The buffer bus is shared.
     FILE    *img = nullptr;
     uint64_t img_size = 0;
+    uint32_t osd_pulse_clocks = 0;            // --osd-pulse: clocks left (not frames: a Reset stops the video)
     FILE    *fdd = nullptr;
     uint64_t fdd_size = 0;
     FILE    *fdd2 = nullptr;                 // --fdd-b: floppy drive B
@@ -587,6 +590,7 @@ void Sim::mount_tape()
 void Sim::clock()
 {
     sd_step();
+    if (osd_pulse_clocks && !--osd_pulse_clocks) top->osd_pulse = 0;
 
     // Sample what the video pipeline sees at this rising edge: MiSTer's
     // video_mixer latches RGB on the clk_sys edge where CE_PIXEL is high.
@@ -843,8 +847,12 @@ void Sim::on_frame_end()
     }
 
     top->tape_rewind = opt.tape_rewinds.count(frame) ? 1 : 0;   // Held for one frame.
-    { auto pu = opt.osd_pulses.find(frame);                      // --osd-pulse: one frame
-      top->osd_pulse = pu != opt.osd_pulses.end(); top->osd_pulse_bit = pu != opt.osd_pulses.end() ? pu->second : 0; }
+    if (opt.tape_unmounts.count(frame)) {                        // the image is removed: size 0, strobe for one frame
+        img_size = 0; top->img_size = 0; top->img_mounted = 1;
+        if (!opt.quiet) fprintf(stderr, "[sim] frame %u: tape image unmounted\n", frame);
+    } else if (opt.tape_unmounts.count(frame - 1)) top->img_mounted = 0;
+    { auto pu = opt.osd_pulses.find(frame);                      // --osd-pulse: about 1 ms, as Main's T/R pulse
+      if (pu != opt.osd_pulses.end()) { top->osd_pulse = 1; top->osd_pulse_bit = pu->second; osd_pulse_clocks = 50000; } }
     auto rl = opt.rom_loads.equal_range(frame);
     for (auto it = rl.first; it != rl.second; ++it) load_rom(it->second.first, it->second.second);
     auto oa = opt.osd_at.equal_range(frame);                    // --osd-at: change OSD options mid-run
