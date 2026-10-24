@@ -24,7 +24,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 
 ## Handoff (2026-10-24)
 
-- **Release:** MiSTer-devel PR #16 is open (`releases/SharpMZ_20261024.rbf`, CONF_STR `v,6`). The previous release is
+- **Release:** SharpMZ_20261024 is released: MiSTer-devel PR #16 merged 2026-10-24 (`releases/SharpMZ_20261024.rbf`, CONF_STR `v,6`). The previous release is
   #15 (20261015). Release recipe: a branch `sharpmz-YYYYMMDD` on MiSTer-devel's `master` with one commit whose tree
   is `standard-core` except `releases/`, which keeps only the official release `.rbf` files plus the new one (tester
   builds stay on `standard-core`). Check the PR deletes nothing (`git diff --name-status origin/master`).
