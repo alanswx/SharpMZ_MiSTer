@@ -20,7 +20,39 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
 | MZ-2000 | Real IPL (MAME mz20ipl.bin) and MZ-2000 character ROM with katakana (MAME font.bin, hand-made, BAD_DUMP). Loads Gang Man and Zero Fighter (colour) from tape and boots a TF-DOS D88 disk with Japanese text, in the sim and on hardware. |
 | FPGA | Latest build (6e70d0e, clean) meets timing (core clock +2.1 ns): about 18,750 ALMs (45%), 74% of block memory bits (the RAM disk adds 64 KB). Built on cottageubuntu or locally in the Quartus container. Built on cottageubuntu (Quartus 17.0.2); always clean-build (`rm -rf db incremental_db`). |
 | Sim = hardware | `rtl/sharpmz_top.sv` holds everything between hps_io and video_mixer, and both `SharpMZ.sv` and the sim (`verilator/sim.v`) use it. The sim takes the OSD status word (`--osd "Name=Value"`, by the CONF_STR names) and Main-style downloads. `tools/osd_sweep.py` runs every value of every OSD option; `tools/mister_test.py` names options the same way (`tools/sharpmz_osd.py`). |
-| Regression | `make test`: 48 tests (boot, keyboard, MZ-800 graphics, tape, floppy, Quick Disk, printer, Load Direct, sound), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, MGL tests T01-T31, Q, B, C, W, G, H, K, V and L01-L12 (2026-10-08). Keys go through `tools/mister_keys.py`, a uinput keyboard kept on the SD card at `/media/fat/tools/` (no mrext needed). Builds: `misterubuntu` (~7 min) or the local Quartus container. |
+| Regression | `make test`: 59 tests (2026-10-24) (boot, keyboard, MZ-800 graphics, tape, floppy, Quick Disk, printer, Load Direct, sound), some needing `software/` (see `verilator/README.md`). All pass. Hardware suite: `tools/mister_test.py`, MGL tests T01-T31, Q, B, C, W, G, H, K, V and L01-L12 (2026-10-08). Keys go through `tools/mister_keys.py`, a uinput keyboard kept on the SD card at `/media/fat/tools/` (no mrext needed). Builds: `misterubuntu` (~7 min) or the local Quartus container. |
+
+## Handoff (2026-10-24)
+
+- **Release:** MiSTer-devel PR #16 is open (`releases/SharpMZ_20261024.rbf`, CONF_STR `v,6`). The previous release is
+  #15 (20261015). Release recipe: a branch `sharpmz-YYYYMMDD` on MiSTer-devel's `master` with one commit whose tree
+  is `standard-core` except `releases/`, which keeps only the official release `.rbf` files plus the new one (tester
+  builds stay on `standard-core`). Check the PR deletes nothing (`git diff --name-status origin/master`).
+- **Settings version 6:** the Model list was reordered by date (MZ-80K, 80C, 80A, 1200, 80B, 2000, 700, 800, 1500);
+  `v,6` makes Main drop older saved settings. `tools/mister_test.py` writes `<test>_v6.CFG`; `MODEL_ORDER=old` for
+  builds before 20261016.
+- **MGL `<option>` (Main):** merged in Main_MiSTer master as e8e915a (`<option name= value= [page=] [default="1"]/>`,
+  by label only; errors shown as an MGL info item). Not in a Main release yet (latest MiSTer_20261010). Our branch:
+  `alanswx/Main_MiSTer` `mgl-option`; worktrees `~/dev2/Main_MiSTer_mgl` (the patch) and `~/dev2/Main_MiSTer_up`
+  (upstream master, built for testers). Build Main on misterubuntu with
+  `PATH=/usr/local/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/bin:$PATH make`.
+- **Per-machine MGLs** are optional, in `mgl/` (not `releases/`, so the updater doesn't install them); README
+  "Optional: one menu entry per machine" explains them and `same_dir`. Once a Main with `<option>` is released they
+  could move to `releases/`.
+- **Standards:** `~/dev2/osd-standard.md` and `tape-standard.md` were reviewed; decision: SharpMZ does not conform
+  for now. The questions for the author are in `docs/osd-standard-questions.md`.
+- **Waiting on testers** (tester zip `out/SharpMZ_20261021_testers.zip`; 20261024 differs only by `v,6`):
+  - Danjuro: Tiny Xevious speed (VRAM wait), Batten Tanuki sound, MZ-80K with a remembered user ROM.
+  - EeDee: (1) the ~3 s before a remembered ROM takes effect: by design (Main sends `FC` files before the status, so
+    `rtl/sharpmz_top.sv` stages ROMs from the first 3 s and copies them to the model's slot); could try ~1.5 s on
+    hardware. (2) Reset after removing a tape: fixed in 1085be8 (TAPE_CLEAR; sim only, `--tape-unmount`); ask how he
+    unmounted and whether disks do it too. (3) "Tape Image doesn't like me": needs machine, file and steps.
+- **Hardware hosts:** mister126 is the test MiSTer (if ssh refuses the key: remount `/` rw, append
+  `~/.ssh/id_ed25519_mister.pub` to `/root/.ssh/authorized_keys`, remount ro). mister14 runs someone's custom Main
+  (`games/DoradoRTL/...`); a `mister_test` run there restarts the stock Main, so ask first. L18 (Auto Load) missed
+  once in a batch on 20261021 and passed three reruns: watch it.
+- **Sim:** `--tape-unmount FRAME`; `--osd-pulse` now lasts ~1 ms of clocks (a Reset pulse used to stop the video and
+  hang the sim). Full regression: 59 tests pass (tape_basic/tape_direct got 400 more frames for the VRAM wait).
 
 ## Open work
 
