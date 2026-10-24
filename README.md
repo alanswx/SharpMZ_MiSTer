@@ -28,17 +28,32 @@ How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and 
 
 Copy `SharpMZ_<date>.rbf` from `releases/` to the `_Computer` folder of your MiSTer SD card, and put your tape files (`.mzf`, `.mzt`) and disk images (`.dsk`) in `games/SharpMZ/`.
 
-### One menu entry per machine
+### Optional: one menu entry per machine
 
-`releases/` also has an MGL file for each machine (`Sharp MZ-80K.mgl` … `Sharp MZ-1500.mgl`, and `Sharp MZ-700 (Japan).mgl`).
-Copied to `_Computer` next to the core, each appears in the Computer menu as its own entry: it starts on that machine and
-keeps its own saved settings and its own remembered System ROM / CGROM, while games stay in `games/SharpMZ`. Starting on
-the right machine needs a Main (MiSTer binary) with MGL `<option>` support, newer than MiSTer_20261010; with an older Main
-the entries still work but each starts as an MZ-80K until you pick its model and save the settings once.
+The `mgl/` folder has an MGL file for each machine (`Sharp MZ-80K.mgl` … `Sharp MZ-1500.mgl`, and
+`Sharp MZ-700 (Japan).mgl`). They are not installed by the MiSTer updater; copy the ones you want to `_Computer`
+next to the core. Each appears in the Computer menu as its own entry, starts on its own machine, and keeps its own
+saved settings and its own remembered System ROM / CGROM, so switching machines no longer means changing the Model
+and saving again.
+
+They choose the machine with MGL `<option>`, which needs a Main (MiSTer binary) newer than MiSTer_20261010. With an
+older Main the entries still work, but each starts as an MZ-80K the first time: pick its Model and Save Settings once.
+
+```xml
+<mistergamedescription>
+	<rbf>_Computer/SharpMZ</rbf>
+	<setname same_dir="1">SharpMZ-700</setname>
+	<option name="Model" value="MZ-700" default="1"/>
+</mistergamedescription>
+```
+
+**Games folder.** With `same_dir="1"` (as shipped) every entry browses `games/SharpMZ`. To give each machine its own
+folder, remove `same_dir="1"` (`<setname>SharpMZ-700</setname>`): that entry then uses `games/SharpMZ-700`. The
+settings and ROMs are per machine either way.
 
 ## Using the Emulator
 
-The core boots as an MZ-80A with the SA-1510 monitor. Press F12 for the OSD.
+The core boots as an MZ-80K with the SP-1002 monitor. Press F12 for the OSD.
 
 Load Direct, the tape image, the two floppy drives and the Quick Disk are on the OSD's first page; the other settings are in the Machine, Tape, Display, Floppy and ROM and RAM pages below. MGL files can load any of the first-page entries (`<file type="f" index="2">` for Load Direct to RAM, `type="s" index="0"` for the tape image, `index="1"`/`"2"` for the drives).
 
@@ -46,7 +61,7 @@ Load Direct, the tape image, the two floppy drives and the Quick Disk are on the
 
 | Option | Description |
 | ------ | ----------- |
-| Model | MZ-80A, MZ-80K, MZ-80C, MZ-1200, MZ-700, MZ-80B, MZ-2000, MZ-800 or MZ-1500. Changing model resets the machine. |
+| Model | MZ-80K, MZ-80C, MZ-80A, MZ-1200, MZ-80B, MZ-2000, MZ-700, MZ-800 or MZ-1500 (by date). Changing model resets the machine and ejects the tape and disks. |
 | CPU Speed | Normal is the original speed; 2x to 16x multiply it, and Fastest is the most the core can do on that model (about 35 MHz, clk_sys/2). On the MZ-700/800/1500 16x is already the fastest. |
 | MZ-80B/2000 Boot Reset | MZ-80B/2000: reset back into the IPL. |
 | Keyboard Layout | PC (default): each key types what is printed on it, as on a US PC keyboard, on every model: the core presses or releases the machine's SHIFT as needed (on the MZ-80A, @ is unshifted and " is SHIFT 2). Letters, Return, the cursor keys and so on work as in the Sharp layout, so letters type capitals as on the real machines. Characters a model doesn't have do nothing. Sharp: each key is the Sharp key in its place, with the Sharp machine's own legends (for games and for typing as on the original keyboard). On the MZ-80A, MZ-700, MZ-800 and MZ-1500, Ctrl is CTRL (CTL), Esc is BREAK and Alt is GRAPH (GRPH). |

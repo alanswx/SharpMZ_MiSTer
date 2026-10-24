@@ -2,7 +2,7 @@
 """Hardware test suite for the SharpMZ core on a MiSTer.
 
 Each test is an MGL that loads the core with its own <setname>, so it gets its own config file
-(<setname>_v5.CFG) holding the OSD settings (model etc.). The MGL mounts the tape/disk images
+(<setname>_v6.CFG) holding the OSD settings (model etc.). The MGL mounts the tape/disk images
 and resets; this script then types keys through a uinput keyboard (tools/mister_keys.py on the SD card) and takes
 screenshots with Main's `screenshot` command, then copies them back.
 
@@ -29,7 +29,7 @@ TESTS = os.path.join(ROOT, 'verilator/tests/mz800')
 MZF = os.path.join(ROOT, 'rtl/software/mzf')
 FAT = '/media/fat'
 HW = f'{FAT}/games/SharpMZ/HWTest'
-CFG_VER = '_v5'           # CONF_STR "v,5"
+CFG_VER = '_v6'           # CONF_STR "v,6"
 
 # Model menu entries (status[38:35]), in CONF_STR order.
 MODEL = {'MZ80K': 0, 'MZ80C': 1, 'MZ80A': 2, 'MZ1200': 3, 'MZ80B': 4, 'MZ2000': 5, 'MZ700': 6, 'MZ800': 7, 'MZ1500': 8}

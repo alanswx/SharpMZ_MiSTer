@@ -143,7 +143,7 @@ localparam CONF_STR =
 	// Reset and close OSD (testers: "you press reset and nothing happens").
 	"J1,Fire 1,Fire 2;",
 	"jn,A,B;",
-	"v,5;",
+	"v,6;",
 	"V,v",`BUILD_DATE
 };
 
