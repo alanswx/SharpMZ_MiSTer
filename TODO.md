@@ -47,7 +47,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
     `rtl/sharpmz_top.sv` stages ROMs from the first 3 s and copies them to the model's slot); could try ~1.5 s on
     hardware. (2) Reset after removing a tape: fixed in 1085be8 (TAPE_CLEAR; sim only, `--tape-unmount`); ask how he
     unmounted and whether disks do it too. (3) "Tape Image doesn't like me": needs machine, file and steps.
-  - EeDee (2026-10-25, `releases/SharpMZ_20261025.rbf`): OSD pages without blank lines, in his order (Machine, Tape,
+  - EeDee (2026-10-25, `releases/SharpMZ_20261025.rbf`, tester zip `out/SharpMZ_20261025_testers.zip`): OSD pages without blank lines, in his order (Machine, Tape,
     Floppy, ROM and RAM, Display, Printer), Aspect ratio under Display; Print Screen shows the tape details (checked
     on mister126; OSD layout not seen on hardware, the capture card was busy). Scroll Lock can't be used: Main keeps
     it for the keyboard emulation mode unless the core has a PS/2 controller. MZ-2000 MZFs: most failing ones are
