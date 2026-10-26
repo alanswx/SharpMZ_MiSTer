@@ -57,7 +57,7 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
     2 colour TV, Star Stream starts. MZ-1Z001/1Z002.mzf have no header (use the .mzt). MZ-80K floppy: not started.
   - Danjuro (2026-10-26): "MZ-80A and MZ-1200 are the same machine". Sharp's MZ-1200 owner's manual (mz-80a.com):
     monitor SP-1002, 1 KB VRAM, kana CG, E00C/E010 swap and E014/E015 reverse, no E200 scroll. So the MZ-1200 stays
-    and now has the Japanese CG (MAME 80kcgj.rom, CRC 7767f11e, `MZ1200_CGROM.rom`; `releases/SharpMZ_20261026.rbf`,
+    and now has the Japanese CG (MAME 80kcgj.rom, CRC 7767f11e, `MZ1200_CGROM.rom`; `releases/SharpMZ_20261026.rbf`, tester zip `out/SharpMZ_20261026_testers.zip`,
     checked in the sim and on mister126). Left as the MZ-80A's (as Takeda's CSCP has them): the hblank VRAM wait and
     E008 bit 7, 2 KB VRAM (the manual says 1 KB; SP-1002 uses 1 KB).
 - **Hardware hosts:** mister126 is the test MiSTer (if ssh refuses the key: remount `/` rw, append
