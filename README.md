@@ -5,7 +5,7 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 | Model  | Status | Model  | Status |
 | ------ | ------ | ------ | ------ |
 | MZ-80K | Working | MZ-80C | Working |
-| MZ-1200 | Working (MZ-80K monitor SP-1002 and keyboard; keys fixed 2026-10-11) | MZ-80A | Working |
+| MZ-1200 | Working (the Japanese MZ-80A: monitor SP-1002 and the Japanese MZ-80K's katakana character set, as its owner's manual lists; keys fixed 2026-10-11) | MZ-80A | Working |
 | MZ-700 | Working | MZ-80B | Working: IPL boots tape and floppy (BASIC, CP/M) |
 | MZ-2000 | Working: IPL, tape and floppy, colour graphics, katakana | MZ-800 | Working (IPL, graphics, PSG, tape, floppy, CP/M), tested on hardware |
 | MZ-1500 | New: IPL, PCG graphics, stereo PSG, Quick Disk (read and write) | | |

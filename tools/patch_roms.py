@@ -13,6 +13,8 @@ Run after romtool (build_meminitfiles.sh).
                           the MZ-1500's monitor is the same ROM with its reset jumping to the IPL), banks 34h/35h.
   combined_cgrom 0x5000:  the MZ-1500 CG (4 KB, CG bank Ah), bit-reversed from mz800emu's copy.
   combined_cgrom 0x3000:  the MZ-800 CG (the MZ-700 CG with each byte bit-reversed).
+  combined_cgrom 0x1000:  the MZ-1200 CG with katakana (MZ1200_CGROM.rom: MAME 80kcgj.rom, CRC 7767f11e, the MZ-80K2E
+                          Japanese CG; idealine.info mz-80k "MZ80K2E Jap CG"). romtool puts the MZ-80A CG there.
   combined_cgrom 0x4800:  the MZ-2000 CG with katakana (MAME font.bin, CRC 6ae6ce8e; rebuilt from EmuZ-2000 bitmaps,
                           MAME marks it BAD_DUMP). The MZ-80B keeps MZFONT (the export font) at 0x4000.
 
@@ -66,6 +68,10 @@ patch("combined_mrom", 0x27 * 0x800, e1500[0x800:0x2000])
 m700j = read("MZ700J_1Z009B.rom")
 assert len(m700j) == 0x1000
 patch("combined_mrom", 0x34 * 0x800, m700j)
+# CG_BANK "0010" (video_vc.vhd) = MZ-1200: the Japanese MZ-80K CG (its owner's manual: SP-1002 monitor, kana CG).
+cg1200 = read("MZ1200_CGROM.rom")
+assert len(cg1200) == 0x800
+patch("combined_cgrom", 0x1000, cg1200)
 # CG_BANK "1001" (video_vc.vhd) = MZ-2000.
 cg2000 = read("MZ2000_CGROM.rom")
 assert len(cg2000) == 0x800
