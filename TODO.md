@@ -52,8 +52,9 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
     on mister126; OSD layout not seen on hardware, the capture card was busy). Scroll Lock can't be used: Main keeps
     it for the keyboard emulation mode unless the core has a PS/2 controller. MZ-2000 MZFs: most failing ones are
     37-62 KB loading at 0000; the IPL loads at 8000 and only 8000-FFFF is RAM in IPL mode (as MAME), so they can't
-    load through the IPL. POLARIS loads at 8000 (the IPL ignores it); MZ-1Z001/1Z002.mzf have no header (use the
-    .mzt). MZ-80K floppy: not started.
+    load through the IPL (sim: Dawn Patrol loads, then the IPL is back at "looking for a program"). The ones under
+    32 KB run in the sim: Space Cruiser waits at a katakana prompt (C colour / G green CRT), Polaris asks 1 monitor /
+    2 colour TV, Star Stream starts. MZ-1Z001/1Z002.mzf have no header (use the .mzt). MZ-80K floppy: not started.
 - **Hardware hosts:** mister126 is the test MiSTer (if ssh refuses the key: remount `/` rw, append
   `~/.ssh/id_ed25519_mister.pub` to `/root/.ssh/authorized_keys`, remount ro). mister14 runs someone's custom Main
   (`games/DoradoRTL/...`); a `mister_test` run there restarts the stock Main, so ask first. L18 (Auto Load) missed
