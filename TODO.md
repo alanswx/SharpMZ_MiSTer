@@ -47,6 +47,13 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
     `rtl/sharpmz_top.sv` stages ROMs from the first 3 s and copies them to the model's slot); could try ~1.5 s on
     hardware. (2) Reset after removing a tape: fixed in 1085be8 (TAPE_CLEAR; sim only, `--tape-unmount`); ask how he
     unmounted and whether disks do it too. (3) "Tape Image doesn't like me": needs machine, file and steps.
+  - EeDee (2026-10-25, `releases/SharpMZ_20261025.rbf`): OSD pages without blank lines, in his order (Machine, Tape,
+    Floppy, ROM and RAM, Display, Printer), Aspect ratio under Display; Print Screen shows the tape details (checked
+    on mister126; OSD layout not seen on hardware, the capture card was busy). Scroll Lock can't be used: Main keeps
+    it for the keyboard emulation mode unless the core has a PS/2 controller. MZ-2000 MZFs: most failing ones are
+    37-62 KB loading at 0000; the IPL loads at 8000 and only 8000-FFFF is RAM in IPL mode (as MAME), so they can't
+    load through the IPL. POLARIS loads at 8000 (the IPL ignores it); MZ-1Z001/1Z002.mzf have no header (use the
+    .mzt). MZ-80K floppy: not started.
 - **Hardware hosts:** mister126 is the test MiSTer (if ssh refuses the key: remount `/` rw, append
   `~/.ssh/id_ed25519_mister.pub` to `/root/.ssh/authorized_keys`, remount ro). mister14 runs someone's custom Main
   (`games/DoradoRTL/...`); a `mister_test` run there restarts the stock Main, so ask first. L18 (Auto Load) missed
