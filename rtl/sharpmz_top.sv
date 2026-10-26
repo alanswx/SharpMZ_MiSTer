@@ -786,11 +786,14 @@ mz800_border mz800_border
 );
 
 // Tape image messages over the picture (OSD Tape Messages): where the tape is, for three seconds after it moves.
-// OSD Show Tape Details (status 58, closes the OSD): the details of the record at the tape position, once more.
-reg  tape_show_req = 0, tape_show_last = 0;
+// OSD Show Tape Details (status 58, closes the OSD) or Scroll Lock (no Sharp key on any model): the details of the
+// record at the tape position, once more.
+reg  tape_show_req = 0, tape_show_last = 0, ps2_toggle_last = 0;
+wire scroll_lock = ps2_key[10] != ps2_toggle_last && ps2_key[9:0] == 10'h27E;   // press, not extended, 7E
 always @(posedge clk_sys) begin
-	tape_show_last <= status[58];
-	tape_show_req  <= status[58] & ~tape_show_last & tape_mounted;
+	tape_show_last  <= status[58];
+	ps2_toggle_last <= ps2_key[10];
+	tape_show_req   <= ((status[58] & ~tape_show_last) | scroll_lock) & tape_mounted;
 end
 wire [7:0] R_osd, G_osd, B_osd;
 tape_osd #(.CLK_HZ(CLK_HZ), .FONT_FILE(FONT_FILE), .A2D_FILE(A2D_FILE)) tape_osd

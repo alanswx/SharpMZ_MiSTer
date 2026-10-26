@@ -55,7 +55,7 @@ settings and ROMs are per machine either way.
 
 The core boots as an MZ-80K with the SP-1002 monitor. Press F12 for the OSD.
 
-Load Direct, the tape image, the two floppy drives and the Quick Disk are on the OSD's first page; the other settings are in the Machine, Tape, Display, Floppy and ROM and RAM pages below. MGL files can load any of the first-page entries (`<file type="f" index="2">` for Load Direct to RAM, `type="s" index="0"` for the tape image, `index="1"`/`"2"` for the drives).
+Load Direct, the tape image, the two floppy drives and the Quick Disk are on the OSD's first page; the other settings are in the Machine, Tape, Floppy, ROM and RAM, Display and Printer pages below. MGL files can load any of the first-page entries (`<file type="f" index="2">` for Load Direct to RAM, `type="s" index="0"` for the tape image, `index="1"`/`"2"` for the drives).
 
 ### Machine
 
@@ -81,7 +81,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Tape Image Start | Tape (default): the tape image plays from its first program, loaded as usual (`L`, `C` at the IPL menu, and so on). Direct: when an image is mounted, its first program goes straight into memory and starts, as Load Direct does, and the tape is left at the second program. A loader then reads the rest from the tape (Exolon, Knight Lore), and a BASIC tape starts BASIC with the program ready for `LOAD`. Not on the MZ-80B/2000. |
 | Tape Messages | On (default): for three seconds after the tape image moves, a line at the bottom of the picture says where it is, for example `TAPE 2/5 EXOLON` (the program now ready to play, out of five on the tape), `TAPE 6/5 END`, `TAPE SAVED 6 MYPROG` or `TAPE FULL`. |
 | Tape Details | Off (default). On: when a program is ready to play (on mounting, and after each load moves the tape on), the box shows its header for five seconds, as the old core's Tape Details page did: name, type (`01 MACHINE CODE`, `02`/`05 BASIC`, `03 DATA`), size, load and exec addresses, and `NOT A MACHINE CODE PROGRAM` for anything Load Direct can't start. Works with Tape Messages Off. |
-| Show Tape Details | Shows the details of the program at the tape position for five seconds (closes the OSD), whatever the two options above say. |
+| Show Tape Details | Shows the details of the program at the tape position for five seconds (closes the OSD), whatever the two options above say. **Scroll Lock** does the same without opening the OSD (no Sharp key uses it). |
 | Auto Load Tape | Off (default). On: after a tape image is mounted, the core types the load command for you about two seconds after its first program is ready (and after any reset): `LOAD` on the MZ-80K/C/1200, `L` on the MZ-80A and MZ-700, `C` at the MZ-800 and MZ-1500 IPL menu. The MZ-80B/2000 IPL loads the tape by itself. Off with Tape Image Start: Direct, which starts the first program itself. |
 | Tape Buttons | Auto (play or record as the machine needs), Off, Play, Record. |
 | Fast Tape | Run the CPU (and the tape) faster while the tape is moving. Fastest (default) is the most the core can do (about 35 MHz); 2x to 16x are slower steps; Off is real speed, for the few programs whose loaders count time while the tape runs. |
@@ -90,7 +90,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | Load Direct Start | Program (default): after Load Direct to RAM the machine boots for about 1.5 s, then the core puts back what the load wrote to 10F0-11FF (the boot uses that area), sets the memory map and jumps to the exec address with SP at 10F0, as after a tape load. Only machine-code files (MZF type 01) are started; BASIC programs and data just reset. Reset Only: just reset, then start it yourself with `J` and the exec address in the monitor; the MZF header is in RAM at 10F0 as after a tape load (load address at 10F0+20, exec at 10F0+22, low byte first). The MZ-80B and MZ-2000 always reset only. |
 
 **Using the tape image, step by step.**
-1. Pick the model in the OSD (Machine page), then on the Tape page mount the `.mzt` or `.mzf` as **Tape Image**. The cassette is now in the deck, at its first program. (With Tape Messages on you see `TAPE 1/3 NAME`; with Tape Details on, the program's header.)
+1. Pick the model in the OSD (Machine page), then mount the `.mzt` or `.mzf` as **Tape Image** on the OSD's first page. The cassette is now in the deck, at its first program. (With Tape Messages on you see `TAPE 1/3 NAME`; with Tape Details on, the program's header.)
 2. Load it as on the real machine: `L` Return at the MZ-700/MZ-80A monitor, `LOAD` Return on the MZ-80K/C/1200, `C` at the MZ-800/MZ-1500 IPL menu; the MZ-80B/2000 IPL loads it by itself. Or turn on **Auto Load Tape** and the core types it for you.
 3. When the machine has read a program and stopped the tape, the tape moves on: the next program is ready (`TAPE 2/3 NAME`). A loader that reads several parts gets them in order; a BASIC tape with programs after it is used by typing `LOAD` Return in BASIC for the next one.
 4. To start again from the first program, use **Rewind Tape Image** (or mount the image again). On the MZ-80B/2000 the deck's own fast forward, rewind and eject work too.
@@ -111,16 +111,6 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 | MZ-800 RAM Disk | A 64 KB RAM disk board (ports EA/EB, F8-FA), for CP/M's RAM drive. Its contents are lost at power off. |
 
 Writes go back to the image; mount a copy if you want to keep the original.
-
-### Display
-
-| Option | Description |
-| ------ | ----------- |
-| Display Type | Default follows the model (MZ-700/800 colour 40x25, MZ-80B/2000 mono 80x25, others mono 40x25). |
-| Scandoubler Fx | None (native 15 kHz), HQ2x or CRT scanlines 25/50/75%: doubles the picture to 31 kHz for VGA monitors. MiSTer.ini `forced_scandoubler=1` doubles it too. |
-| MZ-800 Border | Show the MZ-800 border colour around the picture (464 x 288 instead of 320 x 200). |
-| VRAM Wait | On (default): the original wait states when the CPU accesses video RAM while the screen is drawn. On the MZ-700 and MZ-1500 the CPU gets video RAM only in a short window at the start of each line's blanking (80 CPU clocks of 227 on PAL, 60 of 228 on NTSC), on every line, as the real GDG and Takeda's EmuZ-700/1500 do; so games that write the screen a lot run at their original speed (Tiny Xevious ran far too fast without it); Off: no waits (faster). MZ-700 and MZ-1500 only. |
-| Aspect ratio | Original, full screen, or the custom ratios from `MiSTer.ini`. |
 
 ### ROM and RAM
 
@@ -147,6 +137,16 @@ of `combined_mrom.rom` and load that. (Before 2026-10-17 a single monitor always
 For other models, or the 80-column monitor, make a full image with the monitor at that model's offset and load it
 instead: `tools/make_monitor_rom.py mz80c monitor.rom out.rom [--80col]` (MZ-80K, 80C, 1200, 80A and 700; the
 offsets are listed in the script).
+
+### Display
+
+| Option | Description |
+| ------ | ----------- |
+| Display Type | Default follows the model (MZ-700/800 colour 40x25, MZ-80B/2000 mono 80x25, others mono 40x25). |
+| Scandoubler Fx | None (native 15 kHz), HQ2x or CRT scanlines 25/50/75%: doubles the picture to 31 kHz for VGA monitors. MiSTer.ini `forced_scandoubler=1` doubles it too. |
+| MZ-800 Border | Show the MZ-800 border colour around the picture (464 x 288 instead of 320 x 200). |
+| VRAM Wait | On (default): the original wait states when the CPU accesses video RAM while the screen is drawn. On the MZ-700 and MZ-1500 the CPU gets video RAM only in a short window at the start of each line's blanking (80 CPU clocks of 227 on PAL, 60 of 228 on NTSC), on every line, as the real GDG and Takeda's EmuZ-700/1500 do; so games that write the screen a lot run at their original speed (Tiny Xevious ran far too fast without it); Off: no waits (faster). MZ-700 and MZ-1500 only. |
+| Aspect ratio | Original, full screen, or the custom ratios from `MiSTer.ini`. |
 
 ### Printer
 
