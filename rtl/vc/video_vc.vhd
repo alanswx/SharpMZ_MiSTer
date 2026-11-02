@@ -103,6 +103,7 @@ architecture rtl of video_vc is
     constant V2_NORMAL80     : natural := 17;
     constant V2_COLOUR       : natural := 18;
     constant V2_COLOUR80     : natural := 19;
+    constant V2_SPLIT80      : natural := 14;
     constant V2_OPT_GRAMI    : natural := 43;
     constant V2_OPT_GRAMII   : natural := 44;
     constant V2_OPT_GRAMIII  : natural := 45;
@@ -185,6 +186,7 @@ begin
         V2_CONFIG(V2_NORMAL80)    <= CONFIG(NORMAL80);
         V2_CONFIG(V2_COLOUR)      <= CONFIG(COLOUR);
         V2_CONFIG(V2_COLOUR80)    <= CONFIG(COLOUR80);
+        V2_CONFIG(V2_SPLIT80)     <= CONFIG(SPLIT80);
         -- Graphics options fitted on every machine that has them.
         V2_CONFIG(V2_OPT_GRAMI)   <= '1';
         V2_CONFIG(V2_OPT_GRAMII)  <= '1';

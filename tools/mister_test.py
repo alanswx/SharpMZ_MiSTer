@@ -312,6 +312,11 @@ test('F07', 'MZ80K', 'MZ-80K floppy: SAVE a BASIC line to disk, NEW, LOAD it bac
 test('F08', 'MZ80K', 'MZ-80K floppy: Antc06 boots its game (Wave 1 instructions)',
      files=[('s', 1, f'{K80D88}/Antc06.d88')], opts=[PC_KEYS], reset=True,
      steps=[('wait', 3), ('pctype', 'GOTO$F000\n'), ('wait', 2), ('pctype', '\n'), ('wait', 10), ('shot', 'game')])
+# OSD MZ-80K 80-Col Board: the 80-column board of Crystal Research's CP/M 2.23 (E014 selects 80 columns, odd columns at
+# D400). The CP/M disks need the MZ-1200 (they read E00C, the memory swap); Cpm01 starts dBASE II after the banner.
+test('F09', 'MZ1200', 'MZ-80K 80-column board: CP/M 2.23 boots in 80 columns, dBASE II',
+     files=[('s', 1, f'{K80D88}/Cpm01.d88')], opts=[PC_KEYS, osd('MZ-80K 80-Col Board=On (CP/M)')[0]], reset=True,
+     steps=[('wait', 3), ('pctype', 'GOTO$F000\n'), ('wait', 2), ('pctype', '\n'), ('wait', 25), ('shot', 'cpm')])
 
 # OSD Keyboard Layout: PC. Every punctuation key, typed as on a US PC keyboard, shows its own character
 # (characters the model doesn't have type nothing; tools/keymap_measure.py --verify checks the same in the sim).

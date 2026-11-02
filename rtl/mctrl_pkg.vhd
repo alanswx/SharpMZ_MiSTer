@@ -15,7 +15,7 @@ package mctrl_pkg is
 
     -- Config Bus
     --
-    subtype  CONFIG_WIDTH is integer range 73 downto 0;
+    subtype  CONFIG_WIDTH is integer range 74 downto 0;
 
 
     -- Mode signals indicating type of machine we are emulating.
@@ -78,6 +78,7 @@ package mctrl_pkg is
     constant MZ800_MODE      : integer := 71;
     constant IS_MZ1500       : integer := 72;                            -- MZ-1500: an MZ-700 (CONFIG(MZ700) set) with PCG, palette, 2 PSGs, PIO, QD.
     constant REGION_JAPAN    : integer := 73;                            -- Japanese MZ-700 (OSD Region: Japan): its CG, monitor 1Z-009B, 60 Hz.
+    constant SPLIT80         : integer := 74;                            -- MZ-80K/80C/1200 80-column board (OSD): E014/E018 select 80/40, even columns at D000, odd at D400.
 
     -- CMT Bus
     --

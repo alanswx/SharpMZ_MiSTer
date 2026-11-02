@@ -120,6 +120,7 @@ localparam CONF_STR =
 	"P4FC6,ROMBIN,Load CGROM;",
 	"P3,Display;",
 	"P3O[8:7],Display Type,Default,Mono 80x25,Colour 40x25,Colour 80x25;",
+	"P3O[60],MZ-80K 80-Col Board,Off,On (CP/M);",
 	"P3O[18],VRAM Wait,On,Off;",
 	"P3O[43],MZ-800 Border,Off,On;",
 	"P3O[46:44],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
