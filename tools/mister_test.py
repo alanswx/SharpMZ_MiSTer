@@ -295,6 +295,24 @@ test('F02', 'MZ80A', 'MZ-80A floppy: F, Return boots SA-6510 Disk BASIC from dri
      files=[('s', 1, f'{SW}/idealine/mz-80a/SA-6510bootdisk/SA-6510.DSK')], reset=True,
      steps=[('wait', 4), ('type', 'F\n'), ('wait', 2), ('type', '\n'), ('wait', 12), ('shot', 'basic')])
 
+# MZ-80K floppy (MZ-80FIO, T3444M): GOTO$F000 runs the interface ROM, Return boots drive 1. Disks from the user's
+# MZ-80K archive (software/mz80k-disks), made FM D88 by tools/edsk2d88.py; CSCP shows the same screens.
+K80D88 = os.path.join(SW, 'mz80k-disks/d88')
+test('F06', 'MZ80K', 'MZ-80K floppy: Replenished BASIC boots; DIR, LOAD "LOTTO", LIST',
+     files=[('s', 1, f'{K80D88}/Dsk14.d88')], opts=[PC_KEYS], reset=True,
+     steps=[('wait', 3), ('pctype', 'GOTO$F000\n'), ('wait', 2), ('pctype', '\n'), ('wait', 8), ('shot', 'basic'),
+            ('pctype', 'DIR\n'), ('wait', 4), ('shot', 'dir'), ('pctype', 'LOAD "LOTTO"\n'), ('wait', 6),
+            ('pctype', 'LIST\n'), ('wait', 3), ('shot', 'list')])
+test('F07', 'MZ80K', 'MZ-80K floppy: SAVE a BASIC line to disk, NEW, LOAD it back, DIR',
+     files=[('s', 1, f'{K80D88}/Dsk14.d88')], opts=[PC_KEYS], reset=True,
+     steps=[('wait', 3), ('pctype', 'GOTO$F000\n'), ('wait', 2), ('pctype', '\n'), ('wait', 8),
+            ('pctype', '10 PRINT "HELLO"\n'), ('wait', 1), ('pctype', 'SAVE "T1"\n'), ('wait', 6), ('pctype', 'NEW\n'),
+            ('wait', 1), ('pctype', 'LOAD "T1"\n'), ('wait', 6), ('pctype', 'LIST\n'), ('wait', 1), ('pctype', 'DIR\n'),
+            ('wait', 4), ('shot', 'saved')])
+test('F08', 'MZ80K', 'MZ-80K floppy: Antc06 boots its game (Wave 1 instructions)',
+     files=[('s', 1, f'{K80D88}/Antc06.d88')], opts=[PC_KEYS], reset=True,
+     steps=[('wait', 3), ('pctype', 'GOTO$F000\n'), ('wait', 2), ('pctype', '\n'), ('wait', 10), ('shot', 'game')])
+
 # OSD Keyboard Layout: PC. Every punctuation key, typed as on a US PC keyboard, shows its own character
 # (characters the model doesn't have type nothing; tools/keymap_measure.py --verify checks the same in the sim).
 PCTEXT = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'

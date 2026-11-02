@@ -6,6 +6,8 @@ Run after romtool (build_meminitfiles.sh).
   combined_mrom  0x10800: the MZ-700 FDC ROM banks (F000-FFFF): the MZ-1E05 floppy interface ROM.
   combined_mrom  0x0D000: the MZ-80A FDC ROM banks (F000-F7FF): its floppy interface ROM (MZ80A_FDIF.rom, idealine.info
                           mz-80a/80afdif; FDC at D8-DD as the MZ-700's).
+  combined_mrom  0x02800, 0x06000, 0x09800: the MZ-80K, MZ-80C and MZ-1200 FDC ROM banks (F000-F7FF): the MZ-80FIO
+                          interface ROM (MZ80K_FDIF.rom, 1 KB at F000; idealine.info mz-80k/mz80kfdif).
   combined_mrom  0x17800: the MZ-2000 IPL banks (40 and 80 column): MZ2000_IPL.rom (MAME mz20ipl.bin, CRC d7ccf37f).
   combined_mrom  0x11800: MZ-1500 9Z-502M monitor (banks 23h/24h) and E800/F000/F800 (27h-29h), the old MZ-800 slots;
                           ROMs from mz800emu (ROM_MZ1500_0000/E000).
@@ -53,6 +55,11 @@ patch("combined_mrom", 0x21 * 0x800, fd700)
 fd80a = read("MZ80A_FDIF.rom")
 assert len(fd80a) == 0x800
 patch("combined_mrom", 0x1A * 0x800, fd80a)
+# MROM_BANK "000101" / "001100" / "010011" = MZ-80K / MZ-80C / MZ-1200 F000-F7FF: the MZ-80FIO ROM, then FF.
+fd80k = read("MZ80K_FDIF.rom")
+assert len(fd80k) == 0x400
+for bank in (0x05, 0x0C, 0x13):
+    patch("combined_mrom", bank * 0x800, fd80k + bytes([0xFF] * 0x400))
 # MROM_BANK "101111"/"110000" = MZ-2000 IPL, 40/80 column.
 ipl2000 = read("MZ2000_IPL.rom")
 assert len(ipl2000) == 0x800

@@ -191,7 +191,7 @@ wire [1:0] cfg_tape_buttons = mz_tape_buttons(status[25:24]);
 wire [2:0] cfg_fast_tape = mz_fast_tape(status[23:21]);
 wire [7:0] cfg_userrom = (status[28] | cfg_mz1500) ? (8'd1 << cfg_model) : 8'd0;  // MZ-1500: E800-EFFF is always ROM
 wire       fdc_present;
-wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & (cfg_model == 3'b100 | cfg_model == 3'b011))) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700 / MZ-80A: the interface brings its ROM at F000 (MZ-1E05 / the MZ-80A interface ROM; the MZ-1500 has its own F000 ROM)
+wire [7:0] cfg_fdcrom  = (status[29] | cfg_mz1500 | (fdc_present & (cfg_model == 3'b100 | cfg_model <= 3'b011))) ? (8'd1 << cfg_model) : 8'd0;  // MZ-700, MZ-80A, MZ-80K/80C/1200: the interface brings its ROM at F000 (MZ-1E05, the MZ-80A interface ROM, the MZ-80FIO's MZ80K_FDIF; the MZ-1500 has its own F000 ROM)
 
 wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, ~status[18] & (cfg_model == 3'd4), 1'b0, 1'b0, 1'b0, cfg_display};  // VRAM Wait (default On): the MZ-700/1500 GDG wait. Off on the other models, as before (the MZ-800's graphics wait, the MZ-80A's one-cycle wait).  // PCG is software controlled (E010-E012).
@@ -580,7 +580,7 @@ wire [3:0] mz800_bcol;
 wire [7:0] main_leds;
 
 // Floppy disk interface (MZ-700/MZ-800), drives A/B on image slots S1/S2.
-wire [7:0] ext_io_addr, ext_io_dout, ext_io_din;
+wire [7:0] ext_io_addr, ext_io_addr_hi, ext_io_dout, ext_io_din;
 wire       ext_io_rd, ext_io_wr, ext_io_oe, ext_int_n, ext_ce_cpu;
 wire       fdd_busy;
 wire       fdc_wait;                                // MZ-80A floppy interface: CPU WAIT at F3FE (mz_fdc)
@@ -592,12 +592,14 @@ mz_fdc mz_fdc
 	.clk_sys(clk_sys),
 	.reset(reset | warm_reset_user),            // the machine's reset line resets the interface too (the mounted images stay)
 	.ce_cpu(ext_ce_cpu),
-	.model_ok(cfg_model[2] | cfg_model == 3'b011), // MZ-700, MZ-800, MZ-80B, MZ-2000 and the MZ-80A (same FDC ports)
+	.model_ok(1'b1),                            // every model: MZ-700/800/80B/2000 and the MZ-80A at D8-DF, MZ-80K/80C/1200 at F8-FB
+	.k_mode(cfg_model < 3'd3),                  // MZ-80K, MZ-80C, MZ-1200: the MZ-80FIO interface
 	.mode(status[34:33]),
 	.crc_report(status[42]),
 	.b_unit2(status[48]),
 
 	.io_addr(ext_io_addr),
+	.io_addr_hi(ext_io_addr_hi),
 	.io_rd(ext_io_rd),
 	.io_wr(ext_io_wr),
 	.io_dout(ext_io_dout),
@@ -734,6 +736,7 @@ sharpmz core
 	.CMT_DEBUG(cmt_debug),                                // for the simulation (unused here)
 	.TAPE_CLEAR((img_mounted[0] & ~|img_size) | media_eject),   // tape removed (or model changed): the CMT drops its record
 	.EXT_IO_ADDR(ext_io_addr),
+	.EXT_IO_ADDR_HI(ext_io_addr_hi),
 	.EXT_IO_RD(ext_io_rd),
 	.EXT_IO_WR(ext_io_wr),
 	.EXT_IO_DOUT(ext_io_dout),

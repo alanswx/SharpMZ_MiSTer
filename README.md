@@ -4,7 +4,7 @@ A hardware emulation of the Sharp MZ series personal and business computers, ori
 
 | Model  | Status | Model  | Status |
 | ------ | ------ | ------ | ------ |
-| MZ-80K | Working | MZ-80C | Working |
+| MZ-80K | Working, with floppy (MZ-80FIO), tested on hardware | MZ-80C | Working |
 | MZ-1200 | Working (the Japanese MZ-80A: monitor SP-1002 and the Japanese MZ-80K's katakana character set, as its owner's manual lists; keys fixed 2026-10-11) | MZ-80A | Working |
 | MZ-700 | Working | MZ-80B | Working: IPL boots tape and floppy (BASIC, CP/M) |
 | MZ-2000 | Working: IPL, tape and floppy, colour graphics, katakana | MZ-800 | Working (IPL, graphics, PSG, tape, floppy, CP/M), tested on hardware |
@@ -18,7 +18,7 @@ How it compares with the original v2 core, NibblesLab's DE0 cores, mz800emu and 
 * Native video timing, 15.6 kHz (European MZ-700/800 50 Hz PAL; the MZ-1500, the Japanese MZ-700 and the others 60 Hz), scaled by the MiSTer framework for HDMI; analog output gets the native 15 kHz signal, or 31 kHz through the scandoubler (HQ2x, scanlines) for VGA monitors.
 * 40x25 and 80x25, mono and colour character modes; programmable character generator (PCG): the MZ-700's HAL PCG-700 (E010-E012; programs switch it on), the MZ-1500's PCG; MZ-80B/2000 graphics RAM.
 * MZ-800: IPL and 9Z-504M monitor, MZ-700 and MZ-800 modes with the MZ-800 memory map, all 320x200/640x200 graphics modes with hardware scroll, the SN76489 sound chip and the Z80 PIO.
-* Floppy disk (MB8876 interface on the MZ-700, MZ-800, MZ-80B and MZ-2000): two drives from Extended DSK (`.dsk`) or D88/D77 images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks; the MZ-80B/2000 IPL boots Disk BASIC, CP/M and TF-DOS.
+* Floppy disk (MB8876 interface on the MZ-700, MZ-800, MZ-80A, MZ-80B and MZ-2000; the MZ-80FIO interface on the MZ-80K, MZ-80C and MZ-1200): two drives from Extended DSK (`.dsk`) or D88/D77 images. The MZ-800 IPL boots CP/M 1.x, 2.3 and 4.1 disks; the MZ-80B/2000 IPL boots Disk BASIC, CP/M and TF-DOS; the MZ-80K boots its DOS and BASIC disks.
 * 8253 sound or the tape signal on the audio output.
 * Joysticks: the MZ-800's ports and the MZ-1X03 joysticks of the MZ-700/1500.
 * Cassette: MZF loading onto the virtual tape or straight into RAM, and a **Tape Image** slot that loads multi-program tapes and **saves** programs written with SAVE. MZ-80B/2000 load from the tape image under IPL control (deck commands and APSS seek). Fast tape up to 32x.
@@ -103,7 +103,7 @@ A tape is either a single `.mzf` file (a 128-byte header followed by the program
 
 | Option | Description |
 | ------ | ----------- |
-| Floppy Drive A / B | Mount an Extended DSK or D88/D77 image (up to 2 MB: 720 KB CP/M disks and 1.44 MB HD disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80A, MZ-80B and MZ-2000. On the MZ-80A type `F` at the monitor and Return for drive 1 (the interface ROM boots, for example, SA-6510 Disk BASIC). |
+| Floppy Drive A / B | Mount an Extended DSK or D88/D77 image (up to 2 MB: 720 KB CP/M disks and 1.44 MB HD disks). With a disk in drive A, the MZ-800 and MZ-80B IPLs boot it at reset; on the MZ-700 type `J F000` at the monitor (the interface brings its MZ-1E05 ROM). The interface is available on the MZ-700, MZ-800, MZ-80A, MZ-80B and MZ-2000. On the MZ-80A type `F` at the monitor and Return for drive 1 (the interface ROM boots, for example, SA-6510 Disk BASIC). On the MZ-80K, MZ-80C and MZ-1200 type `GOTO$F000` at the monitor and Return at BOOT DRIVE ? for drive 1 (see the MZ-80K disks note below). |
 | Quick Disk | Mount a Quick Disk image: a raw dump (`.qdf`) or mz800emu's `.mzq`. Built into the MZ-1500 (press `Q` at the IPL menu); on the MZ-800 it appears while an image is mounted. Writes (BASIC `INIT "QD:"`, `SAVE`) go back to the image, which must be full size: make a blank one with `tools/make_blank_qd.py`. A tape (`.mzt` or `.mzf`) can be mounted here too: each of its programs becomes a file on the disk (read only). Many MZ-1500 Quick Disk titles survive only as tapes: mount their side B (or the program) here. For a BASIC program, boot MZ-5Z001 BASIC from its disk or tape, then mount the program's tape here and `LOAD` it. The tape message starts `QD:` (instead of `TAPE`) for such a program when it is mounted as a tape on the MZ-1500. |
 | Floppy Interface | Auto (present only while a disk is mounted, so the IPL doesn't stop at "Make ready FD"), On or Off. |
 | Floppy CRC Errors | Ignore (default): sectors the disk image marks as read with a CRC error are read as good, which suits most dumps. Report: the drive reports CRC ERROR for them, for software that checks (copy protection). |
@@ -161,7 +161,8 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 
 * MZ-2000: the character ROM is MAME's `font.bin`, which was rebuilt by hand from bitmaps (MAME marks it a bad dump); a few katakana glyphs may differ from the real IX0286PA ROM.
 * MZ-800: checked in simulation against the mz800emu emulator, still being tested on hardware. The border colour is an option (Display > MZ-800 Border). Joysticks work in Knight Lore and Exolon in simulation; the RAM disk is new. Load Direct starts the program as mz800emu's direct load does, so programs that start in or read their MZF header at 10F0 (Exploding Fist, Jumpin' Jack, Solomon's Key) work (`docs/triage.md`).
-* Floppy: the MZ-80K floppy interface isn't implemented (the MZ-80A's is). 1.44 MB images work as CP/M 4.1's HD drive C: (Drive B Unit: 3rd), read and write, on hardware. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
+* MZ-80K disks: the MZ-80FIO interface (Toshiba T3444M controller, ports F8-FB, its 1 KB boot ROM at F000) reads single-density disks of 35 or 40 tracks, 2 sides, 16 sectors of 128 bytes. The MZ-80K disk images that circulate were read with CPDRead into Extended DSK files that don't say they are single density and have a wrong track size table; convert them with `tools/edsk2d88.py IN.dsk OUT.d88` and mount the D88. Tested on hardware: Replenished BASIC (DIR, LOAD, SAVE), BAKER-QUICK-DOS 2.5 and a game boot and read as in CSCP (Takeda's emulator). Formatting (Write ID) is untested.
+* Floppy: 1.44 MB images work as CP/M 4.1's HD drive C: (Drive B Unit: 3rd), read and write, on hardware. Writing works (CP/M SAVE on hardware); drive B and writes at turbo speeds are untested.
 * The author's framebuffer graphics extension (bitmap graphics for the MZ-700/80A) isn't available in this version.
 * The MZ-80B/2000 have had little testing beyond a handful of tapes and disks (see `TODO.md`).
 * Many MZ-1500 Quick Disk titles are archived as two tape images (side A a "DATA" loader that asks for side B). Side A loads from the tape image; when it asks for side B ("SET PROGRAM QD ?"), mount side B's `.mzt` as the Quick Disk and answer `Y`. (`tools/mzf2qdf.py OUT.qdf SIDE.mzt` still makes a real Quick Disk image of a tape, the same disk the core shows.) `tools/qdinfo.py` lists a Quick Disk image's files and checks their CRCs.
@@ -175,7 +176,7 @@ The MZ-700 printer port is I/O FE/FF and the MZ-800/1500 one the Z80 PIO (port B
 * **Standard MiSTer framework.** The `sys/` folder is stock Template_MiSTer, the OSD is a normal configuration string, and files come in through the standard ioctl and image-slot interfaces. Main_MiSTer's old Sharp MZ driver isn't used.
 * **Video** is the author's v2 VideoController from the [tranZPUter](https://git.eaw.app/eaw/tranZPUter) project, moved onto the core clock (`rtl/vc/`).
 * **Tape images** are handled in the FPGA by `rtl/tape_image.sv`, which moves programs between the image and the core's cassette buffer. The 64 KB tape data buffer is in the DE10-Nano's DDR3 (`rtl/tape_ddr.sv`, the MiSTer DDRAM port), which leaves block RAM for the floppy sector tables; no SDRAM board is needed.
-* **Floppy** is `rtl/mz_fdc.sv`: the Sharp interface around Sorgelig's `wd1793.sv` (from the FM-7 core), reading DSK images through the image slots.
+* **Floppy** is `rtl/mz_fdc.sv`: the Sharp interface around Sorgelig's `wd1793.sv` (from the FM-7 core), reading DSK and D88 images through the image slots. On the MZ-80K family a T3444M command sequencer in the same module drives the `wd1793` (restore, seek, read and write sector, the next sector until TND).
 * More detail in `docs/design.md`.
 
 ## Building and Simulation
