@@ -60,6 +60,13 @@ Design notes are in `docs/design.md`, and the simulation and tests in `verilator
     and now has the Japanese CG (MAME 80kcgj.rom, CRC 7767f11e, `MZ1200_CGROM.rom`; `releases/SharpMZ_20261026.rbf`, tester zip `out/SharpMZ_20261026_testers.zip`,
     checked in the sim and on mister126). Left as the MZ-80A's (as Takeda's CSCP has them): the hblank VRAM wait and
     E008 bit 7, 2 KB VRAM (the manual says 1 KB; SP-1002 uses 1 KB).
+  - EeDee (2026-10-31): Space Cruiser (MZ-2000) keys 4 and 6 didn't steer: it reads the keypad (row 2) and Keyboard
+    Layout PC put the PC keypad on the main-row digits; now the keypad stays on the machine's keypad on the
+    MZ-80A/80B/2000 (sim: MZ-80A PC layout types 450 from the keypad; the game itself not run). OSD top blank line
+    removed. `releases/SharpMZ_20261101.rbf`, tester zip `out/SharpMZ_20261101_testers.zip` (asks EeDee about Door
+    Door). Open: Door Door MkII (MZ-1500) "music note holds at Game Over": the game plays on the PSG at F2 and
+    re-arms 8253 counter 0 (mode 0, E008=1) from its interrupt; not reproduced (RTL sim too slow to reach Game Over;
+    CSP falls back to the IPL menu at the game's "turn the QD over" prompt).
 - **Hardware hosts:** mister126 is the test MiSTer (if ssh refuses the key: remount `/` rw, append
   `~/.ssh/id_ed25519_mister.pub` to `/root/.ssh/authorized_keys`, remount ro). mister14 runs someone's custom Main
   (`games/DoradoRTL/...`); a `mister_test` run there restarts the stock Main, so ask first. L18 (Auto Load) missed
