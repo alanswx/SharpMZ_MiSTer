@@ -78,7 +78,6 @@ assign BUTTONS = 0;
 localparam CONF_STR =
 {
 	"SharpMZ;UART9600:19200:38400:4800:2400:1200;",
-	"-;",
 	// Tape and disk entries stay on the top level: MGL files can only load F/S entries that are
 	// not on a sub-page.
 	"F2,MZF,Load Direct to RAM;",
