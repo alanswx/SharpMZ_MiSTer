@@ -321,6 +321,14 @@ Working well for testers: Snake & Snake (MZ-700), Donkey Gorilla in play, MZ-80K
 - [x] Tape position on screen (OSD Tape Messages, on by default): `rtl/tape_osd.sv` draws a line at the bottom of the picture for 150 frames when the tape image has a record ready (`TAPE 2/5 NAME`), reaches the end, saves or is full, in the MZ-700's characters (`tools/make_osd_font.py`). MiSTer's info popups (CONF_STR `I,`) only show fixed strings, so they can't name the program. On hardware: TAPE 1/2 S-BASIC on mounting, TAPE 2/2 R.P.S. once BASIC is in (L16). The first message comes a few seconds after the core starts, when the record has loaded.
 - [x] MZ-80A floppy: its interface has the FDC at D8-DD as the MZ-700's, so mz_fdc now runs on the MZ-80A with its interface ROM at F000 (MZ80A_FDIF.rom, banks 1Ah-1Bh, `tools/patch_roms.py`). The ROM doesn't poll: its INI loop runs through an opcode fetch at F3FE (F7FE), and the interface holds the CPU in WAIT there while a command runs and no byte is ready (`mz_fdc` wait_req, `sharpmz.vhd`). `F` at the monitor, Return: SA-6510 Disk BASIC boots (sim test fdd_mz80a; hardware F02).
 - [ ] MZ-80K floppy: a different interface (ports F8-FA, motor by IN (C), DRDY/CRDY/RQM flags; ROM and source in `software/idealine/mz-80k/mz80kfdif`), so it needs its own controller model. The old core never had it either.
+  - Disks (2026-11-02): `software/mz80k-disks/` (80k_01..10 zips from the user: 76 CPDRead EDSK images, 35/40
+    tracks, 2 sides, 16 x 128-byte FM sectors, IDs 1-16, side 1 IDs say head 0; some sectors unread). The EDSK
+    files don't mark FM and their track size table is wrong (1100h for 900h); `tools/edsk2d88.py` writes FM D88s
+    (`software/mz80k-disks/d88/`). CSP (`mz80k`, MZ-80FIO + T3444M, ROMs SP1002 / MZ80K_cgrom / MZ80K_FDIF as
+    IPL/FONT/FDIF.ROM, `GOTO$F000`, Return) boots Antc06 (German game), Dsk01/02/15 (BAKER-QUICK-DOS 2.5),
+    Dsk08 (VOL.MASTER menu), Dsk14 (Replenished BASIC). The Cpm disks read E00C (MZ-1200/80A swap) and boot on CSP's
+    mz1200, but every second character is lost (an 80-column card?). Reference model: CSP `src/vm/t3444a.cpp`,
+    `src/vm/mz80k/mz80fio.cpp`. `80k_10/80K_FD_DISASS.rom` is a 4 KB ROM starting like MZ80K_FDIF (not used yet).
 - [ ] Load real tapes through MiSTer's audio input (upstream issue #7): the core leaves ADC_BUS unused; other cores feed the ADC's tape signal (sys/ltc2308) into their cassette input. Feed it to the CMT read bit.
 - Already done in the release (the tester had an older build): OSD Reset works (fixed in 20261009b); floppies work on the MZ-700 (`J F000`), MZ-800, MZ-80B and MZ-2000 (mount, then reset).
 
