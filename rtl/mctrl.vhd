@@ -106,7 +106,7 @@ begin
     process (COLD_RESET, CLKBUS(CKMASTER))
     begin
         if COLD_RESET = '1' then
-            CONFIG(CONFIG_WIDTH) <= "000000000000000000000000000000000000011000000000000000000000011001000001000";
+            CONFIG(CONFIG_WIDTH) <= "0000000000000000000000000000000000000011000000000000000000000011001000001000";
             DEBUG(DEBUG_WIDTH)   <= "0000000000000000";
 
         elsif CLKBUS(CKMASTER)'event and CLKBUS(CKMASTER)='1' then
@@ -434,6 +434,11 @@ begin
                     CONFIG(SPLIT80) <= REGISTER_DISPLAY3(5);
                 else
                     CONFIG(SPLIT80) <= '0';
+                end if;
+                if REGISTER_MODEL(2 downto 0) = "010" then
+                    CONFIG(MZ1200_JAPAN) <= REGISTER_DISPLAY3(4);
+                else
+                    CONFIG(MZ1200_JAPAN) <= '0';
                 end if;
                 if REGISTER_MODEL(2 downto 0) = "100" then
                     CONFIG(IS_MZ1500) <= REGISTER_DISPLAY3(3);

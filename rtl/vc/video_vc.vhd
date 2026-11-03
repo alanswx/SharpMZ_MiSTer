@@ -205,8 +205,8 @@ begin
     -- Character generator ROM bank (layout of rtl/software/mif/combined_cgrom.mif).
     CG_BANK <= "0000" when CONFIG(MZ80K)  = '1' else
                "0001" when CONFIG(MZ80C)  = '1' else
-               "0010" when CONFIG(MZ1200) = '1' else
-               "0011" when CONFIG(MZ80A)  = '1' else
+               "0010" when CONFIG(MZ1200) = '1' and CONFIG(MZ1200_JAPAN) = '1' else   -- MZ-1200: Japanese CG (Region: Japan),
+               "0011" when CONFIG(MZ1200) = '1' or CONFIG(MZ80A) = '1' else          -- else the European one, the MZ-80A's
                "1010" when CONFIG(IS_MZ1500) = '1' or CONFIG(REGION_JAPAN) = '1' else   -- before MZ700: the MZ-1500 also sets it;
                                                                                      -- the Japanese MZ-700 has the MZ-1500's CG (MAME mz700fon.jpn)
                "0100" when CONFIG(MZ700)  = '1' else

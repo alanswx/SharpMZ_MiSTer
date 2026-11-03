@@ -197,7 +197,8 @@ wire [7:0] cfg_reg0_model   = {5'd0, cfg_model};
 wire [7:0] cfg_reg1_display = {1'b0, ~status[18] & (cfg_model == 3'd4), 1'b0, 1'b0, 1'b0, cfg_display};  // VRAM Wait (default On): the MZ-700/1500 GDG wait. Off on the other models, as before (the MZ-800's graphics wait, the MZ-80A's one-cycle wait).  // PCG is software controlled (E010-E012).
 wire [7:0] cfg_reg2_display = 8'd3;                    // Native timing (the video is native-only).
 wire       cfg_japan = status[56] & (cfg_model == 3'b100) & ~cfg_mz1500;   // OSD Region: Japan (MZ-700: Japanese CG, monitor 1Z-009B, 60 Hz)
-wire [7:0] cfg_reg3_display = {2'd0, status[60], cfg_japan, cfg_mz1500, status[32], 2'b00};   // 5: MZ-80K/80C/1200 80-column board (E014/E018, split D000/D400). 4: Japanese MZ-700. 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
+wire       cfg_japan_1200 = status[56] & (cfg_model == 3'd2);                 // OSD Region: Japan on the MZ-1200: its Japanese CG (Europe: the MZ-80A's)
+wire [7:0] cfg_reg3_display = {2'd0, status[60], cfg_japan | cfg_japan_1200, cfg_mz1500, status[32], 2'b00};   // 5: MZ-80K/80C/1200 80-column board (E014/E018, split D000/D400). 4: Japanese MZ-700 or MZ-1200 CG. 3: MZ-1500. 2: MZ-800 rear mode switch (0 = MZ-700, as mz800emu's default; 1 = MZ-800).
 // CPU Speed: Normal, 2x .. 16x, Fastest. The core's steps past a model's limit fall back to the original speed, so
 // Fastest (and the old +6/+7) is that model's last step: 64 MHz on the MZ-80K/80C/1200/80A (5), 56/64 MHz elsewhere
 // (4), both capped at clk_sys/2 (about 35 MHz).
@@ -309,7 +310,7 @@ always @(posedge clk_sys) begin
 	case (cfg_model)
 		3'd0: cg_base <= 4'd0;
 		3'd1: cg_base <= 4'd1;
-		3'd2: cg_base <= 4'd2;
+		3'd2: cg_base <= cfg_japan_1200 ? 4'd2 : 4'd3;   // MZ-1200 Europe shows the MZ-80A's CG bank
 		3'd3: cg_base <= 4'd3;
 		3'd4: begin cg_base <= (cfg_mz1500 | cfg_japan) ? 4'd10 : 4'd4; cg_area <= 13'h1000; end
 		3'd5: begin cg_base <= 4'd6; cg_area <= 13'h1000; end

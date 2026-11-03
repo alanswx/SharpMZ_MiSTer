@@ -427,7 +427,7 @@ test('P03', 'MZ700', 'MZ-700 BASIC: LIST/P, then PRINT/P "HELLO" (the sim seemed
 # MZ-5Z001 (either copy, software/mz1500 or the collection's BASIC/MZ-1500) rejects as an illegal filemode, probably a Quick
 # Disk file type kept in a tape conversion. As type 05 it loads, and stops at "Illegal data error in 150", the same in
 # mz1500emu, so the file needs another BASIC or is damaged; the core matches the emulator. Maze Land (Enix) loads three ways.
-test('Z01', 'MZ1500', 'MZ-1500: MZ-5Z001 then Zulpoko as type 05 AUTO RUN: "Illegal data error in 150", as mz1500emu',
+test('Z01', 'MZ1500', 'MZ-1500: MZ-5Z001 then Zulpoko as type 05 AUTO RUN: its title (PRESS [SPACE] KEY TO GAME START)',
      files=[('s', 0, 'gen:zulpoko')], opts=[FAST_TAPE(6)], reset=True,
      steps=[('wait', 6), ('type', 'C'), ('wait', 60), ('shot', 'run')])
 test('A01', 'MZ1500', 'MZ-1500 PSG stereo: left PSG 440 Hz, right PSG 880 Hz (HDMI audio from the capture card)',
